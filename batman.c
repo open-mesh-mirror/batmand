@@ -37,6 +37,24 @@
  
 int debug_level = 0;
 
+/* "-g" is the command line switch for the gateway class,
+ * 0 no gateway
+ * 1 modem
+ * 2 ISDN 
+ * 3 Double ISDN
+ * 3 256 KBit
+ * 5 UMTS/ 0.5 MBit
+ * 6 1 MBit
+ * 7 2 MBit	
+ * 8 3 MBit
+ * 9 5 MBit
+ * 10 6 MBit
+ * 11 >6 MBit
+ * Beware that high debugging levels eat a lot of CPU-Power
+ */
+int gateway_class = 0;
+
+
 int orginator_interval = 1000; /* orginator message interval in miliseconds */
 #define UNIDIRECTIONAL 0xF0
 #define ADDR_STR_LEN 16
