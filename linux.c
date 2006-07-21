@@ -255,8 +255,9 @@ static void handler(int sig)
 static void usage(void)
 {
 	fprintf(stderr, "Usage: batman -i interface [options]\n");
-	fprintf(stderr, "       -o orginator interval\n");
-	fprintf(stderr, "       -d debug level\n");
+	fprintf(stderr, "       -o [option] orginator interval\n");
+	fprintf(stderr, "       -d [option] debug level\n");
+	fprintf(stderr, "       -g [option] gateway class\n");
 	fprintf(stderr, "       -h this help\n");
 }
 
@@ -268,48 +269,89 @@ int main(int argc, char *argv[])
 	int optchar;
 	struct ifreq int_req;
 	char str1[16], str2[16];
+	int optchar;
+	int debug_level = 0;
+	int orginator_interval = 1100;
+	int gateway_class = 0;
+
 
 	printf("B.A.T.M.A.N-II %s\n", VERSION);
 	dev = NULL;
 
-  while ( ( optchar = getopt ( argc, argv, "dho:i:" ) ) != -1 ) {
+	while ( ( optchar = getopt ( argc, argv, "d:ho:i:" ) ) != -1 ) {
 
-          switch ( optchar ) {
+		switch ( optchar ) {
 
-                  case 'd':
-                          debug_level++;
-                          break;
+			case 'd':
+			
+			errno = 0;
+			debug_level = strtol (optarg, NULL , 10);
+		
+			if ((errno == ERANGE && (debug_level == LONG_MAX || debug_level == LONG_MIN))|| (errno != 0 && debug_level == 0)) {
+					perror("strtol");
+					exit(EXIT_FAILURE);
+			} 
+			
+			if (debug_level < 0 || debug_level > 3){
+					printf( "Invalid debug level: %i\n Debug level has to be between 0 and 3.\n", debug_level );
+					exit(EXIT_FAILURE);
+			}
 
-                  case 'o':
-                          orginator_interval = (int *)optarg;
-                          printf( "interval: %i\n", orginator_interval );
-                          break;
-                          
-                  case 'i':
-                          dev = optarg;
-                          break;
+			printf(" debug level: %i\n", debug_level);
+			break;
 
-                  case 'h':
-                  default:
-                          usage();
-                          return (0);
+			case 'o':
+			
+				errno = 0;
+				orginator_interval = strtol (optarg, NULL , 10);
+			
+				if ((errno == ERANGE && (orginator_interval == LONG_MAX || orginator_interval == LONG_MIN))	|| (errno != 0 && orginator_interval == 0)) {
+						perror("strtol");
+						exit(EXIT_FAILURE);
+				} 
+				
+				if (orginator_interval < 1){
+						printf( "Invalid orginator interval specified: %i. The Interval has to be greater than 0.\n", orginator_interval );
+						exit(EXIT_FAILURE);
+				}
+
+				
+				printf( "interval: %i\n", orginator_interval );
+				break;
+								
+			case 'g':
+			
+				errno = 0;
+				gateway_class = strtol (optarg, NULL , 10);
+					
+				if ((errno == ERANGE && (gateway_class == LONG_MAX || gateway_class == LONG_MIN))
+								|| (errno != 0 && gateway_class == 0)) {
+						perror("strtol");
+						exit(EXIT_FAILURE);
+				} 
+				
+				if (gateway_class < 0 || gateway_class > 32){
+						printf( "Invalid orginator interval specified: %i. The Interval has to be between 0 and 32.\n", gateway_class );
+						exit(EXIT_FAILURE);
+				}
+
+				
+				printf( "interval: %i\n", gateway_class );
+				break;
+					
+			case 'i':
+				dev = optarg;
+				printf(" interface:%s", dev);
+				break;
+
+			case 'h':
+			default:
+					usage();
+					return (0);
 
           }
 
-  }
-
-// 	while ((av[1] != NULL) && (av[1][0] == '-')) {
-// 		char *s = &(av[1][1]);
-// 		while (*s) {
-// 			switch(*s) {
-// 				case 'd':
-// 					debug_level++;
-// 					break;
-// 			}
-// 			s++;
-// 		}
-// 		av++; ac--;
-// 	}
+	}
 	
 	if (dev == NULL)
 	{
