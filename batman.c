@@ -611,7 +611,7 @@ int batman(unsigned int addr_parm)
 	out.seqno = 0;
 	out.interval = orginator_interval + JITTER;
 	out.gwflags = gateway_class;
-	out.version = 0x01;
+	out.version = BATMAN_VERSION;
 
 	forward_old = get_forwarding();
 	set_forwarding(1);
@@ -664,7 +664,7 @@ int batman(unsigned int addr_parm)
 						output("received via bidirectional link \n");
 				}
 
-
+				printf("this %x, other %x, & %x \n", BATMAN_VERSION, in.version, ( BATMAN_VERSION & in.version ));
 				if ( !( in.version & BATMAN_VERSION ) ) {
 
 					if (debug_level >= 1)
