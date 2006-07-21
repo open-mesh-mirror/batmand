@@ -43,6 +43,8 @@ static int stop;
 static char *dev;
 extern int debug_level;
 extern int orginator_interval;
+extern int gateway_class;
+
 
 static void get_time_internal(struct timeval *tv)
 {
@@ -269,11 +271,6 @@ int main(int argc, char *argv[])
 	int optchar;
 	struct ifreq int_req;
 	char str1[16], str2[16];
-	int optchar;
-	int debug_level = 0;
-	int orginator_interval = 1100;
-	int gateway_class = 0;
-
 
 	printf("B.A.T.M.A.N-II %s\n", VERSION);
 	dev = NULL;
@@ -341,6 +338,11 @@ int main(int argc, char *argv[])
 					
 			case 'i':
 				dev = optarg;
+					if (strlen(dev) > IFNAMSIZ - 1)
+					{
+						fprintf(stderr, "Interface name too long\n");
+						exit(EXIT_FAILURE);
+					}
 				printf(" interface:%s", dev);
 				break;
 
@@ -357,12 +359,6 @@ int main(int argc, char *argv[])
 	{
 	  fprintf(stderr, "Error - no interface specified\n");
 		usage();
-		return 1;
-	}
-
-	if (strlen(dev) > IFNAMSIZ - 1)
-	{
-		fprintf(stderr, "Interface name too long\n");
 		return 1;
 	}
 
