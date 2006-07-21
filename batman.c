@@ -50,7 +50,7 @@ int debug_level = 0;
  * 9 5 MBit
  * 10 6 MBit
  * 11 >6 MBit
- * Beware that high debugging levels eat a lot of CPU-Power
+ * this option is used to determine packet path
  */
 int gateway_class = 0;
 
