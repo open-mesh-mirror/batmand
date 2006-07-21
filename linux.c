@@ -4,12 +4,12 @@
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of version 2 of the GNU General Public
  * License as published by the Free Software Foundation.
- * 
+ *
  * This program is distributed in the hope that it will be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
  * General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
@@ -70,8 +70,8 @@ unsigned int get_time(void)
 	struct timeval tv;
 
 	get_time_internal(&tv);
-	
-	return tv.tv_sec * 1000 + tv.tv_usec / 1000;  
+
+	return tv.tv_sec * 1000 + tv.tv_usec / 1000;
 }
 
 void output(char *format, ...)
@@ -91,7 +91,7 @@ void set_forwarding(int state)
 
 	if((f = fopen("/proc/sys/net/ipv4/ip_forward", "w")) == NULL)
 		return;
-	
+
 	fprintf(f, "%d", state);
 	fclose(f);
 }
@@ -100,10 +100,10 @@ int get_forwarding(void)
 {
 	FILE *f;
 	int state = 0;
-	
+
 	if((f = fopen("/proc/sys/net/ipv4/ip_forward", "r")) == NULL)
 		return 0;
-	
+
 	fscanf(f, "%d", &state);
 	fclose(f);
 
@@ -134,7 +134,7 @@ void add_del_route(unsigned int dest, unsigned int router, int del)
 	addr->sin_addr.s_addr = 0xffffffff;
 
 	route.rt_flags = RTF_HOST | RTF_UP;
-	
+
 	if (dest != router)
 	{
 		addr = (struct sockaddr_in *)&route.rt_gateway;
@@ -271,7 +271,6 @@ int main(int argc, char *argv[])
 	int optchar;
 	struct ifreq int_req;
 	char str1[16], str2[16];
-	const char hex_array[] = {"0123456789ABCDEF"};
 
 	printf("B.A.T.M.A.N-II %s\n", VERSION);
 	dev = NULL;
@@ -281,93 +280,80 @@ int main(int argc, char *argv[])
 		switch ( optchar ) {
 
 			case 'd':
-			
-			errno = 0;
-			debug_level = strtol (optarg, NULL , 10);
-		
-			if ((errno == ERANGE && (debug_level == LONG_MAX || debug_level == LONG_MIN))|| (errno != 0 && debug_level == 0)) {
-					perror("strtol");
-					exit(EXIT_FAILURE);
-			} 
-			
-			if (debug_level < 0 || debug_level > 3){
-					printf( "Invalid debug level: %i\n Debug level has to be between 0 and 3.\n", debug_level );
-					exit(EXIT_FAILURE);
-			}
 
-			printf(" debug level: %i\n", debug_level);
-			break;
+				errno = 0;
+				debug_level = strtol (optarg, NULL , 10);
+
+				if ((errno == ERANGE && (debug_level == LONG_MAX || debug_level == LONG_MIN))|| (errno != 0 && debug_level == 0)) {
+						perror("strtol");
+						exit(EXIT_FAILURE);
+				}
+
+				if (debug_level < 0 || debug_level > 3){
+						printf( "Invalid debug level: %i\nDebug level has to be between 0 and 3.\n", debug_level );
+						exit(EXIT_FAILURE);
+				}
+
+				if ( debug_level > 1 ) printf(" debug level: %i\n", debug_level);
+				break;
 
 			case 'o':
-			
+
 				errno = 0;
 				orginator_interval = strtol (optarg, NULL , 10);
-			
-				if ((errno == ERANGE && (orginator_interval == LONG_MAX || orginator_interval == LONG_MIN))	|| (errno != 0 && orginator_interval == 0)) {
-						perror("strtol");
-						exit(EXIT_FAILURE);
-				} 
-				
+
+				if ((errno == ERANGE && (orginator_interval == LONG_MAX || orginator_interval == LONG_MIN)) || (errno != 0 && orginator_interval == 0)) {
+					perror("strtol");
+					exit(EXIT_FAILURE);
+				}
+
 				if (orginator_interval < 1){
-						printf( "Invalid orginator interval specified: %i. The Interval has to be greater than 0.\n", orginator_interval );
-						exit(EXIT_FAILURE);
+					printf( "Invalid orginator interval specified: %i.\nThe Interval has to be greater than 0.\n", orginator_interval );
+					exit(EXIT_FAILURE);
 				}
 
-				
-				printf( "interval: %i\n", orginator_interval );
+
+				if ( debug_level > 1 ) printf( "orginator interval: %i\n", orginator_interval );
 				break;
-								
+
 			case 'g':
-			
-				errno = 0;
-				int pre_gateway_class = strtol (optarg, NULL , 10);
-				
-				char string1[] = "M";
-				char string2[] = "M";
-				string1[0] = hex_array[pre_gateway_class / 16];
-				string2[0] = hex_array[pre_gateway_class % 16];
-				
-				char *string3;
-		
-				string3 = strcat ( string1, string2 );
-// 				printf("%s\n", string3);
 
-				gateway_class = string3;
-	
-				if ((errno == ERANGE && (gateway_class == LONG_MAX || gateway_class == LONG_MIN))
-								|| (errno != 0 && gateway_class == 0)) {
-						perror("strtol");
-						exit(EXIT_FAILURE);
-				} 
-				
-				if (pre_gateway_class < 0 || pre_gateway_class > 32){
-						printf( "Invalid orginator interval specified: %i. The Interval has to be between 0 and 32.\n", gateway_class );
-						exit(EXIT_FAILURE);
+				errno = 0;
+				gateway_class = strtol (optarg, NULL , 10);
+
+				if ((errno == ERANGE && (gateway_class == LONG_MAX || gateway_class == LONG_MIN)) || (errno != 0 && gateway_class == 0)) {
+					perror("strtol");
+					exit(EXIT_FAILURE);
 				}
 
-				
-				printf( "interval: %s\n", string3 );
+				if (gateway_class < 0 || gateway_class > 32){
+					printf( "Invalid gateway class specified: %i.\nThe class is a value between 0 and 32.\n", gateway_class );
+					exit(EXIT_FAILURE);
+				}
+
+				if ( debug_level > 1 ) printf( "gateway class: %i\n", gateway_class );
 				break;
-					
+
 			case 'i':
 				dev = optarg;
-					if (strlen(dev) > IFNAMSIZ - 1)
-					{
-						fprintf(stderr, "Interface name too long\n");
-						exit(EXIT_FAILURE);
-					}
-				printf(" interface:%s", dev);
+
+				if (strlen(dev) > IFNAMSIZ - 1) {
+					fprintf(stderr, "Interface name too long\n");
+					exit(EXIT_FAILURE);
+				}
+
+				if ( debug_level > 1 ) printf( "Using interface: %s\n", dev );
 				break;
 
 			case 'h':
 			default:
-					usage();
-					return (0);
+				usage();
+				return (0);
 
           }
 
 	}
-	
+
 	if (dev == NULL)
 	{
 	  fprintf(stderr, "Error - no interface specified\n");

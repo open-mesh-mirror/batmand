@@ -610,7 +610,7 @@ int batman(unsigned int addr_parm)
 	out.ttl = TTL;
 	out.seqno = 0;
 	out.interval = orginator_interval + JITTER;
-	out.gwflags = 0x00;
+	out.gwflags = gateway_class;
 	out.version = 0x01;
 
 	forward_old = get_forwarding();
@@ -665,7 +665,7 @@ int batman(unsigned int addr_parm)
 				}
 
 
-				if !( in.version & BATMAN_VERSION ) {
+				if ( !( in.version & BATMAN_VERSION ) ) {
 
 					if (debug_level >= 1)
 						output("Incompatible batman version - ignoring packet... \n");
