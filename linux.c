@@ -271,11 +271,12 @@ int main(int argc, char *argv[])
 	int optchar;
 	struct ifreq int_req;
 	char str1[16], str2[16];
+	const char hex_array[] = {"0123456789ABCDEF"};
 
 	printf("B.A.T.M.A.N-II %s\n", VERSION);
 	dev = NULL;
 
-	while ( ( optchar = getopt ( argc, argv, "d:ho:i:" ) ) != -1 ) {
+	while ( ( optchar = getopt ( argc, argv, "d:ho:i:g:" ) ) != -1 ) {
 
 		switch ( optchar ) {
 
@@ -319,21 +320,33 @@ int main(int argc, char *argv[])
 			case 'g':
 			
 				errno = 0;
-				gateway_class = strtol (optarg, NULL , 10);
-					
+				int pre_gateway_class = strtol (optarg, NULL , 10);
+				
+				char string1[] = "M";
+				char string2[] = "M";
+				string1[0] = hex_array[pre_gateway_class / 16];
+				string2[0] = hex_array[pre_gateway_class % 16];
+				
+				char *string3;
+		
+				string3 = strcat ( string1, string2 );
+// 				printf("%s\n", string3);
+
+				gateway_class = string3;
+	
 				if ((errno == ERANGE && (gateway_class == LONG_MAX || gateway_class == LONG_MIN))
 								|| (errno != 0 && gateway_class == 0)) {
 						perror("strtol");
 						exit(EXIT_FAILURE);
 				} 
 				
-				if (gateway_class < 0 || gateway_class > 32){
+				if (pre_gateway_class < 0 || pre_gateway_class > 32){
 						printf( "Invalid orginator interval specified: %i. The Interval has to be between 0 and 32.\n", gateway_class );
 						exit(EXIT_FAILURE);
 				}
 
 				
-				printf( "interval: %i\n", gateway_class );
+				printf( "interval: %s\n", string3 );
 				break;
 					
 			case 'i':
