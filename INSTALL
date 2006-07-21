@@ -1,0 +1,129 @@
+#################################
+B.A.T.M.A.N Installation and Use
+#################################
+
+Axel Neumann (neumann@tkn.tu-berlin.de)
+Corinna 'Elektra' Aichele (onelektra@gmx.net)
+Thomas Lopatic  (thomas@lopatic.de)
+Felix Fietkau (nbd@nbd.name)
+
+
+-------
+Preface
+-------
+
+This is a minimalistic and experimental piece of code to test the viability
+of the B.A.T.M.A.N-II routing algorithm based on ideas of Thomas Lopatic and
+Corinna 'Elektra' Aichele.
+
+This is implementation 0.06 of the improved B.A.T.M.A.N algorithm with
+bidirectional link check mechanism. It is not unlikely that we have to
+fix some bugs. So far the deamon seems to behave well...
+
+
+--------
+Features
+--------
+
+At the moment this code implements just the bare routing algorithm. It will only work on a
+single interface (of course it could be a virtual one, to run a deathmatch
+against other routing protocols like olsrd) ;-) 
+
+There is no gateway-feature yet. So set up an IPIP-tunnel by hand.
+
+
+-------
+Roadmap
+-------
+
+If the tests with this algorithm are sucessful, implementing a gateway feature should not
+take too long. We will definitely go for a way to semi-automatically set up
+IPIP-Tunnels to avoid too much gateway-switching. This is a real annoyance if you
+are behind a NATed gateway - which is the default in most environments -
+because your SSH, VOIP, FTP, IM-Sessions, Downloads... are interrupted every time
+the protocol chooses to switch the gateway.
+
+Supporting multiple interfaces should be the next step after implementing the gateway feature. 
+
+This process can of course be accelerated with your support (testing, debugging,
+coding, patches.)
+
+
+------------
+Installation
+------------
+
+At the moment there is only support for Linux. You need the usual working
+environment to compile software. In the B.A.T.M.A.N directory type
+
+make <press enter>
+
+After the compilation process is finished you'll find a executable called 'batman'. This
+executable is quite big because it contains debugging information for GDB.
+
+If you want to use the routing deamon on a small embedded system you should
+strip it - that means removing the informations needed by GDB. To do this just
+perform 
+
+strip batman <press enter>
+
+Note there is no installation script at the moment. If you want to install
+it, copy the deamon to a location in your path, for example /usr/sbin or
+/usr/local/bin.
+
+
+
+---
+Use
+---
+
+
+Make sure you have no firewall running that is blocking UDP port 1966.
+ 
+The functionality of B.A.T.M.A.N at the moment is minimal, so launching it is
+fairly easy. In the directory with the B.A.T.M.A.N deamon type - as root - 
+
+./batman <interface> <press enter>
+
+Example:
+
+If the interface you want batman to run on is wlan0, type:
+
+./batman wlan0 <press enter>
+
+If you want to start with debug level 1, type:
+
+./batman -d wlan0 
+
+You can add more d's to have even more debugging information:
+
+./batman -ddd wlan0
+
+
+Switch the output of runtime debugging messages to a low level if you want
+to test the software on a slow system.
+
+We would love to see B.A.T.M.A.N in a match against other routing protocols
+in existing mesh networks. You can set up a virtual interface on an
+interface that you run another mesh routing protocol on.
+
+If, for example, you have olsrd running on interface wlan0 with IP address
+104.30.30.30 you could set up a virtual interface wlan0:0 with another
+IP-address within another network:
+
+ifconfig wlan0:0 103.30.30.30 netmask 255.0.0.0 broadcast 103.255.255.255
+
+./batman wlan0:0
+
+Now you can check out which protocol works better.
+
+Happy routing!
+
+
+
+
+
+
+
+
+

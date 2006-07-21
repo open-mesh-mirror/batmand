@@ -1,0 +1,235 @@
+B.A.T.M.A.N-II
+
+BETTER APPROACH TO MOBILE AD-HOC NETWORKING
+
+B.A.T.M.A.N is a new and pretty much different approach to Ad-Hoc-Routing,
+whose operability we want to test with this code. So far all popular routing
+algorithms for MANETs (Mobile Ad-Hoc Networks) that we are aware of try to
+calculate routes. B.A.T.M.A.N does something completely different. It
+doesn't calculate routes - it detects routes that exist and uses them, if
+needed. 
+
+B.A.T.M.A.N does not care where a route goes along that it utilizes to
+connect to another node in the mesh. B.A.T.M.A.N merely checks which single
+hop neighbour it has to send a package to put it on the best way to a node
+in the distance. If you want to find out how B.A.T.M.A.N routes to a certain
+node, perform a 
+
+ping -R <destination address> 
+
+Note that this command does not work with busybox (a multicall binary, the
+'swiss knife' for embedded linux systems, used in OpenWRT and Freifunk
+firmware), since 'ping' doesn't have the -R option in busybox. You can do
+
+traceroute -n <destination address>
+
+instead.
+
+A node in a B.A.T.M.A.N MANET is only interested to know about the existence
+of all nodes that it can communicate with, either in single or multihop
+range, and which single hop neighbour it has to choose as a router. To
+communicate with a node in multihop range a B.A.T.M.A.N node must *only*
+know which single hop neighbour is the right one to give its packets to, in
+order that the packets find the best way to the node in the distance. To
+explain the advantage of this approach it may be best to compare it with
+other ideas about mesh routing - namely source routing and link state
+routing.
+
+Source routing means a node Y in the mesh 'thinks', that the best way to
+send data to node D is a path where the packet travels from node Q to node
+S, from node S to node H, from H to W - and so on - until the data
+terminates at the destination node. Y gives Q the directive to send the data
+to S. S receives the directive from Y to send the data to H - the whole
+chain is planned by the orginator of the traffic. So Y computes the path to
+D and tells intermediate nodes what to do.
+
+One known design for MANET Routing is DSR - Dynamic Source Routing. DSR
+contains an algorithm that aims to find source routes and to maintain them,
+in case they break down. The fly in the ointment is, that MANETs are subject
+to highly dynamic changes. A MANET does not only lose payload data, but
+loses topology information also. If the orginator is several hops away from
+the destination it is very likely that the information about the topology on
+the other end is very hazy, incomplete and outdated. The orginator is the
+node most incompetent to decide the path of the data on the other end. The
+chain could be already broken down before Y sends its first packet. Y
+receives the message "destination host unreachable' and starts looking for a
+new path again.
+
+In a mesh with link state routing (LSR) every node tries to calculate routes
+valid for the whole mesh from every single node to every other. Fortunately
+this does not mean source routing, because the view about the topology in
+the distance is hazy, too. In fact every node maintains a huge database and
+computes paths that its packets should follow and hands it confidingly to
+the next neighbour on the path that it has calculated. While one node may
+believe that it knows the path that the packages are going to travel, each
+node maintains its own database and calculates its own paths. So every node
+autonomously computes its own decisions when initiating or forwarding
+traffic. This decisions are likely to differ from what an orginator believes
+about the path its packets are going to travel.
+
+There are two flies in the ointment that come with this approach. First
+tradeoff is the calculation of huge databases, while all a node can decide
+is select the next single hop neighbour that it hands a packet to. Second
+the databases in nodes in a mesh with more than a handful of nodes are
+never really consistent - so routing loops can occur if the route
+calculations of two nodes involved in forwarding traffic are not in sync and
+collide with each other. Link state routing therefore bears a lot of
+overhead and problems. The advantage compared to source routing is that a
+node nearer to the destination has better information about the status of
+the topology and can compute better decisions about the path.
+
+If routing loops occur you get the message 'Time to live exceeded' when
+performing a 'ping'.
+
+The link state routing protocol (LSR) most popular today is OLSR from
+olsr.org. OLSR with LinkQualityExtension and Fisheye-Algorithm works quite
+well, apart from a few bugs and the annoying effect, that it too often
+switches between internet gateways which causes problems (connections break
+down, timeouts) when these gateways perform network address translation
+(masquerading). In the end OLSR lacks an IP-Tunnel-Plugin that would users
+allow to select their gateways.
+
+In conclusion OLSR is too complicated for its own good and draws too much
+CPU-Power. So it is time for something more simple and more effective -
+B.A.T.M.A.N
+
+Antoine Saint Exupery, Autor of the 'The little prince' said this quote stammt:
+
+All human doing goes the way from the primitive along the complicated to the
+simple. 
+
+
+B.A.T.M.A.N is a simple set of rules a node has to comply with.
+
+#####################################
+# Simple B.A.T.M.A.N procedure	    #
+#	     		      	    #
+# 	   B.A.T.M.A.N-I	    #
+#####################################
+
+
+A firewall must not block B.A.T.M.A.N traffic. B.A.T.M.A.N sends its traffic
+on Port 1966 UDP. This port must be open for incoming and outgoing traffic.
+This is a problem occuring quite often.
+
+1.) Broadcasts
+
+B.A.T.M.A.N detects its neighbours and distant nodes by transmitting and
+receiving broadcasts that are forwarded by every node. A broadcast (we will
+call it orginator messages from now on) contains the orginator address, a
+sequence number and a TTL. TTL or Time-To-Live is a number that is
+decremented by 1 every time the packet is forwarded. If the TTL value
+reaches 0 the packet is dropped. The TTL is used to avoid packets endlessly
+roaming around. This is a common mechanism in TCP. The TTL does also tell
+how often has been forwarded. Particular important for B.A.T.M.A.N is the
+sequence number. Orginators number their broadcasts so other nodes can
+deceide whether they receive a orginator message the first time or receive
+it repeatedly. 
+
+Orginator messages are broadcasted from every node at a given interval and
+forwarded by all other nodes. If a broadcast gets lost it is not
+resend. If a node receives a orginator message for the first
+time it is forwarded.
+
+Imagine we have a chain of mesh nodes:
+
+Node A <--> Node B <--> Node C <--> Node D
+
+Imagine further that every node can only see its direct neighbours. Now node A
+broadcasts a orginator-message. Node B receives the message and rebroadcasts it. 
+
+Thereby node C receives the information: Message from node A, forwarded from
+node B, sequence number 0, TTL 49
+
+Node C forwards the message again. Thus node D receives the information:
+message from node A, forwarded by node C, sequence number 0, TTL 48
+
+Now node D knows:
+
+There is a node A that is three hops away. In order to communicate with node
+A I have to send packets to node C. Node D does not need to know more than
+that.
+
+The first example was of course very simple. So what happens if the network
+looks like this:
+
+
+       * ---- Node B ---- Node C ---- *
+       |			      |
+Node A + ------------ Node D -------- + Node F
+       | 		 	      |
+       * ------------ Node E -------- *
+
+What does B.A.T.M.A.N do now?
+
+Node A broadcasts an orginator-message with sequence number 0. B, C, D and E
+all forward this message.
+
+Node F receives the orginator-message sequence number 0 from node A
+forwarded by node D first and memorises that he has seen A over D. Node F
+ignores the orginator-message with sequence number 0 from A, that he
+receives from node C because it receives the same message again. The message
+forwarded by node E may get lost or come too late to be the first, too.
+
+Using the best path between node A and F the packets travel more reliable
+and/or quicker.  All node F has to do is memorise where it gets most orginator messages
+from. Speed is decisive, because node F is only memorising who is forwarding
+the packet first. If node F wants to communicate with node A it simply sends
+its packets to the node with the best statistic.
+
+If the statistic is equal amongst two or more neighbours the biggest TTL is
+decisive. If TTL is equal, too the last received orginator packet from
+destination host is decisive.
+
+
+######################################
+# Improved B.A.T.M.A.N procedure     #
+#				     #
+#	   B.A.T.M.A.N-II	     #
+######################################
+
+
+
+The simple B.A.T.M.A.N procedure has a limitation: It does not consider that
+wireless links could be unidirectional. The assumption is, that there is a
+way back on the path orginator messages came from. A single unidirectional
+(unsymmetric) link would spoil the whole concept. It is not uncommon in a
+wireless network that links work perfectly - but only in one direction. So
+the simple B.A.T.M.A.N algorithm would fail miserably. So the conclusion is
+that B.A.T.M.A.N must check that it only considers symmetric links.
+
+This could be achieved with a simple set of rules:
+
+1.) Bidirectional link check
+
+Neighbours that repeat our own orginator messages with a value of TTLMAX - 1
+can see us and we can see them if we receive them forwarding our own
+orginator broadcasts. Only messages from neighbours that we have a
+bidirectional link to are prcessed. If we don't see them repeat our
+orginator messages within a given timeframe we consider them as unsymmetric
+neighbours again.
+
+2.) Broadcasts from nodes that we have no bidirectional link to are ignored
+and not forwarded. We ignore them until the bidirectional link check is
+successful again.
+
+
+3.) Exception from rule 1.) and 2.)
+
+Orginator broadcasts from orginators that are single hop neighbours are
+repeated always. These are broadcasts with TTLMAX. We do so even if the
+orginators are not bidirectional neighbours. In this case we put an
+'unsymmetric-flag' in the broadcast before we repeat it. So the orginator
+can tell that we successfully received him. Other nodes that see the message
+ignore them because they see the flag. The forwarded orginator message with
+'unsymmetric-flag' is of interest only for the orginator that initiated the
+transmission.
+
+This exception is necessary to avoid an chicken-and-egg problem. Otherwise
+we would ignore all orginator messages from our single hop neighbours
+forever. And they would forever ignore us, of course...
+
+
+Happy testing!
+
+Elektra, Thomas, Axel, Felix 
