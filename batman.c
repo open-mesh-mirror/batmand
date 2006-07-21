@@ -664,7 +664,7 @@ int batman(unsigned int addr_parm)
 						output("received via bidirectional link \n");
 
 					if ( in.gwflags != 0 )
-						printf("Is an internet gateway \n");
+						output("Is an internet gateway (class %i) \n", in.gwflags);
 				}
 
 

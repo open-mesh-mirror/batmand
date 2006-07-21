@@ -272,7 +272,7 @@ int main(int argc, char *argv[])
 	struct ifreq int_req;
 	char str1[16], str2[16];
 
-	printf( "B.A.T.M.A.N-II %s (%x)\n", VERSION, BATMAN_VERSION );
+	printf( "B.A.T.M.A.N-II v%s (internal version %x)\n", VERSION, BATMAN_VERSION );
 	dev = NULL;
 
 	while ( ( optchar = getopt ( argc, argv, "d:ho:i:g:" ) ) != -1 ) {
