@@ -662,10 +662,13 @@ int batman(unsigned int addr_parm)
 
 					if ( isBidirectionalNeigh( orig_neigh_node ) )
 						output("received via bidirectional link \n");
+
+					if ( in.gwflags != 0 )
+						printf("Is an internet gateway \n");
 				}
 
-				printf("this %x, other %x, & %x \n", BATMAN_VERSION, in.version, ( BATMAN_VERSION & in.version ));
-				if ( !( in.version & BATMAN_VERSION ) ) {
+
+				if ( in.version != BATMAN_VERSION ) {
 
 					if (debug_level >= 1)
 						output("Incompatible batman version - ignoring packet... \n");

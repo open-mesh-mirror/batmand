@@ -21,7 +21,7 @@
 #define _BATMAN_BATMAN_H
 
 #define VERSION "0.1"
-#define BATMAN_VERSION 0x02
+#define BATMAN_VERSION 1
 #define PORT 1966
 
 /*
