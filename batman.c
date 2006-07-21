@@ -6,12 +6,12 @@
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of version 2 of the GNU General Public
  * License as published by the Free Software Foundation.
- * 
+ *
  * This program is distributed in the hope that it will be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
  * General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
@@ -30,22 +30,22 @@
  * specify it multiple times to increase verbosity
  * 0 gives a minimum of messages to save CPU-Power
  * 1 normal
- * 2 verbose 
+ * 2 verbose
  * 3 very verbose
  * Beware that high debugging levels eat a lot of CPU-Power
  */
- 
+
 int debug_level = 0;
 
 /* "-g" is the command line switch for the gateway class,
  * 0 no gateway
  * 1 modem
- * 2 ISDN 
+ * 2 ISDN
  * 3 Double ISDN
  * 3 256 KBit
  * 5 UMTS/ 0.5 MBit
  * 6 1 MBit
- * 7 2 MBit	
+ * 7 2 MBit
  * 8 3 MBit
  * 9 5 MBit
  * 10 6 MBit
@@ -65,8 +65,10 @@ struct packet
 	unsigned long  orig;
 	unsigned char  flags;    /* 0xF0: UNIDIRECTIONAL link, 0x80: ip-gateway, ... */
 	unsigned char  ttl;
-	unsigned short seqno;    
+	unsigned short seqno;
 	unsigned short interval; /* in ms until latest next emission */
+	unsigned char  gwflags;  /* flags related to gateway functions: gateway class */
+	unsigned char  version;  /* batman version field */
 } __attribute__((packed));
 
 struct orig_node
@@ -126,19 +128,19 @@ struct orig_node *get_orig_node( unsigned int addr )
 		if (orig_node->orig == addr)
 			return orig_node;
 	}
-	
-	if (debug_level >= 2) 
+
+	if (debug_level >= 2)
 		output("Creating new originator\n");
-	
+
 	orig_node = alloc_memory(sizeof(struct orig_node));
 	memset(orig_node, 0, sizeof(struct orig_node));
 	INIT_LIST_HEAD(&orig_node->list);
 	INIT_LIST_HEAD(&orig_node->neigh_list);
-	
+
 	orig_node->orig = addr;
-	
+
 	list_add_tail(&orig_node->list, &orig_list);
-	
+
 	return orig_node;
 }
 
@@ -168,7 +170,7 @@ static void update_routes()
 		/* for every neighbour... */
 		list_for_each(neigh_pos, &orig_node->neigh_list) {
 			neigh_node = list_entry(neigh_pos, struct neigh_node, list);
-					
+
 			neigh_ttl = 0;
 			neigh_pkts = 0;
 
@@ -180,44 +182,44 @@ static void update_routes()
 				neigh_pkts++;
 			}
 
-			/* if received most orig_packets via this neighbour (or ) then 
-		 		select this neighbour as next hop for this origin */ 
+			/* if received most orig_packets via this neighbour (or ) then
+		 		select this neighbour as next hop for this origin */
 			if ((neigh_pkts > max_pack) || ((neigh_pkts > max_pack) && (neigh_ttl > max_ttl))) {
 				max_pack = neigh_pkts;
 				max_ttl = neigh_ttl;
-				
+
 				next_hop = neigh_node;
-				if (debug_level >= 2) 
+				if (debug_level >= 2)
 					output("%d living received packets via selected router \n", neigh_pkts );
 			}
 		}
-		
+
 		if (next_hop != NULL) {
 			if (debug_level >= 2) {
 				addr_to_string(orig_node->orig, orig_str, ADDR_STR_LEN);
 				addr_to_string(next_hop->addr, next_str, ADDR_STR_LEN);
-		
+
 				output("Route to %s via %s\n", orig_str, next_str);
 			}
 
-		
+
 			if (orig_node->router != next_hop->addr) {
 				if (debug_level >= 2)
 				output("Route changed\n");
-			
+
 				if (orig_node->router != 0) {
-					if (debug_level >= 2) 
+					if (debug_level >= 2)
 						output("Deleting previous route\n");
 
 					add_del_route(orig_node->orig, orig_node->router, 1);
 				}
-			
+
 				if (debug_level >= 2) { output("Adding new route\n");  }
-			
-			
+
+
 				/* TODO: maybe the order delete, add should be changed ???? */
 				add_del_route(orig_node->orig, next_hop->addr, 0);
-			
+
 				orig_node->router = next_hop->addr;
 			}
 		}
@@ -234,34 +236,34 @@ static void debug()
 	static char str[ADDR_STR_LEN];
 	int l;
 
-	if (debug_level < 1) 
+	if (debug_level < 1)
 		return;
 
 	if (debug_level >= 2) {
 		output("------------------ DEBUG ------------------\n");
-		output("Forward list\n");  
+		output("Forward list\n");
 
 		list_for_each(forw_pos, &forw_list) {
 			forw_node = list_entry(forw_pos, struct forw_node, list);
 			addr_to_string(forw_node->pack.orig, str, sizeof (str));
 			output("    %s at %u\n", str, forw_node->when);
 		}
-		
+
 
 		output("Originator list\n");
 	}
-	
+
 	list_for_each(orig_pos, &orig_list) {
 		orig_node = list_entry(orig_pos, struct orig_node, list);
-		
+
 		addr_to_string(orig_node->orig, str, sizeof (str));
-		
+
 		output("%s, last_aware:%u, last_reply:%u, last_seen:%u via:\n",
-				 str, orig_node->last_aware, orig_node->last_reply, orig_node->last_seen); 
-			
+				 str, orig_node->last_aware, orig_node->last_reply, orig_node->last_seen);
+
 		list_for_each(neigh_pos, &orig_node->neigh_list) {
 			neigh_node = list_entry(neigh_pos, struct neigh_node, list);
-			
+
 			l = 0;
 			list_for_each(temp, &neigh_node->pack_list) {
 				l++;
@@ -271,18 +273,18 @@ static void debug()
 				addr_to_string(neigh_node->addr, str, sizeof (str));
 				output("\t\t%s (%d)\n", str, l);
 			}
-			
+
 			if (debug_level >= 3) {
 				list_for_each(pack_pos, &neigh_node->pack_list) {
 					pack_node = list_entry(pack_pos, struct pack_node, list);
 					output("        Sequence number: %d, TTL: %d at: %u \n",
 							pack_node->seqno, pack_node->ttl, pack_node->time);
-				}    
+				}
 			}
 		}
 	}
-	
-	if (debug_level >= 2) 
+
+	if (debug_level >= 2)
 		output("---------------------------------------------- END DEBUG\n");
 }
 
@@ -302,7 +304,7 @@ int isDuplicate(unsigned int orig, unsigned short seqno)
 			neigh_node = list_entry(neigh_pos, struct neigh_node, list);
 
 /*     		if (debug_level >= 2)  {  output("isDuplicate(): every packet \n");  } */
-			
+
 			list_for_each(pack_pos, &neigh_node->pack_list) {
 				pack_node = list_entry(pack_pos, struct pack_node, list);
 
@@ -327,7 +329,7 @@ int isBidirectionalNeigh( struct orig_node *orig_neigh_node )
 
 int hasUnidirectionalFlag( struct packet *in )
 {
-	if( in->flags & UNIDIRECTIONAL ) 
+	if( in->flags & UNIDIRECTIONAL )
 		return 1;
 	else return 0;
 }
@@ -338,14 +340,14 @@ struct orig_node *update_last_hop(struct packet *in, unsigned int neigh)
 {
 	struct orig_node *orig_neigh_node;
 
-	if (debug_level >= 2) { 
+	if (debug_level >= 2) {
 		output("update_last_hop(): Searching originator entry of last-hop neighbour of received packet \n"); }
 	orig_neigh_node = get_orig_node( neigh );
 	orig_neigh_node->last_aware = get_time();
 
 	if (neigh != my_addr && in->orig == my_addr && in->ttl == TTL-1)	{
-		if (debug_level >= 2)	{	
-			output("received my own packet from neighbour indicating bidirectional link, updating last_reply stamp \n");  
+		if (debug_level >= 2)	{
+			output("received my own packet from neighbour indicating bidirectional link, updating last_reply stamp \n");
 		}
 		orig_neigh_node->last_reply = get_time();
 	}
@@ -363,7 +365,7 @@ void update_originator(struct packet *in, unsigned int neigh)
 
 	if (debug_level >= 2)
 		output("update_originator(): Searching and updating originator entry of received packet,  \n");
-	
+
 	orig_node = get_orig_node( in->orig );
 
 	orig_node->last_seen = get_time();
@@ -372,7 +374,7 @@ void update_originator(struct packet *in, unsigned int neigh)
 
 	list_for_each(neigh_pos, &orig_node->neigh_list) {
 		neigh_node = list_entry(neigh_pos, struct neigh_node, list);
-		
+
 		if (neigh_node->addr != neigh)
 			neigh_node = NULL;
 	}
@@ -388,7 +390,7 @@ void update_originator(struct packet *in, unsigned int neigh)
 		neigh_node->addr = neigh;
 
 		list_add_tail(&neigh_node->list, &orig_node->neigh_list);
-	} else if (debug_level >= 2) 
+	} else if (debug_level >= 2)
 		output("Updating existing last-hop neighbour of originator\n");
 
 	list_for_each(pack_pos, &neigh_node->pack_list) {
@@ -397,7 +399,7 @@ void update_originator(struct packet *in, unsigned int neigh)
 		if (pack_node->seqno != in->seqno)
 			pack_node = NULL;
 	}
-	
+
 	if (pack_node == NULL)  {
 		if (debug_level >= 2)
 			output("Creating new packet entry for last-hop neighbor of originator \n");
@@ -409,7 +411,7 @@ void update_originator(struct packet *in, unsigned int neigh)
 		list_add_tail(&pack_node->list, &neigh_node->pack_list);
 	} else
 		output("ERROR - Updating existing packet\n");
-	
+
 	pack_node->ttl = in->ttl;
 	pack_node->time = get_time();
 
@@ -423,7 +425,7 @@ void schedule_forward_packet( struct packet *in, int unidirectional)
 
 	if (debug_level >= 2)
 		output("schedule_forward_packet():  \n");
-	
+
 	if (in->ttl <= 1) {
 		if (debug_level >= 2)
 			output("ttl exceeded \n");
@@ -432,24 +434,24 @@ void schedule_forward_packet( struct packet *in, int unidirectional)
 		INIT_LIST_HEAD(&forw_node_new->list);
 
 		memcpy(&forw_node_new->pack, in, sizeof (struct packet));
-		
+
 		forw_node_new->pack.ttl--;
-		
+
 		if (unidirectional) {
 			if (debug_level >= 2)
 				output("sending with unidirectional flag \n");
 
 			forw_node_new->pack.flags = (forw_node_new->pack.flags | UNIDIRECTIONAL);
 		}
-		
+
 		forw_node_new->when = get_time() + rand_num(JITTER);
-		
+
 		list_for_each(forw_pos, &forw_list) {
 			forw_node = list_entry(forw_pos, struct forw_node, list);
 			if ((int)(forw_node->when - forw_node_new->when) > 0)
 				break;
 		}
-		
+
 		list_add(&forw_node_new->list, &forw_list);
 	}
 }
@@ -471,17 +473,17 @@ void send_outstanding_packets()
 		{
 			pack = &forw_node->pack;
 
-			if (debug_level >= 2) { 
+			if (debug_level >= 2) {
 				addr_to_string(pack->orig, orig_str, ADDR_STR_LEN);
 				output("Forwarding packet (originator %s, seqno %d, TTL %d)\n",
-						 orig_str, pack->seqno, pack->ttl);	
+						 orig_str, pack->seqno, pack->ttl);
 			}
-		
+
 			if (send_packet((unsigned char *)pack, sizeof (struct packet)) < 0) {
 				output("ERROR: send_packet returned -1 \n");
 				exit( -1);
 			}
-			
+
 			list_del(forw_pos);
 			free_memory(forw_node);
 		}
@@ -497,7 +499,7 @@ void schedule_own_packet() {
 		forw_node = list_entry(forw_pos, struct forw_node, list);
 		break;
 	}
-	
+
 	if (forw_node != NULL)
 	{
 		if ((int)(forw_node->when - next_own) < 0)
@@ -520,7 +522,7 @@ void schedule_own_packet() {
 
 void purge()
 {
-	struct list_head *orig_pos, *neigh_pos, *pack_pos, *orig_temp, *neigh_temp, *pack_temp;	
+	struct list_head *orig_pos, *neigh_pos, *pack_pos, *orig_temp, *neigh_temp, *pack_temp;
 	struct orig_node *orig_node;
 	struct neigh_node *neigh_node;
 	struct pack_node *pack_node;
@@ -528,7 +530,7 @@ void purge()
 
 	if (debug_level >= 2)
 		output("purge() \n");
-	
+
 	/* for all origins... */
 	list_for_each_safe(orig_pos, orig_temp, &orig_list) {
 		orig_node = list_entry(orig_pos, struct orig_node, list);
@@ -608,6 +610,8 @@ int batman(unsigned int addr_parm)
 	out.ttl = TTL;
 	out.seqno = 0;
 	out.interval = orginator_interval + JITTER;
+	out.gwflags = 0x00;
+	out.version = 0x01;
 
 	forward_old = get_forwarding();
 	set_forwarding(1);
@@ -625,7 +629,7 @@ int batman(unsigned int addr_parm)
 			break;
 		}
 
-		if (res < 0) 
+		if (res < 0)
 			return -1;
 
 		if (res > 0)
@@ -633,20 +637,20 @@ int batman(unsigned int addr_parm)
 			if (debug_level >= 3)  {
 				addr_to_string(in.orig, orig_str, sizeof (orig_str));
 				addr_to_string(neigh, neigh_str, sizeof (neigh_str));
-				output("Received BATMAN packet from %s (originator %s, seqno %d, TTL %d)\n", neigh_str, orig_str, in.seqno, in.ttl);       
+				output("Received BATMAN packet from %s (originator %s, seqno %d, TTL %d)\n", neigh_str, orig_str, in.seqno, in.ttl);
 			}
-				
+
 			if (neigh == my_addr /* && in.orig == my_addr */) {
 				if (debug_level >= 3)
 					output("Ignoring all (zero-hop) packets send by me \n");
-					
+
 			} else {
 				orig_neigh_node = update_last_hop( &in, neigh );
-	
+
 				if (debug_level >= 2) {
-					if (isDuplicate(in.orig, in.seqno)) 
+					if (isDuplicate(in.orig, in.seqno))
 						output("Duplicate packet \n");
-					
+
 					if ( in.orig == neigh )
 						output("Originator packet from neighbour \n");
 
@@ -661,41 +665,46 @@ int batman(unsigned int addr_parm)
 				}
 
 
-				if( in.orig == neigh && in.ttl == TTL &&
-						!isBidirectionalNeigh( orig_neigh_node )  && 
-						!isDuplicate(in.orig, in.seqno) &&
-						!(in.flags & UNIDIRECTIONAL) ) {
-						
-					schedule_forward_packet(&in, 1);
-					
+				if !( in.version & BATMAN_VERSION ) {
+
+					if (debug_level >= 1)
+						output("Incompatible batman version - ignoring packet... \n");
+
 				} else if ( in.orig == neigh && in.ttl == TTL &&
-						isBidirectionalNeigh( orig_neigh_node )  && 
+						!isBidirectionalNeigh( orig_neigh_node )  &&
 						!isDuplicate(in.orig, in.seqno) &&
 						!(in.flags & UNIDIRECTIONAL) ) {
-						
+
+					schedule_forward_packet(&in, 1);
+
+				} else if ( in.orig == neigh && in.ttl == TTL &&
+						isBidirectionalNeigh( orig_neigh_node )  &&
+						!isDuplicate(in.orig, in.seqno) &&
+						!(in.flags & UNIDIRECTIONAL) ) {
+
 					update_originator( &in, neigh );
 					schedule_forward_packet(&in, 0);
-					
+
 				} else if ( in.orig != neigh && in.orig != my_addr &&
-						isBidirectionalNeigh( orig_neigh_node )  && 
+						isBidirectionalNeigh( orig_neigh_node )  &&
 						!isDuplicate(in.orig, in.seqno) &&
 						!(in.flags & UNIDIRECTIONAL) ) {
-						
+
 					update_originator( &in, neigh );
 					schedule_forward_packet(&in, 0);
-						
+
 				} else {
 					if (debug_level >= 3)
 						output("Ignoring packet... \n");
 				}
 			}
 		}
-		send_outstanding_packets(); 
-		
+		send_outstanding_packets();
+
 		purge();
 		debug();
 	}
-	
+
 	output("Deleting all BATMAN routes\n");
 
 	list_for_each(orig_pos, &orig_list) {
@@ -706,6 +715,6 @@ int batman(unsigned int addr_parm)
 	}
 
 	set_forwarding(forward_old);
-	
+
 	return 0;
 }
