@@ -52,6 +52,7 @@ int debug_level = 0;
  * 11 >6 MBit
  * this option is used to determine packet path
  */
+
 int gateway_class = 0;
 
 /* "-r" is the command line switch for the routing class,
@@ -61,6 +62,7 @@ int gateway_class = 0;
  * 3 use olsr style
  * this option is used to set the routing behaviour
  */
+
 int routing_class = 0;
 
 
@@ -721,10 +723,10 @@ int batman(unsigned int addr_parm)
 
 					if ( isBidirectionalNeigh( orig_neigh_node ) )
 						output("received via bidirectional link \n");
-				}
+
 					if ( in.gwflags != 0 )
 						output("Is an internet gateway (class %i) \n", in.gwflags);
-// 				}
+				}
 
 
 				if ( in.version != BATMAN_VERSION ) {
