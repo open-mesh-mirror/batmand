@@ -256,7 +256,7 @@ static void update_gw_list( unsigned int addr, unsigned char new_gwflags )
 			if (debug_level >= 0) {
 
 				addr_to_string( orig_node->orig, orig_str, ADDR_STR_LEN );
-				output( "gateway class of originator %s changed to %i\n", orig_str, new_gwflags );
+				output( "gateway class of originator %s changed from %i to %i\n", orig_str, orig_node->gwflags, new_gwflags );
 
 			}
 
