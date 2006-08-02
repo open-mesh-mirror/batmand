@@ -54,6 +54,15 @@ int debug_level = 0;
  */
 int gateway_class = 0;
 
+/* "-r" is the command line switch for the routing class,
+ * 0 set no default route
+ * 1 use fast internet connection
+ * 2 use stable internet connection
+ * 3 use olsr style
+ * this option is used to set the routing behaviour
+ */
+int routing_class = 0;
+
 
 int orginator_interval = 1000; /* orginator message interval in miliseconds */
 #define UNIDIRECTIONAL 0xF0
@@ -81,6 +90,7 @@ struct orig_node
 	unsigned int last_aware;   /* if node is a neighbour, when last packet via this node was received */
 	unsigned short interval;   /* in ms until next emission */
 	unsigned char flags;
+	unsigned char gwflags;     /* flags related to gateway functions: gateway class */
 	struct list_head neigh_list;
 };
 
@@ -109,6 +119,7 @@ struct forw_node
 
 static LIST_HEAD(orig_list);
 static LIST_HEAD(forw_list);
+static LIST_HEAD(gw_list);
 static unsigned int next_own;
 static unsigned int my_addr;
 
@@ -138,6 +149,7 @@ struct orig_node *get_orig_node( unsigned int addr )
 	INIT_LIST_HEAD(&orig_node->neigh_list);
 
 	orig_node->orig = addr;
+	orig_node->gwflags = 0;
 
 	list_add_tail(&orig_node->list, &orig_list);
 
@@ -224,6 +236,48 @@ static void update_routes()
 			}
 		}
 	}
+}
+
+static void update_gw_list( unsigned int addr, unsigned char new_gwflags )
+{
+
+	struct list_head *pos;
+	struct orig_node *orig_node;
+	static char orig_str[ADDR_STR_LEN];
+
+	list_for_each(pos, &gw_list) {
+
+		orig_node = list_entry(pos, struct orig_node, list);
+
+		if ( orig_node->orig == addr ) {
+
+			if (debug_level >= 0) {
+
+				addr_to_string( orig_node->orig, orig_str, ADDR_STR_LEN );
+				output( "gateway class of originator %s changed to %i\n", orig_str, new_gwflags );
+
+			}
+
+			orig_node->gwflags = new_gwflags;
+			return;
+
+		}
+
+	}
+
+	if (debug_level >= 0)
+		output( "Creating new gateway\n" );
+
+	orig_node = alloc_memory(sizeof(struct orig_node));
+	memset(orig_node, 0, sizeof(struct orig_node));
+	INIT_LIST_HEAD(&orig_node->list);
+	INIT_LIST_HEAD(&orig_node->neigh_list);
+
+	orig_node->orig = addr;
+	orig_node->gwflags = new_gwflags;
+
+	list_add_tail(&orig_node->list, &gw_list);
+
 }
 
 static void debug()
@@ -371,6 +425,11 @@ void update_originator(struct packet *in, unsigned int neigh)
 	orig_node->last_seen = get_time();
 	orig_node->interval = in->interval;
 	orig_node->flags = in->flags;
+
+	if ( orig_node->gwflags != in->gwflags )
+		update_gw_list( in->orig, in->gwflags );
+
+	orig_node->gwflags = in->gwflags;
 
 	list_for_each(neigh_pos, &orig_node->neigh_list) {
 		neigh_node = list_entry(neigh_pos, struct neigh_node, list);
@@ -662,16 +721,16 @@ int batman(unsigned int addr_parm)
 
 					if ( isBidirectionalNeigh( orig_neigh_node ) )
 						output("received via bidirectional link \n");
-
+				}
 					if ( in.gwflags != 0 )
 						output("Is an internet gateway (class %i) \n", in.gwflags);
-				}
+// 				}
 
 
 				if ( in.version != BATMAN_VERSION ) {
 
 					if (debug_level >= 1)
-						output("Incompatible batman version - ignoring packet... \n");
+						output( "Incompatible batman version (%i) - ignoring packet... \n", in.version );
 
 				} else if ( in.orig == neigh && in.ttl == TTL &&
 						!isBidirectionalNeigh( orig_neigh_node )  &&

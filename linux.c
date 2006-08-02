@@ -44,6 +44,7 @@ static char *dev;
 extern int debug_level;
 extern int orginator_interval;
 extern int gateway_class;
+extern int routing_class;
 
 
 static void get_time_internal(struct timeval *tv)
@@ -256,11 +257,43 @@ static void handler(int sig)
 
 static void usage(void)
 {
-	fprintf(stderr, "Usage: batman -i interface [options]\n");
-	fprintf(stderr, "       -o [option] orginator interval\n");
-	fprintf(stderr, "       -d [option] debug level\n");
-	fprintf(stderr, "       -g [option] gateway class\n");
-	fprintf(stderr, "       -h this help\n");
+	fprintf(stderr, "Usage: batman -i interface [options]\n" );
+	fprintf(stderr, "       -d debug level\n" );
+	fprintf(stderr, "       -g gateway class\n" );
+	fprintf(stderr, "       -h this help\n" );
+	fprintf(stderr, "       -H verbose help\n" );
+	fprintf(stderr, "       -o orginator interval in ms\n" );
+	fprintf(stderr, "       -r routing class\n" );
+}
+
+static void verbose_usage(void)
+{
+	fprintf(stderr, "Usage: batman -i interface [options]\n\n" );
+	fprintf(stderr, "       -d debug level\n" );
+	fprintf(stderr, "          default: 0, allowed values: 0 - 3\n\n" );
+	fprintf(stderr, "       -g gateway class\n" );
+	fprintf(stderr, "          default:         0 -> this is not an internet gateway\n" );
+	fprintf(stderr, "          allowed values:  1 -> modem line\n" );
+	fprintf(stderr, "                           2 -> ISDN line\n" );
+	fprintf(stderr, "                           3 -> double ISDN\n" );
+	fprintf(stderr, "                           4 -> 256 KBit\n" );
+	fprintf(stderr, "                           5 -> UMTS / 0.5 MBit\n" );
+	fprintf(stderr, "                           6 -> 1 MBit\n" );
+	fprintf(stderr, "                           7 -> 2 MBit\n" );
+	fprintf(stderr, "                           8 -> 3 MBit\n" );
+	fprintf(stderr, "                           9 -> 5 MBit\n" );
+	fprintf(stderr, "                          10 -> 6 MBit\n" );
+	fprintf(stderr, "                          11 -> >6 MBit\n\n" );
+	fprintf(stderr, "       -h shorter help\n" );
+	fprintf(stderr, "       -H this help\n" );
+	fprintf(stderr, "       -o orginator interval in ms\n" );
+	fprintf(stderr, "          default: 1000, allowed values: >0\n\n" );
+	fprintf(stderr, "       -r routing class (only needed if gateway class = 0)\n" );
+	fprintf(stderr, "          default:         0 -> set no default route\n" );
+	fprintf(stderr, "          allowed values:  1 -> use fast internet connection\n" );
+	fprintf(stderr, "                           2 -> use stable internet connection\n" );
+	fprintf(stderr, "                           3 -> use olsr style\n\n" );
+
 }
 
 int main(int argc, char *argv[])
@@ -272,10 +305,10 @@ int main(int argc, char *argv[])
 	struct ifreq int_req;
 	char str1[16], str2[16];
 
-	printf( "B.A.T.M.A.N-II v%s (internal version %x)\n", VERSION, BATMAN_VERSION );
+	printf( "B.A.T.M.A.N-II v%s (internal version %i)\n", VERSION, BATMAN_VERSION );
 	dev = NULL;
 
-	while ( ( optchar = getopt ( argc, argv, "d:ho:i:g:" ) ) != -1 ) {
+	while ( ( optchar = getopt ( argc, argv, "d:hHo:i:g:r:" ) ) != -1 ) {
 
 		switch ( optchar ) {
 
@@ -284,36 +317,17 @@ int main(int argc, char *argv[])
 				errno = 0;
 				debug_level = strtol (optarg, NULL , 10);
 
-				if ((errno == ERANGE && (debug_level == LONG_MAX || debug_level == LONG_MIN))|| (errno != 0 && debug_level == 0)) {
+				if ( (errno == ERANGE && (debug_level == LONG_MAX || debug_level == LONG_MIN) ) || (errno != 0 && debug_level == 0) ) {
 						perror("strtol");
 						exit(EXIT_FAILURE);
 				}
 
-				if (debug_level < 0 || debug_level > 3){
+				if (debug_level < 0 || debug_level > 3) {
 						printf( "Invalid debug level: %i\nDebug level has to be between 0 and 3.\n", debug_level );
 						exit(EXIT_FAILURE);
 				}
 
-				if ( debug_level > 1 ) printf(" debug level: %i\n", debug_level);
-				break;
-
-			case 'o':
-
-				errno = 0;
-				orginator_interval = strtol (optarg, NULL , 10);
-
-				if ((errno == ERANGE && (orginator_interval == LONG_MAX || orginator_interval == LONG_MIN)) || (errno != 0 && orginator_interval == 0)) {
-					perror("strtol");
-					exit(EXIT_FAILURE);
-				}
-
-				if (orginator_interval < 1){
-					printf( "Invalid orginator interval specified: %i.\nThe Interval has to be greater than 0.\n", orginator_interval );
-					exit(EXIT_FAILURE);
-				}
-
-
-				if ( debug_level > 1 ) printf( "orginator interval: %i\n", orginator_interval );
+				if ( debug_level > 0 ) printf("debug level: %i\n", debug_level);
 				break;
 
 			case 'g':
@@ -321,18 +335,22 @@ int main(int argc, char *argv[])
 				errno = 0;
 				gateway_class = strtol (optarg, NULL , 10);
 
-				if ((errno == ERANGE && (gateway_class == LONG_MAX || gateway_class == LONG_MIN)) || (errno != 0 && gateway_class == 0)) {
+				if ( (errno == ERANGE && (gateway_class == LONG_MAX || gateway_class == LONG_MIN) ) || (errno != 0 && gateway_class == 0) ) {
 					perror("strtol");
 					exit(EXIT_FAILURE);
 				}
 
-				if (gateway_class < 0 || gateway_class > 32){
+				if (gateway_class < 0 || gateway_class > 32) {
 					printf( "Invalid gateway class specified: %i.\nThe class is a value between 0 and 32.\n", gateway_class );
 					exit(EXIT_FAILURE);
 				}
 
 				if ( debug_level > 1 ) printf( "gateway class: %i\n", gateway_class );
 				break;
+
+			case 'H':
+				verbose_usage();
+				return (0);
 
 			case 'i':
 				dev = optarg;
@@ -343,6 +361,43 @@ int main(int argc, char *argv[])
 				}
 
 				if ( debug_level > 1 ) printf( "Using interface: %s\n", dev );
+				break;
+
+			case 'o':
+
+				errno = 0;
+				orginator_interval = strtol (optarg, NULL , 10);
+
+				if ( (errno == ERANGE && (orginator_interval == LONG_MAX || orginator_interval == LONG_MIN) ) || (errno != 0 && orginator_interval == 0) ) {
+					perror("strtol");
+					exit(EXIT_FAILURE);
+				}
+
+				if (orginator_interval < 1) {
+					printf( "Invalid orginator interval specified: %i.\nThe Interval has to be greater than 0.\n", orginator_interval );
+					exit(EXIT_FAILURE);
+				}
+
+
+				if ( debug_level > 1 ) printf( "orginator interval: %i\n", orginator_interval );
+				break;
+
+			case 'r':
+
+				errno = 0;
+				routing_class = strtol (optarg, NULL , 10);
+
+				if ( (errno == ERANGE && (routing_class == LONG_MAX || routing_class == LONG_MIN) ) || (errno != 0 && routing_class == 0) ) {
+					perror("strtol");
+					exit(EXIT_FAILURE);
+				}
+
+				if (routing_class < 0 || routing_class > 3) {
+					printf( "Invalid routing class specified: %i.\nThe class is a value between 0 and 3.\n", routing_class );
+					exit(EXIT_FAILURE);
+				}
+
+				if ( debug_level > 1 ) printf( "routing class: %i\n", routing_class );
 				break;
 
 			case 'h':
@@ -357,6 +412,13 @@ int main(int argc, char *argv[])
 	if (dev == NULL)
 	{
 	  fprintf(stderr, "Error - no interface specified\n");
+		usage();
+		return 1;
+	}
+
+	if ( ( gateway_class != 0 ) && ( routing_class != 0 ) )
+	{
+		fprintf(stderr, "Error - routing class can't be set while gateway class is in use !\n");
 		usage();
 		return 1;
 	}
