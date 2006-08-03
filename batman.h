@@ -30,9 +30,7 @@
  * and recompile the code
  * Here is the stuff you may want to play with: */
 
-// #define INTERVAL 1000 /* orginator message interval in miliseconds */
 #define BIDIRECT_TO 3000 /* bidirectional neighbour reply timeout in ms */
-#define JITTER 100 /* jitter to reduce broadcast collisions in ms */
 #define TTL 50 /* Time To Live of broadcast messages */
 #define TIMEOUT 30000 /* sliding window size of received orginator messages in ms */
 

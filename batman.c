@@ -160,11 +160,11 @@ struct orig_node *get_orig_node( unsigned int addr )
 
 
 
-
-static void update_routes()
+static void update_routes( struct orig_node *orig_node )
 {
-	struct list_head *orig_pos, *neigh_pos, *pack_pos;
-	struct orig_node *orig_node;
+// 	struct list_head *orig_pos, *neigh_pos, *pack_pos;
+// 	struct orig_node *orig_node;
+	struct list_head *neigh_pos, *pack_pos;
 	struct neigh_node *neigh_node, *next_hop;
 	struct pack_node *pack_node;
 	int max_pack, max_ttl, neigh_ttl, neigh_pkts;
@@ -173,71 +173,67 @@ static void update_routes()
 	if (debug_level >= 2)
 		output("update_routes() \n");
 
-	/* for every origin... */
-	list_for_each(orig_pos, &orig_list) {
-		orig_node = list_entry(orig_pos, struct orig_node, list);
+	max_ttl  = 0;
+	max_pack = 0;
+	next_hop = NULL;
 
-		max_ttl  = 0;
-		max_pack = 0;
-		next_hop = NULL;
+	/* for every neighbour... */
+	list_for_each(neigh_pos, &orig_node->neigh_list) {
+		neigh_node = list_entry(neigh_pos, struct neigh_node, list);
 
-		/* for every neighbour... */
-		list_for_each(neigh_pos, &orig_node->neigh_list) {
-			neigh_node = list_entry(neigh_pos, struct neigh_node, list);
+		neigh_ttl = 0;
+		neigh_pkts = 0;
 
-			neigh_ttl = 0;
-			neigh_pkts = 0;
+		list_for_each(pack_pos, &neigh_node->pack_list) {
+			pack_node = list_entry(pack_pos, struct pack_node, list);
+			if (pack_node->ttl > neigh_ttl)
+				neigh_ttl = pack_node->ttl;
 
-			list_for_each(pack_pos, &neigh_node->pack_list) {
-				pack_node = list_entry(pack_pos, struct pack_node, list);
-				if (pack_node->ttl > neigh_ttl)
-					neigh_ttl = pack_node->ttl;
-
-				neigh_pkts++;
-			}
-
-			/* if received most orig_packets via this neighbour (or ) then
-		 		select this neighbour as next hop for this origin */
-			if ((neigh_pkts > max_pack) || ((neigh_pkts > max_pack) && (neigh_ttl > max_ttl))) {
-				max_pack = neigh_pkts;
-				max_ttl = neigh_ttl;
-
-				next_hop = neigh_node;
-				if (debug_level >= 2)
-					output("%d living received packets via selected router \n", neigh_pkts );
-			}
+			neigh_pkts++;
 		}
 
-		if (next_hop != NULL) {
-			if (debug_level >= 2) {
-				addr_to_string(orig_node->orig, orig_str, ADDR_STR_LEN);
-				addr_to_string(next_hop->addr, next_str, ADDR_STR_LEN);
+		/* if received most orig_packets via this neighbour (or ) then
+			select this neighbour as next hop for this origin */
+		if ((neigh_pkts > max_pack) || ((neigh_pkts == max_pack) && (neigh_ttl > max_ttl))) {
+			max_pack = neigh_pkts;
+			max_ttl = neigh_ttl;
 
-				output("Route to %s via %s\n", orig_str, next_str);
-			}
-
-
-			if (orig_node->router != next_hop->addr) {
-				if (debug_level >= 2)
-				output("Route changed\n");
-
-				if (orig_node->router != 0) {
-					if (debug_level >= 2)
-						output("Deleting previous route\n");
-
-					add_del_route(orig_node->orig, orig_node->router, 1);
-				}
-
-				if (debug_level >= 2) { output("Adding new route\n");  }
-
-
-				/* TODO: maybe the order delete, add should be changed ???? */
-				add_del_route(orig_node->orig, next_hop->addr, 0);
-
-				orig_node->router = next_hop->addr;
-			}
+			next_hop = neigh_node;
+			if (debug_level >= 2)
+				output("%d living received packets via selected router \n", neigh_pkts );
 		}
 	}
+
+	if (next_hop != NULL) {
+		if (debug_level >= 2) {
+			addr_to_string(orig_node->orig, orig_str, ADDR_STR_LEN);
+			addr_to_string(next_hop->addr, next_str, ADDR_STR_LEN);
+
+			output("Route to %s via %s\n", orig_str, next_str);
+		}
+
+
+		if (orig_node->router != next_hop->addr) {
+			if (debug_level >= 2)
+			output("Route changed\n");
+
+			if (orig_node->router != 0) {
+				if (debug_level >= 2)
+					output("Deleting previous route\n");
+
+				add_del_route(orig_node->orig, orig_node->router, 1);
+			}
+
+			if (debug_level >= 2) { output("Adding new route\n");  }
+
+
+			/* TODO: maybe the order delete, add should be changed ???? */
+			add_del_route(orig_node->orig, next_hop->addr, 0);
+
+			orig_node->router = next_hop->addr;
+		}
+	}
+
 }
 
 static void update_gw_list( unsigned int addr, unsigned char new_gwflags )
@@ -476,7 +472,7 @@ void update_originator(struct packet *in, unsigned int neigh)
 	pack_node->ttl = in->ttl;
 	pack_node->time = get_time();
 
-	update_routes();
+	update_routes( orig_node );
 }
 
 void schedule_forward_packet( struct packet *in, int unidirectional)
@@ -505,7 +501,7 @@ void schedule_forward_packet( struct packet *in, int unidirectional)
 			forw_node_new->pack.flags = (forw_node_new->pack.flags | UNIDIRECTIONAL);
 		}
 
-		forw_node_new->when = get_time() + rand_num(JITTER);
+		forw_node_new->when = get_time();
 
 		list_for_each(forw_pos, &forw_list) {
 			forw_node = list_entry(forw_pos, struct forw_node, list);
@@ -576,7 +572,7 @@ void schedule_own_packet() {
 
 		list_add(&forw_node_new->list, (forw_node == NULL ? &forw_list : forw_pos));
 
-		next_own += orginator_interval - JITTER + rand_num(2 * JITTER);
+		next_own += orginator_interval;
 		out.seqno++;
 	}
 }
@@ -603,6 +599,8 @@ void purge()
 			/* for all packets from the origins via this neighbours... */
 			list_for_each_safe(pack_pos, pack_temp, &neigh_node->pack_list) {
 				pack_node = list_entry(pack_pos, struct pack_node, list);
+
+//TODO liste rückwärts durchgehen bis kein timeout mehr auftritt
 
 				/* remove them if outdated */
 				if ((int)((pack_node->time + TIMEOUT) < get_time()))
@@ -646,7 +644,8 @@ void purge()
 		}
 	}
 
-	update_routes();
+	/* is not needed - calculate new route with next packet
+	update_routes(); */
 }
 
 
@@ -670,7 +669,7 @@ int batman(unsigned int addr_parm)
 	out.flags = 0x00;
 	out.ttl = TTL;
 	out.seqno = 0;
-	out.interval = orginator_interval + JITTER;
+	out.interval = orginator_interval;
 	out.gwflags = gateway_class;
 	out.version = BATMAN_VERSION;
 
@@ -763,6 +762,7 @@ int batman(unsigned int addr_parm)
 				}
 			}
 		}
+
 		send_outstanding_packets();
 
 		purge();

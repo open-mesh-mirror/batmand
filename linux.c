@@ -292,7 +292,7 @@ static void verbose_usage(void)
 	fprintf(stderr, "          default:         0 -> set no default route\n" );
 	fprintf(stderr, "          allowed values:  1 -> use fast internet connection\n" );
 	fprintf(stderr, "                           2 -> use stable internet connection\n" );
-	fprintf(stderr, "                           3 -> use olsr style\n\n" );
+	fprintf(stderr, "                           3 -> use best statistic internet connection (olsr style)\n\n" );
 
 }
 
