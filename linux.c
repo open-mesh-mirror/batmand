@@ -257,7 +257,7 @@ static void handler(int sig)
 
 static void usage(void)
 {
-	fprintf(stderr, "Usage: batman -i interface [options]\n" );
+	fprintf(stderr, "Usage: batman [options] interface\n" );
 	fprintf(stderr, "       -d debug level\n" );
 	fprintf(stderr, "       -g gateway class\n" );
 	fprintf(stderr, "       -h this help\n" );
@@ -268,7 +268,7 @@ static void usage(void)
 
 static void verbose_usage(void)
 {
-	fprintf(stderr, "Usage: batman -i interface [options]\n\n" );
+	fprintf(stderr, "Usage: batman [options] interface\n\n" );
 	fprintf(stderr, "       -d debug level\n" );
 	fprintf(stderr, "          default: 0, allowed values: 0 - 3\n\n" );
 	fprintf(stderr, "       -g gateway class\n" );
@@ -308,7 +308,7 @@ int main(int argc, char *argv[])
 	printf( "B.A.T.M.A.N-II v%s (internal version %i)\n", VERSION, BATMAN_VERSION );
 	dev = NULL;
 
-	while ( ( optchar = getopt ( argc, argv, "d:hHo:i:g:r:" ) ) != -1 ) {
+	while ( ( optchar = getopt ( argc, argv, "d:hHo:g:r:" ) ) != -1 ) {
 
 		switch ( optchar ) {
 
@@ -322,12 +322,11 @@ int main(int argc, char *argv[])
 						exit(EXIT_FAILURE);
 				}
 
-				if (debug_level < 0 || debug_level > 3) {
+				if ( debug_level < 0 || debug_level > 3 ) {
 						printf( "Invalid debug level: %i\nDebug level has to be between 0 and 3.\n", debug_level );
 						exit(EXIT_FAILURE);
 				}
 
-				if ( debug_level > 0 ) printf("debug level: %i\n", debug_level);
 				break;
 
 			case 'g':
@@ -340,28 +339,16 @@ int main(int argc, char *argv[])
 					exit(EXIT_FAILURE);
 				}
 
-				if (gateway_class < 0 || gateway_class > 32) {
+				if ( gateway_class < 0 || gateway_class > 32 ) {
 					printf( "Invalid gateway class specified: %i.\nThe class is a value between 0 and 32.\n", gateway_class );
 					exit(EXIT_FAILURE);
 				}
 
-				if ( debug_level > 1 ) printf( "gateway class: %i\n", gateway_class );
 				break;
 
 			case 'H':
 				verbose_usage();
 				return (0);
-
-			case 'i':
-				dev = optarg;
-
-				if (strlen(dev) > IFNAMSIZ - 1) {
-					fprintf(stderr, "Interface name too long\n");
-					exit(EXIT_FAILURE);
-				}
-
-				if ( debug_level > 1 ) printf( "Using interface: %s\n", dev );
-				break;
 
 			case 'o':
 
@@ -378,8 +365,6 @@ int main(int argc, char *argv[])
 					exit(EXIT_FAILURE);
 				}
 
-
-				if ( debug_level > 1 ) printf( "orginator interval: %i\n", orginator_interval );
 				break;
 
 			case 'r':
@@ -397,7 +382,6 @@ int main(int argc, char *argv[])
 					exit(EXIT_FAILURE);
 				}
 
-				if ( debug_level > 1 ) printf( "routing class: %i\n", routing_class );
 				break;
 
 			case 'h':
@@ -409,11 +393,21 @@ int main(int argc, char *argv[])
 
 	}
 
+	while ( ( optind < argc ) && ( argv[optind][0] != '-' ) ) optind++;
+	if ( argc > 1 ) dev = argv[optind - 1];
+
 	if (dev == NULL)
 	{
 	  fprintf(stderr, "Error - no interface specified\n");
 		usage();
 		return 1;
+	} else {
+
+		if (strlen(dev) > IFNAMSIZ - 1) {
+			fprintf(stderr, "Interface name too long\n");
+			exit(EXIT_FAILURE);
+		}
+
 	}
 
 	if ( ( gateway_class != 0 ) && ( routing_class != 0 ) )
@@ -422,6 +416,12 @@ int main(int argc, char *argv[])
 		usage();
 		return 1;
 	}
+
+	if ( debug_level > 0 ) printf("debug level: %i\n", debug_level);
+	if ( debug_level > 1 ) printf( "Using interface: %s\n", dev );
+	if ( ( debug_level > 1 ) && ( orginator_interval != 1000 ) ) printf( "orginator interval: %i\n", orginator_interval );
+	if ( ( debug_level > 1 ) && ( gateway_class > 0 ) ) printf( "gateway class: %i\n", gateway_class );
+	if ( ( debug_level > 1 ) && ( routing_class > 0 ) ) printf( "routing class: %i\n", routing_class );
 
 	sock = socket(PF_INET, SOCK_DGRAM, 0);
 

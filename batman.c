@@ -162,8 +162,7 @@ struct orig_node *get_orig_node( unsigned int addr )
 
 static void update_routes( struct orig_node *orig_node )
 {
-// 	struct list_head *orig_pos, *neigh_pos, *pack_pos;
-// 	struct orig_node *orig_node;
+
 	struct list_head *neigh_pos, *pack_pos;
 	struct neigh_node *neigh_node, *next_hop;
 	struct pack_node *pack_node;
