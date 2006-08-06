@@ -2,10 +2,17 @@
 version 0.1
 ^^^^^^^^^^^
 
+new functions:
+
+- gateway classes added
+- routing classes added
+- set orginator interval via command line switch
+- batman version check added
+- preferred gateway funtion added
+
+
+bug fixes:
 - fix bug neighbour in select ( max packet && ttl )
 - performance improvement in update_routes()
-- gateway classes added && broadcast
-- routing classes added && configurable
-- set orginator interval via command line switch
-- batman version check introduced
+- performance improvement in purge()
 - JITTER removed

@@ -45,6 +45,7 @@ extern int debug_level;
 extern int orginator_interval;
 extern int gateway_class;
 extern int routing_class;
+extern unsigned int pref_gateway;
 
 
 static void get_time_internal(struct timeval *tv)
@@ -263,6 +264,7 @@ static void usage(void)
 	fprintf(stderr, "       -h this help\n" );
 	fprintf(stderr, "       -H verbose help\n" );
 	fprintf(stderr, "       -o orginator interval in ms\n" );
+	fprintf(stderr, "       -p preferred gateway\n" );
 	fprintf(stderr, "       -r routing class\n" );
 }
 
@@ -288,6 +290,8 @@ static void verbose_usage(void)
 	fprintf(stderr, "       -H this help\n" );
 	fprintf(stderr, "       -o orginator interval in ms\n" );
 	fprintf(stderr, "          default: 1000, allowed values: >0\n\n" );
+	fprintf(stderr, "       -p preferred gateway\n" );
+	fprintf(stderr, "          default: none, allowed values: IP\n\n" );
 	fprintf(stderr, "       -r routing class (only needed if gateway class = 0)\n" );
 	fprintf(stderr, "          default:         0 -> set no default route\n" );
 	fprintf(stderr, "          allowed values:  1 -> use fast internet connection\n" );
@@ -299,16 +303,20 @@ static void verbose_usage(void)
 int main(int argc, char *argv[])
 {
 	struct sockaddr_in addr, null;
+	struct in_addr tmp_pref_gw;
 	int on;
 	int res;
-	int optchar;
+	int optchar, found_args = 1;
 	struct ifreq int_req;
 	char str1[16], str2[16];
 
-	printf( "B.A.T.M.A.N-II v%s (internal version %i)\n", VERSION, BATMAN_VERSION );
 	dev = NULL;
+	memset(&tmp_pref_gw, 0, sizeof (struct in_addr));
+// 	tmp_pref_gw->sin_family = AF_INET;
 
-	while ( ( optchar = getopt ( argc, argv, "d:hHo:g:r:" ) ) != -1 ) {
+	printf( "B.A.T.M.A.N-II v%s (internal version %i)\n", VERSION, BATMAN_VERSION );
+
+	while ( ( optchar = getopt ( argc, argv, "d:hHo:g:r:p:" ) ) != -1 ) {
 
 		switch ( optchar ) {
 
@@ -327,6 +335,7 @@ int main(int argc, char *argv[])
 						exit(EXIT_FAILURE);
 				}
 
+				found_args += 2;
 				break;
 
 			case 'g':
@@ -344,6 +353,7 @@ int main(int argc, char *argv[])
 					exit(EXIT_FAILURE);
 				}
 
+				found_args += 2;
 				break;
 
 			case 'H':
@@ -365,6 +375,22 @@ int main(int argc, char *argv[])
 					exit(EXIT_FAILURE);
 				}
 
+				found_args += 2;
+				break;
+
+			case 'p':
+
+				errno = 0;
+				if ( inet_pton(AF_INET, optarg, &tmp_pref_gw) < 1 ) {
+
+					printf( "Invalid preferred gateway IP specified: %s\n", optarg );
+					exit(EXIT_FAILURE);
+
+				}
+
+				pref_gateway = tmp_pref_gw.s_addr;
+
+				found_args += 2;
 				break;
 
 			case 'r':
@@ -382,6 +408,7 @@ int main(int argc, char *argv[])
 					exit(EXIT_FAILURE);
 				}
 
+				found_args += 2;
 				break;
 
 			case 'h':
@@ -393,8 +420,7 @@ int main(int argc, char *argv[])
 
 	}
 
-	while ( ( optind < argc ) && ( argv[optind][0] != '-' ) ) optind++;
-	if ( argc > 1 ) dev = argv[optind - 1];
+	if ( argc > found_args ) dev = argv[found_args];
 
 	if (dev == NULL)
 	{
@@ -417,11 +443,22 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
+	if ( ( gateway_class != 0 ) && ( pref_gateway != 0 ) )
+	{
+		fprintf(stderr, "Error - preferred gateway can't be set while gateway class is in use !\n");
+		usage();
+		return 1;
+	}
+
 	if ( debug_level > 0 ) printf("debug level: %i\n", debug_level);
-	if ( debug_level > 1 ) printf( "Using interface: %s\n", dev );
-	if ( ( debug_level > 1 ) && ( orginator_interval != 1000 ) ) printf( "orginator interval: %i\n", orginator_interval );
-	if ( ( debug_level > 1 ) && ( gateway_class > 0 ) ) printf( "gateway class: %i\n", gateway_class );
-	if ( ( debug_level > 1 ) && ( routing_class > 0 ) ) printf( "routing class: %i\n", routing_class );
+	if ( debug_level > 0 ) printf( "Using interface: %s\n", dev );
+	if ( ( debug_level > 0 ) && ( orginator_interval != 1000 ) ) printf( "orginator interval: %i\n", orginator_interval );
+	if ( ( debug_level > 0 ) && ( gateway_class > 0 ) ) printf( "gateway class: %i\n", gateway_class );
+	if ( ( debug_level > 0 ) && ( routing_class > 0 ) ) printf( "routing class: %i\n", routing_class );
+	if ( ( debug_level > 0 ) && ( pref_gateway > 0 ) ) {
+		addr_to_string(pref_gateway, str1, sizeof (str1));
+		printf( "preferred gateway: %s\n", str1 );
+	}
 
 	sock = socket(PF_INET, SOCK_DGRAM, 0);
 
@@ -436,7 +473,7 @@ int main(int argc, char *argv[])
 
 	if (ioctl(sock, SIOCGIFADDR, &int_req) < 0)
 	{
-		fprintf(stderr, "Cannot get IP address of interface %s\n", argv[1]);
+		fprintf(stderr, "Cannot get IP address of interface %s\n", dev);
 		close(sock);
 		return 1;
 	}
@@ -445,7 +482,7 @@ int main(int argc, char *argv[])
 
 	if (ioctl(sock, SIOCGIFBRDADDR, &int_req) < 0)
 	{
-		fprintf(stderr, "Cannot get broadcast IP address of interface %s\n", argv[1]);
+		fprintf(stderr, "Cannot get broadcast IP address of interface %s\n", dev);
 		close(sock);
 		return 1;
 	}

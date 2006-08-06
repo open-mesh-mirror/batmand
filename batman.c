@@ -59,7 +59,7 @@ int gateway_class = 0;
  * 0 set no default route
  * 1 use fast internet connection
  * 2 use stable internet connection
- * 3 use olsr style
+ * 3 use use best statistic (olsr style)
  * this option is used to set the routing behaviour
  */
 
@@ -67,6 +67,9 @@ int routing_class = 0;
 
 
 int orginator_interval = 1000; /* orginator message interval in miliseconds */
+
+struct gw_node *curr_gateway = NULL;
+unsigned int pref_gateway = 0;
 #define UNIDIRECTIONAL 0xF0
 #define ADDR_STR_LEN 16
 
@@ -87,6 +90,7 @@ struct orig_node
 	struct list_head list;
 	unsigned int orig;
 	unsigned int router;
+	unsigned int packet_count; /* packets gathered from its router */
 	unsigned int last_seen;    /* when last originator packet (with new seq-number) from this node was received */
 	unsigned int last_reply;   /* if node is a neighbour, when my originator packet was last broadcasted (replied) by this node and received by me */
 	unsigned int last_aware;   /* if node is a neighbour, when last packet via this node was received */
@@ -116,6 +120,12 @@ struct forw_node
 	struct list_head list;
 	unsigned int when;
 	struct packet pack;
+};
+
+struct gw_node
+{
+	struct list_head list;
+	struct orig_node *orig_node;
 };
 
 
@@ -152,10 +162,102 @@ struct orig_node *get_orig_node( unsigned int addr )
 
 	orig_node->orig = addr;
 	orig_node->gwflags = 0;
+	orig_node->packet_count = 0;
 
 	list_add_tail(&orig_node->list, &orig_list);
 
 	return orig_node;
+}
+
+
+
+static void choose_gw()
+{
+	struct list_head *pos;
+	struct gw_node *gw_node, *tmp_curr_gw;
+	int max_gw_class = 0, max_packets = 0, max_gw_factor = 0;
+	static char orig_str[ADDR_STR_LEN];
+
+
+	if ( routing_class == 0 ) return;
+
+	if ( list_empty(&gw_list) ) {
+
+		if ( curr_gateway != NULL ) {
+
+			if (debug_level >= 0) output( "Removing default route - no gateway in range\n" );
+
+			/* TODO remove default route */
+
+			curr_gateway = NULL;
+
+		}
+
+		return;
+
+	}
+
+
+	list_for_each(pos, &gw_list) {
+
+		gw_node = list_entry(pos, struct gw_node, list);
+
+		switch ( routing_class ) {
+
+			case 1:   /* fast connection */
+				if ( ( gw_node->orig_node->gwflags > max_gw_class ) || ( ( gw_node->orig_node->gwflags == max_gw_class ) && ( gw_node->orig_node->packet_count > max_packets ) ) ) tmp_curr_gw = gw_node;
+				break;
+
+			case 2:   /* stable connection */
+				if ( ( ( gw_node->orig_node->packet_count * gw_node->orig_node->gwflags ) > max_gw_factor ) || ( ( ( gw_node->orig_node->packet_count * gw_node->orig_node->gwflags ) == max_gw_factor ) && ( gw_node->orig_node->packet_count > max_packets ) ) ) tmp_curr_gw = gw_node;
+				break;
+
+			default:  /* use best statistic (olsr style) */
+				if ( gw_node->orig_node->packet_count > max_packets ) tmp_curr_gw = gw_node;
+				break;
+
+		}
+
+		if ( gw_node->orig_node->gwflags > max_gw_class ) max_gw_class = gw_node->orig_node->gwflags;
+		if ( gw_node->orig_node->packet_count > max_packets ) max_packets = gw_node->orig_node->packet_count;
+		if ( ( gw_node->orig_node->packet_count * gw_node->orig_node->gwflags ) > max_gw_class ) max_gw_factor = ( gw_node->orig_node->packet_count * gw_node->orig_node->gwflags );
+
+		if ( ( pref_gateway != 0 ) && ( pref_gateway == gw_node->orig_node->orig ) ) {
+
+			tmp_curr_gw = gw_node;
+
+			if (debug_level >= 0) {
+				addr_to_string( tmp_curr_gw->orig_node->orig, orig_str, ADDR_STR_LEN );
+				output( "Preferred gateway found: %s (%i,%i,%i)\n", orig_str, gw_node->orig_node->gwflags, gw_node->orig_node->packet_count, ( gw_node->orig_node->packet_count * gw_node->orig_node->gwflags ) );
+			}
+
+			break;
+
+		}
+
+	}
+
+
+	if ( curr_gateway != tmp_curr_gw ) {
+
+		if ( curr_gateway != NULL ) {
+
+			if (debug_level >= 0) output( "Removing default route - better gateway found\n" );
+
+			/* TODO remove default route */
+
+		}
+
+		if (debug_level >= 0) {
+			addr_to_string( tmp_curr_gw->orig_node->orig, orig_str, ADDR_STR_LEN );
+			output( "Adding default route to %s (%i,%i,%i)\n", orig_str, max_gw_class, max_packets, max_gw_factor );
+		}
+
+		/* TODO add default route */
+		curr_gateway = tmp_curr_gw;
+
+	}
+
 }
 
 
@@ -207,10 +309,10 @@ static void update_routes( struct orig_node *orig_node )
 		if (debug_level >= 2) {
 			addr_to_string(orig_node->orig, orig_str, ADDR_STR_LEN);
 			addr_to_string(next_hop->addr, next_str, ADDR_STR_LEN);
-
 			output("Route to %s via %s\n", orig_str, next_str);
 		}
 
+		orig_node->packet_count = neigh_pkts;
 
 		if (orig_node->router != next_hop->addr) {
 			if (debug_level >= 2)
@@ -235,45 +337,45 @@ static void update_routes( struct orig_node *orig_node )
 
 }
 
-static void update_gw_list( unsigned int addr, unsigned char new_gwflags )
+static void update_gw_list( struct orig_node *orig_node, unsigned char new_gwflags )
 {
 
 	struct list_head *pos;
-	struct orig_node *orig_node;
+	struct gw_node *gw_node;
 	static char orig_str[ADDR_STR_LEN];
 
 	list_for_each(pos, &gw_list) {
 
-		orig_node = list_entry(pos, struct orig_node, list);
+		gw_node = list_entry(pos, struct gw_node, list);
 
-		if ( orig_node->orig == addr ) {
+		if ( gw_node->orig_node == orig_node ) {
 
 			if (debug_level >= 0) {
 
-				addr_to_string( orig_node->orig, orig_str, ADDR_STR_LEN );
-				output( "gateway class of originator %s changed from %i to %i\n", orig_str, orig_node->gwflags, new_gwflags );
+				addr_to_string( gw_node->orig_node->orig, orig_str, ADDR_STR_LEN );
+				output( "Gateway class of originator %s changed from %i to %i\n", orig_str, gw_node->orig_node->gwflags, new_gwflags );
 
 			}
 
-			orig_node->gwflags = new_gwflags;
+			gw_node->orig_node->gwflags = new_gwflags;
 			return;
 
 		}
 
 	}
 
-	if (debug_level >= 0)
-		output( "Creating new gateway\n" );
+	if (debug_level >= 0) {
+		addr_to_string( gw_node->orig_node->orig, orig_str, ADDR_STR_LEN );
+		output( "Found new gateway %s with class %i\n", orig_str, new_gwflags );
+	}
 
-	orig_node = alloc_memory(sizeof(struct orig_node));
-	memset(orig_node, 0, sizeof(struct orig_node));
-	INIT_LIST_HEAD(&orig_node->list);
-	INIT_LIST_HEAD(&orig_node->neigh_list);
+	gw_node = alloc_memory(sizeof(struct gw_node));
+	memset(gw_node, 0, sizeof(struct gw_node));
+	INIT_LIST_HEAD(&gw_node->list);
 
-	orig_node->orig = addr;
-	orig_node->gwflags = new_gwflags;
+	gw_node->orig_node = orig_node;
 
-	list_add_tail(&orig_node->list, &gw_list);
+	list_add_tail(&gw_node->list, &gw_list);
 
 }
 
@@ -424,7 +526,7 @@ void update_originator(struct packet *in, unsigned int neigh)
 	orig_node->flags = in->flags;
 
 	if ( orig_node->gwflags != in->gwflags )
-		update_gw_list( in->orig, in->gwflags );
+		update_gw_list( orig_node, in->gwflags );
 
 	orig_node->gwflags = in->gwflags;
 
@@ -472,6 +574,7 @@ void update_originator(struct packet *in, unsigned int neigh)
 	pack_node->time = get_time();
 
 	update_routes( orig_node );
+
 }
 
 void schedule_forward_packet( struct packet *in, int unidirectional)
@@ -578,10 +681,11 @@ void schedule_own_packet() {
 
 void purge()
 {
-	struct list_head *orig_pos, *neigh_pos, *pack_pos, *orig_temp, *neigh_temp, *pack_temp;
+	struct list_head *orig_pos, *neigh_pos, *pack_pos, *gw_pos, *orig_temp, *neigh_temp, *pack_temp;
 	struct orig_node *orig_node;
 	struct neigh_node *neigh_node;
 	struct pack_node *pack_node;
+	struct gw_node *gw_node;
 	static char orig_str[ADDR_STR_LEN], neigh_str[ADDR_STR_LEN];
 
 	if (debug_level >= 2)
@@ -599,8 +703,6 @@ void purge()
 			list_for_each_safe(pack_pos, pack_temp, &neigh_node->pack_list) {
 				pack_node = list_entry(pack_pos, struct pack_node, list);
 
-//TODO liste rückwärts durchgehen bis kein timeout mehr auftritt
-
 				/* remove them if outdated */
 				if ((int)((pack_node->time + TIMEOUT) < get_time()))
 				{
@@ -612,6 +714,11 @@ void purge()
 					}
 					list_del(pack_pos);
 					free_memory(pack_node);
+				} else {
+
+					/* if this packet is not outdated the following packets won't be either */
+					break;
+
 				}
 			}
 
@@ -633,6 +740,25 @@ void purge()
 				addr_to_string(orig_node->orig, orig_str, sizeof (orig_str));
 				output("Removing orphaned originator %s\n", orig_str);
 			}
+
+			list_for_each(gw_pos, &gw_list) {
+
+				gw_node = list_entry(gw_pos, struct gw_node, list);
+
+				if ( gw_node->orig_node == orig_node ) {
+
+					addr_to_string( gw_node->orig_node->orig, orig_str, ADDR_STR_LEN );
+					if (debug_level >= 0) output( "Removing gateway %s from gateway list\n", orig_str );
+
+					list_del(gw_pos);
+					free_memory(gw_pos);
+
+					break;
+
+				}
+
+			}
+
 			list_del(orig_pos);
 
 			if (debug_level >= 2)
