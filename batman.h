@@ -53,16 +53,6 @@ extern struct list_head if_list;
 
 
 
-struct batman_if
-{
-	struct list_head list;
-	char *dev;
-	int sock;
-	int if_num;
-	struct sockaddr_in addr;
-	struct sockaddr_in broad;
-};
-
 struct packet
 {
 	unsigned long  orig;
@@ -117,6 +107,17 @@ struct gw_node
 {
 	struct list_head list;
 	struct orig_node *orig_node;
+};
+
+struct batman_if
+{
+	struct list_head list;
+	char *dev;
+	int sock;
+	int if_num;
+	struct sockaddr_in addr;
+	struct sockaddr_in broad;
+	struct packet out;
 };
 
 

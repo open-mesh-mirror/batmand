@@ -24,8 +24,8 @@
 #include <stdio.h>
 #include <arpa/inet.h>
 #include "os.h"
-#include "batman.h"
 #include "list.h"
+#include "batman.h"
 
 /* "-d" is the command line switch for the debug level,
  * specify it multiple times to increase verbosity
@@ -80,8 +80,6 @@ static LIST_HEAD(forw_list);
 static LIST_HEAD(gw_list);
 LIST_HEAD(if_list);
 static unsigned int next_own;
-
-static struct packet out;
 
 
 
@@ -610,7 +608,7 @@ void send_outstanding_packets()
 
 				batman_if = list_entry(if_pos, struct batman_if, list);
 
-				if (send_packet((unsigned char *)pack, sizeof (struct packet),&batman_if->broad, batman_if->sock) < 0) {
+				if (send_packet((unsigned char *)pack, sizeof (struct packet), &batman_if->broad, batman_if->sock) < 0) {
 					output("ERROR: send_packet returned -1 \n");
 					exit( -1);
 				}
@@ -626,7 +624,8 @@ void send_outstanding_packets()
 void schedule_own_packet() {
 	int queue_own = 1;
 	struct forw_node *forw_node = NULL, *forw_node_new;
-	struct list_head *forw_pos;
+	struct list_head *forw_pos, *if_pos;
+	struct batman_if *batman_if;
 
 	list_for_each(forw_pos, &forw_list) {
 		forw_node = list_entry(forw_pos, struct forw_node, list);
@@ -640,17 +639,26 @@ void schedule_own_packet() {
 	}
 
 	if (queue_own != 0) {
-		forw_node_new = alloc_memory(sizeof (struct forw_node));
-		INIT_LIST_HEAD(&forw_node_new->list);
 
-		memcpy(&forw_node_new->pack, &out, sizeof (struct packet));
-		forw_node_new->when = next_own;
+		list_for_each(if_pos, &if_list) {
 
-		list_add(&forw_node_new->list, (forw_node == NULL ? &forw_list : forw_pos));
+			batman_if = list_entry(if_pos, struct batman_if, list);
 
-		next_own += orginator_interval;
-		out.seqno++;
+			forw_node_new = alloc_memory(sizeof (struct forw_node));
+			INIT_LIST_HEAD(&forw_node_new->list);
+
+			memcpy(&forw_node_new->pack, &batman_if->out, sizeof (struct packet));
+			forw_node_new->when = next_own;
+
+			list_add(&forw_node_new->list, (forw_node == NULL ? &forw_list : forw_pos));
+
+			next_own += orginator_interval;
+			batman_if->out.seqno++;
+
+		}
+
 	}
+
 }
 
 void purge()
@@ -765,12 +773,17 @@ int batman()
 
 	next_own = 0;
 
-	out.flags = 0x00;
-	out.ttl = TTL;
-	out.seqno = 0;
-	out.interval = orginator_interval;
-	out.gwflags = gateway_class;
-	out.version = BATMAN_VERSION;
+	list_for_each(if_pos, &if_list) {
+		batman_if = list_entry(if_pos, struct batman_if, list);
+
+		batman_if->out.orig = batman_if->addr.sin_addr.s_addr;
+		batman_if->out.flags = 0x00;
+		batman_if->out.ttl = TTL;
+		batman_if->out.seqno = 0;
+		batman_if->out.interval = orginator_interval;
+		batman_if->out.gwflags = gateway_class;
+		batman_if->out.version = BATMAN_VERSION;
+	}
 
 	forward_old = get_forwarding();
 	set_forwarding(1);
