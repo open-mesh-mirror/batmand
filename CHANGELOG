@@ -6,6 +6,7 @@ new functions:
 
 - gateway classes added
 - routing classes added
+- multiple interface support added (experimental)
 - set orginator interval via command line switch
 - batman version check added
 - preferred gateway funtion added

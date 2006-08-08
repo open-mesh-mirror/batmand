@@ -220,6 +220,7 @@ int receive_packet(unsigned char *buff, int len, unsigned int *neigh, unsigned i
 
 		FD_SET(batman_if->sock, &wait_set);
 		if ( batman_if->sock > max_sock ) max_sock = batman_if->sock;
+
 	}
 
 	for (;;)
@@ -500,7 +501,7 @@ int main(int argc, char *argv[])
 			exit(EXIT_FAILURE);
 		}
 
-		if (bind(batman_if->sock, (struct sockaddr *)&batman_if->addr, sizeof (struct sockaddr_in)) < 0)
+		if (bind(batman_if->sock, (struct sockaddr *)&batman_if->broad, sizeof (struct sockaddr_in)) < 0)
 		{
 			fprintf(stderr, "Cannot bind socket: %s\n", strerror(errno));
 			close_all_sockets();
@@ -510,7 +511,7 @@ int main(int argc, char *argv[])
 		addr_to_string(batman_if->addr.sin_addr.s_addr, str1, sizeof (str1));
 		addr_to_string(batman_if->broad.sin_addr.s_addr, str2, sizeof (str2));
 
-		printf("Using address %s and broadcast address %s\n", str1, str2);
+		printf("Using interface %s with address %s and broadcast address %s\n", batman_if->dev, str1, str2);
 
 		found_ifs++;
 		found_args++;
@@ -540,7 +541,6 @@ int main(int argc, char *argv[])
 	}
 
 	if ( debug_level > 0 ) printf("debug level: %i\n", debug_level);
-	if ( debug_level > 0 ) printf( "Using interface: %s\n", dev );
 	if ( ( debug_level > 0 ) && ( orginator_interval != 1000 ) ) printf( "orginator interval: %i\n", orginator_interval );
 	if ( ( debug_level > 0 ) && ( gateway_class > 0 ) ) printf( "gateway class: %i\n", gateway_class );
 	if ( ( debug_level > 0 ) && ( routing_class > 0 ) ) printf( "routing class: %i\n", routing_class );

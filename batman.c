@@ -246,6 +246,8 @@ static void update_routes( struct orig_node *orig_node )
 
 		/* if received most orig_packets via this neighbour (or ) then
 			select this neighbour as next hop for this origin */
+// 		printf( "%i\n", neigh_pkts[max_if->if_num] );
+		printf( "%i  %i  %i  %i\n", neigh_pkts[max_if->if_num], max_pack, neigh_ttl[max_if->if_num], max_ttl );
 		if ((neigh_pkts[max_if->if_num] > max_pack) || ((neigh_pkts[max_if->if_num] == max_pack) && (neigh_ttl[max_if->if_num] > max_ttl))) {
 			max_pack = neigh_pkts[max_if->if_num];
 			max_ttl = neigh_ttl[max_if->if_num];
@@ -448,7 +450,7 @@ struct orig_node *update_last_hop(struct packet *in, unsigned int neigh)
 	struct batman_if *batman_if;
 	int is_my_addr = 0, is_my_orig = 0;
 
-	if (debug_level >= 2) {
+	if (debug_level >= 0) {
 		output("update_last_hop(): Searching originator entry of last-hop neighbour of received packet \n"); }
 	orig_neigh_node = get_orig_node( neigh );
 	orig_neigh_node->last_aware = get_time();
@@ -463,7 +465,7 @@ struct orig_node *update_last_hop(struct packet *in, unsigned int neigh)
 	}
 
 	if (is_my_addr != 1 && is_my_orig == 1 && in->ttl == TTL-1)	{
-		if (debug_level >= 2)	{
+		if (debug_level >= 0)	{
 			output("received my own packet from neighbour indicating bidirectional link, updating last_reply stamp \n");
 		}
 		orig_neigh_node->last_reply = get_time();
@@ -480,7 +482,7 @@ void update_originator(struct packet *in, unsigned int neigh, struct batman_if *
 	struct neigh_node *neigh_node = NULL;
 	struct pack_node *pack_node = NULL;
 
-	if (debug_level >= 2)
+	if (debug_level >= 0)
 		output("update_originator(): Searching and updating originator entry of received packet,  \n");
 
 	orig_node = get_orig_node( in->orig );
@@ -807,13 +809,18 @@ int batman()
 			}
 
 			if (is_my_addr == 1 /* && in.orig == my_addr */) {
-				if (debug_level >= 3)
-					output("Ignoring all (zero-hop) packets send by me \n");
+				if (debug_level >= 3) {
+					addr_to_string(neigh, neigh_str, sizeof (neigh_str));
+					output("Ignoring all (zero-hop) packets send by me (sender: %s)\n", neigh_str);
+				}
 
 			} else {
+				addr_to_string(in.orig, orig_str, sizeof (orig_str));
+				addr_to_string(neigh, neigh_str, sizeof (neigh_str));
+				output("Received BATMAN packet from %s (originator %s, seqno %d, TTL %d)\n", neigh_str, orig_str, in.seqno, in.ttl);
 				orig_neigh_node = update_last_hop( &in, neigh );
 
-				if (debug_level >= 2) {
+				if (debug_level >= 0) {
 					if (isDuplicate(in.orig, in.seqno))
 						output("Duplicate packet \n");
 
