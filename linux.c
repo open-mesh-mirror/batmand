@@ -293,6 +293,7 @@ static void usage(void)
 	fprintf(stderr, "       -o orginator interval in ms\n" );
 	fprintf(stderr, "       -p preferred gateway\n" );
 	fprintf(stderr, "       -r routing class\n" );
+	fprintf(stderr, "       -s visualisation server\n" );
 }
 
 static void verbose_usage(void)
@@ -324,6 +325,8 @@ static void verbose_usage(void)
 	fprintf(stderr, "          allowed values:  1 -> use fast internet connection\n" );
 	fprintf(stderr, "                           2 -> use stable internet connection\n" );
 	fprintf(stderr, "                           3 -> use best statistic internet connection (olsr style)\n\n" );
+	fprintf(stderr, "       -s visualisation server\n" );
+	fprintf(stderr, "          default: none, allowed values: IP\n\n" );
 
 }
 
@@ -340,7 +343,7 @@ int main(int argc, char *argv[])
 
 	printf( "B.A.T.M.A.N-II v%s (internal version %i)\n", VERSION, BATMAN_VERSION );
 
-	while ( ( optchar = getopt ( argc, argv, "d:hHo:g:r:p:" ) ) != -1 ) {
+	while ( ( optchar = getopt ( argc, argv, "d:hHo:g:p:r:s:" ) ) != -1 ) {
 
 		switch ( optchar ) {
 
@@ -417,20 +420,18 @@ int main(int argc, char *argv[])
 				found_args += 2;
 				break;
 
-			case 'r':
+			case 's':
 
 				errno = 0;
-				routing_class = strtol (optarg, NULL , 10);
+				if ( inet_pton(AF_INET, optarg, &tmp_pref_gw) < 1 ) {
 
-				if ( (errno == ERANGE && (routing_class == LONG_MAX || routing_class == LONG_MIN) ) || (errno != 0 && routing_class == 0) ) {
-					perror("strtol");
+					printf( "Invalid preferred gateway IP specified: %s\n", optarg );
 					exit(EXIT_FAILURE);
+
 				}
 
-				if (routing_class < 0 || routing_class > 3) {
-					printf( "Invalid routing class specified: %i.\nThe class is a value between 0 and 3.\n", routing_class );
-					exit(EXIT_FAILURE);
-				}
+				pref_gateway = tmp_pref_gw.s_addr;
+
 
 				found_args += 2;
 				break;
