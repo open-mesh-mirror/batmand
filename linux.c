@@ -154,7 +154,7 @@ void add_del_route(unsigned int dest, unsigned int router, int del, char *dev, i
 	route.rt_metric = 1;
 
 	route.rt_dev = dev;
-	printf( "%i %s\n", sock, dev );
+
 	if (ioctl(sock, del ? SIOCDELRT : SIOCADDRT, &route) < 0)
 	{
 		fprintf(stderr, "Cannot %s route to %s via %s: %s\n",
@@ -195,7 +195,7 @@ int rand_num(int limit)
 	return rand() % limit;
 }
 
-int receive_packet(unsigned char *buff, int len, unsigned int *neigh, unsigned int timeout, struct batman_if *if_incoming)
+int receive_packet(unsigned char *buff, int len, unsigned int *neigh, unsigned int timeout, struct batman_if **if_incoming)
 {
 	fd_set wait_set;
 	int res, max_sock = 0;
@@ -245,7 +245,7 @@ int receive_packet(unsigned char *buff, int len, unsigned int *neigh, unsigned i
 
 	list_for_each(if_pos, &if_list) {
 		batman_if = list_entry(if_pos, struct batman_if, list);
-		printf( "batman_if %s, %i\n", batman_if->dev, batman_if->sock );
+
 		if ( FD_ISSET( batman_if->sock, &wait_set) ) {
 
 			if (recvfrom(batman_if->sock, buff, len, 0, (struct sockaddr *)&addr, &addr_len) < 0)
@@ -254,8 +254,7 @@ int receive_packet(unsigned char *buff, int len, unsigned int *neigh, unsigned i
 				return -1;
 			}
 
-			if_incoming = &batman_if;
-// 			printf( "incoming %s\n", (*if_incoming)->dev );
+			(*if_incoming) = batman_if;
 			break;
 
 		}

@@ -239,13 +239,10 @@ static void update_routes( struct orig_node *orig_node )
 
 			neigh_pkts[pack_node->if_incoming->if_num]++;
 			if ( neigh_pkts[pack_node->if_incoming->if_num] > neigh_pkts[max_if->if_num] ) max_if = pack_node->if_incoming;
-			printf("dev: %i - %s <> %s\n", neigh_pkts[pack_node->if_incoming->if_num], max_if->dev, pack_node->if_incoming->dev);
 		}
 
 		/* if received most orig_packets via this neighbour (or ) then
 			select this neighbour as next hop for this origin */
-// 		printf( "%i\n", neigh_pkts[max_if->if_num] );
-		printf( "%i  %i  %i  %i\n", neigh_pkts[max_if->if_num], max_pack, neigh_ttl[max_if->if_num], max_ttl );
 		if ((neigh_pkts[max_if->if_num] > max_pack) || ((neigh_pkts[max_if->if_num] == max_pack) && (neigh_ttl[max_if->if_num] > max_ttl))) {
 			max_pack = neigh_pkts[max_if->if_num];
 			max_ttl = neigh_ttl[max_if->if_num];
@@ -763,9 +760,8 @@ int batman()
 	struct list_head *forw_pos, *orig_pos, *if_pos;
 	struct forw_node *forw_node;
 	struct orig_node *orig_node, *orig_neigh_node;
-	struct batman_if *batman_if, if_incoming;
+	struct batman_if *batman_if, *if_incoming;
 	struct packet in;
-	void *if_incoming_tmp;
 	int res;
 	unsigned int neigh;
 	static char orig_str[ADDR_STR_LEN], neigh_str[ADDR_STR_LEN];
@@ -812,8 +808,7 @@ int batman()
 				addr_to_string(neigh, neigh_str, sizeof (neigh_str));
 				output("Received BATMAN packet from %s (originator %s, seqno %d, TTL %d)\n", neigh_str, orig_str, in.seqno, in.ttl);
 			}
-// 			if_incoming = *if_incoming_tmp;
-			printf("incoming2: %s\n", if_incoming.dev);
+
 			is_my_addr = is_my_orig = 0;
 
 			list_for_each(if_pos, &if_list) {
@@ -872,7 +867,7 @@ int batman()
 						!isDuplicate(in.orig, in.seqno) &&
 						!(in.flags & UNIDIRECTIONAL) ) {
 
-					update_originator( &in, neigh, &if_incoming );
+					update_originator( &in, neigh, if_incoming );
 					schedule_forward_packet(&in, 0);
 
 				} else if ( in.orig != neigh && is_my_orig != 1 &&
@@ -880,7 +875,7 @@ int batman()
 						!isDuplicate(in.orig, in.seqno) &&
 						!(in.flags & UNIDIRECTIONAL) ) {
 
-					update_originator( &in, neigh, &if_incoming );
+					update_originator( &in, neigh, if_incoming );
 					schedule_forward_packet(&in, 0);
 
 				} else {
