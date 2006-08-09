@@ -20,6 +20,8 @@
 #ifndef _BATMAN_OS_H
 #define _BATMAN_OS_H
 
+#include "batman.h"
+
 unsigned int get_time(void);
 void set_forwarding(int);
 int get_forwarding(void);
@@ -29,7 +31,7 @@ int is_aborted();
 void *alloc_memory(int len);
 void free_memory(void *mem);
 void addr_to_string(unsigned int addr, char *str, int len);
-int receive_packet(unsigned char *buff, int len, unsigned int *neigh, unsigned int timeout, void *if_incoming);
+int receive_packet(unsigned char *buff, int len, unsigned int *neigh, unsigned int timeout, struct batman_if *if_incoming);
 int send_packet(unsigned char *buff, int len, struct sockaddr_in *broad, int sock);
 int rand_num(int limit);
 
