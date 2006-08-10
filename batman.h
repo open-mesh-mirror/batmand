@@ -51,9 +51,8 @@ extern unsigned int pref_gateway;
 extern int found_ifs;
 
 extern struct list_head if_list;
-
-
-
+extern struct vis_if vis_if;
+  
 struct packet
 {
 	unsigned long  orig;
@@ -122,7 +121,10 @@ struct batman_if
 	struct packet out;
 };
 
-
+struct vis_if {
+	int sock;
+	struct sockaddr_in addr;
+};
 
 /*
 static void update_routes();

@@ -801,6 +801,31 @@ void purge()
 	update_routes(); */
 }
 
+void send_vis_packet()
+{
+	struct list_head *pos;
+	struct orig_node *orig_node;
+	char orig_str[ADDR_STR_LEN];
+
+	char *packet;	
+
+//	addr_to_string(orig_node->orig, orig_str, ADDR_STR_LEN);
+//	addr_to_string(orig_node->router, orig_str2, ADDR_STR_LEN);
+//	printf("%s, %s, %i\n",orig_str, orig_str2,orig_node->packet_count);
+	
+	list_for_each(pos, &orig_list) {
+		orig_node = list_entry(pos, struct orig_node, list);
+		
+		
+		addr_to_string(orig_node->orig, orig_str, ADDR_STR_LEN);
+		printf("%s\n",orig_str);
+	}
+
+//	addr_to_string(packet->route,orig_str,sizeof(orig_str));
+//	addr_to_string(orig_node->router,orig_str2,sizeof(orig_str2));
+//	printf("sende %s %s",orig_str,orig_str2);
+//	send_packet((unsigned char*)packet, sizeof(struct packet), &vis_if.addr, vis_if.sock);
+}
 
 
 
@@ -840,6 +865,8 @@ int batman()
 			output(" \n \n");
 
 		schedule_own_packet();
+		if(vis_if.addr.sin_addr.s_addr)
+			send_vis_packet();
 
 		list_for_each(forw_pos, &forw_list) {
 			forw_node = list_entry(forw_pos, struct forw_node, list);

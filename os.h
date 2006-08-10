@@ -29,6 +29,7 @@ void output(char *format, ...);
 void add_del_route(unsigned int dest, unsigned int router, int del, char *dev, int sock);
 int is_aborted();
 void *alloc_memory(int len);
+void *realloc_memory(void *ptr, int len);
 void free_memory(void *mem);
 void addr_to_string(unsigned int addr, char *str, int len);
 int receive_packet(unsigned char *buff, int len, unsigned int *neigh, unsigned int timeout, struct batman_if **if_incoming);

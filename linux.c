@@ -37,6 +37,8 @@
 #include "batman.h"
 #include "list.h"
 
+struct vis_if vis_if;
+
 static struct timeval start_time;
 static int stop;
 
@@ -114,6 +116,9 @@ void close_all_sockets()
 		batman_if = list_entry(if_pos, struct batman_if, list);
 		close(batman_if->recv_sock);
 	}
+	
+	if(vis_if.sock)
+		close(vis_if.sock);
 }
 
 void add_del_route(unsigned int dest, unsigned int router, int del, char *dev, int sock)
@@ -172,6 +177,19 @@ int is_aborted()
 void *alloc_memory(int len)
 {
 	void *res = malloc(len);
+
+	if (res == NULL)
+	{
+		fprintf(stderr, "Out of memory\n");
+		exit(1);
+	}
+
+	return res;
+}
+
+void *realloc_memory(void *ptr, int len)
+{
+	void *res = realloc(ptr,len);
 
 	if (res == NULL)
 	{
@@ -292,6 +310,7 @@ int main(int argc, char *argv[])
 	struct ifreq int_req;
 	int on = 1, res, optchar, found_args = 1;
 	char str1[16], str2[16], *dev;
+	unsigned int vis_server = 0;
 
 	dev = NULL;
 	memset(&tmp_pref_gw, 0, sizeof (struct in_addr));
@@ -380,12 +399,12 @@ int main(int argc, char *argv[])
 				errno = 0;
 				if ( inet_pton(AF_INET, optarg, &tmp_pref_gw) < 1 ) {
 
-					printf( "Invalid preferred gateway IP specified: %s\n", optarg );
+					printf( "Invalid preferred visualation server IP specified: %s\n", optarg );
 					exit(EXIT_FAILURE);
 
 				}
 
-				pref_gateway = tmp_pref_gw.s_addr;
+				vis_server = tmp_pref_gw.s_addr;
 
 
 				found_args += 2;
@@ -476,6 +495,14 @@ int main(int argc, char *argv[])
 
 	}
 
+	if(vis_server)
+	{
+		memset(&vis_if.addr, 0, sizeof(vis_if.addr));
+		vis_if.addr.sin_family = AF_INET;
+		vis_if.addr.sin_port = htons(1967);
+		vis_if.addr.sin_addr.s_addr = vis_server;
+		vis_if.sock = socket( PF_INET, SOCK_DGRAM, 0);
+	}
 
 	if (found_ifs == 0)
 	{
