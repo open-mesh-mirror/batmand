@@ -865,7 +865,7 @@ int batman()
 			output(" \n \n");
 
 		schedule_own_packet();
-		if(vis_if.addr.sin_addr.s_addr)
+		if(vis_if.sock)
 			send_vis_packet();
 
 		list_for_each(forw_pos, &forw_list) {

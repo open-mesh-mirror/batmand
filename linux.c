@@ -502,7 +502,9 @@ int main(int argc, char *argv[])
 		vis_if.addr.sin_port = htons(1967);
 		vis_if.addr.sin_addr.s_addr = vis_server;
 		vis_if.sock = socket( PF_INET, SOCK_DGRAM, 0);
-	}
+	} else
+		memset(&vis_if, 0, sizeof(vis_if));
+		
 
 	if (found_ifs == 0)
 	{
