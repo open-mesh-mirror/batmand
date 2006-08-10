@@ -20,6 +20,7 @@
 #ifndef _BATMAN_BATMAN_H
 #define _BATMAN_BATMAN_H
 
+#include <netinet/in.h>
 #include "list.h"
 
 #define VERSION "0.1"
@@ -113,7 +114,8 @@ struct batman_if
 {
 	struct list_head list;
 	char *dev;
-	int sock;
+	int send_sock;
+	int recv_sock;
 	int if_num;
 	struct sockaddr_in addr;
 	struct sockaddr_in broad;
@@ -129,5 +131,7 @@ static void debug();
 
 
 int batman();
+void usage(void);
+void verbose_usage(void);
 
 #endif

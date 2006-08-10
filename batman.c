@@ -22,7 +22,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
-#include <arpa/inet.h>
 #include "os.h"
 #include "list.h"
 #include "batman.h"
@@ -83,6 +82,52 @@ static unsigned int next_own;
 
 
 
+void usage(void)
+{
+	fprintf(stderr, "Usage: batman [options] interface [interface interface]\n" );
+	fprintf(stderr, "       -d debug level\n" );
+	fprintf(stderr, "       -g gateway class\n" );
+	fprintf(stderr, "       -h this help\n" );
+	fprintf(stderr, "       -H verbose help\n" );
+	fprintf(stderr, "       -o orginator interval in ms\n" );
+	fprintf(stderr, "       -p preferred gateway\n" );
+	fprintf(stderr, "       -r routing class\n" );
+	fprintf(stderr, "       -s visualisation server\n" );
+}
+
+void verbose_usage(void)
+{
+	fprintf(stderr, "Usage: batman [options] interface [interface interface]\n\n" );
+	fprintf(stderr, "       -d debug level\n" );
+	fprintf(stderr, "          default: 0, allowed values: 0 - 3\n\n" );
+	fprintf(stderr, "       -g gateway class\n" );
+	fprintf(stderr, "          default:         0 -> this is not an internet gateway\n" );
+	fprintf(stderr, "          allowed values:  1 -> modem line\n" );
+	fprintf(stderr, "                           2 -> ISDN line\n" );
+	fprintf(stderr, "                           3 -> double ISDN\n" );
+	fprintf(stderr, "                           4 -> 256 KBit\n" );
+	fprintf(stderr, "                           5 -> UMTS / 0.5 MBit\n" );
+	fprintf(stderr, "                           6 -> 1 MBit\n" );
+	fprintf(stderr, "                           7 -> 2 MBit\n" );
+	fprintf(stderr, "                           8 -> 3 MBit\n" );
+	fprintf(stderr, "                           9 -> 5 MBit\n" );
+	fprintf(stderr, "                          10 -> 6 MBit\n" );
+	fprintf(stderr, "                          11 -> >6 MBit\n\n" );
+	fprintf(stderr, "       -h shorter help\n" );
+	fprintf(stderr, "       -H this help\n" );
+	fprintf(stderr, "       -o orginator interval in ms\n" );
+	fprintf(stderr, "          default: 1000, allowed values: >0\n\n" );
+	fprintf(stderr, "       -p preferred gateway\n" );
+	fprintf(stderr, "          default: none, allowed values: IP\n\n" );
+	fprintf(stderr, "       -r routing class (only needed if gateway class = 0)\n" );
+	fprintf(stderr, "          default:         0 -> set no default route\n" );
+	fprintf(stderr, "          allowed values:  1 -> use fast internet connection\n" );
+	fprintf(stderr, "                           2 -> use stable internet connection\n" );
+	fprintf(stderr, "                           3 -> use best statistic internet connection (olsr style)\n\n" );
+	fprintf(stderr, "       -s visualisation server\n" );
+	fprintf(stderr, "          default: none, allowed values: IP\n\n" );
+
+}
 
 /* this function finds or creates an originator entry for the given address if it does not exits */
 struct orig_node *get_orig_node( unsigned int addr )
@@ -270,7 +315,7 @@ static void update_routes( struct orig_node *orig_node )
 				if (debug_level >= 2)
 					output("Deleting previous route\n");
 
-				add_del_route(orig_node->orig, orig_node->router, 1, orig_node->batman_if->dev, orig_node->batman_if->sock);
+				add_del_route(orig_node->orig, orig_node->router, 1, orig_node->batman_if->dev, orig_node->batman_if->send_sock);
 			}
 
 			if (debug_level >= 2) { output("Adding new route\n");  }
@@ -278,7 +323,7 @@ static void update_routes( struct orig_node *orig_node )
 
 			/* TODO: maybe the order delete, add should be changed ???? */
 			orig_node->batman_if = max_if;
-			add_del_route(orig_node->orig, next_hop->addr, 0, orig_node->batman_if->dev, orig_node->batman_if->sock);
+			add_del_route(orig_node->orig, next_hop->addr, 0, orig_node->batman_if->dev, orig_node->batman_if->send_sock);
 
 			orig_node->router = next_hop->addr;
 		}
@@ -605,7 +650,7 @@ void send_outstanding_packets()
 
 				batman_if = list_entry(if_pos, struct batman_if, list);
 
-				if (send_packet((unsigned char *)pack, sizeof (struct packet), &batman_if->broad, batman_if->sock) < 0) {
+				if (send_packet((unsigned char *)pack, sizeof (struct packet), &batman_if->broad, batman_if->send_sock) < 0) {
 					output("ERROR: send_packet returned -1 \n");
 					exit( -1);
 				}
@@ -740,11 +785,15 @@ void purge()
 
 			list_del(orig_pos);
 
-			if (debug_level >= 2)
-				output("Deleting route to originator \n");
+			if ( isBidirectionalNeigh( orig_node ) ) {
 
-			add_del_route(orig_node->orig, 0, 1, orig_node->batman_if->dev, orig_node->batman_if->sock);
-			free_memory(orig_node);
+				if (debug_level >= 2)
+					output("Deleting route to originator \n");
+
+				add_del_route(orig_node->orig, 0, 1, orig_node->batman_if->dev, orig_node->batman_if->send_sock);
+				free_memory(orig_node);
+
+			}
 		}
 	}
 
@@ -766,7 +815,7 @@ int batman()
 	unsigned int neigh;
 	static char orig_str[ADDR_STR_LEN], neigh_str[ADDR_STR_LEN];
 	int forward_old;
-	int is_my_addr = 0, is_my_orig = 0;
+	int is_my_addr = 0, is_my_orig = 0, is_broadcast = 0;
 
 	next_own = 0;
 
@@ -809,13 +858,14 @@ int batman()
 				output("Received BATMAN packet from %s (originator %s, seqno %d, TTL %d)\n", neigh_str, orig_str, in.seqno, in.ttl);
 			}
 
-			is_my_addr = is_my_orig = 0;
+			is_my_addr = is_my_orig = is_broadcast = 0;
 
 			list_for_each(if_pos, &if_list) {
 				batman_if = list_entry(if_pos, struct batman_if, list);
 
 				if ( neigh == batman_if->addr.sin_addr.s_addr ) is_my_addr = 1;
 				if ( in.orig == batman_if->addr.sin_addr.s_addr ) is_my_orig = 1;
+				if ( neigh == batman_if->broad.sin_addr.s_addr ) is_broadcast = 1;
 			}
 
 			if (is_my_addr == 1 /* && in.orig == my_addr */) {
@@ -823,6 +873,13 @@ int batman()
 				if (debug_level >= 3) {
 					addr_to_string(neigh, neigh_str, sizeof (neigh_str));
 					output("Ignoring all (zero-hop) packets send by me (sender: %s)\n", neigh_str);
+				}
+
+			} else if (is_broadcast == 1) {
+
+				if (debug_level >= 0) {
+					addr_to_string(neigh, neigh_str, sizeof (neigh));
+					output("Ignoring all packets with broadcast source IP (sender: %s)\n", neigh_str);
 				}
 
 			} else {
@@ -863,7 +920,7 @@ int batman()
 					schedule_forward_packet(&in, 1);
 
 				} else if ( in.orig == neigh && in.ttl == TTL &&
-						isBidirectionalNeigh( orig_neigh_node )  &&
+						isBidirectionalNeigh( orig_neigh_node ) &&
 						!isDuplicate(in.orig, in.seqno) &&
 						!(in.flags & UNIDIRECTIONAL) ) {
 
@@ -871,7 +928,7 @@ int batman()
 					schedule_forward_packet(&in, 0);
 
 				} else if ( in.orig != neigh && is_my_orig != 1 &&
-						isBidirectionalNeigh( orig_neigh_node )  &&
+						isBidirectionalNeigh( orig_neigh_node ) &&
 						!isDuplicate(in.orig, in.seqno) &&
 						!(in.flags & UNIDIRECTIONAL) ) {
 
@@ -897,7 +954,7 @@ int batman()
 		orig_node = list_entry(orig_pos, struct orig_node, list);
 
 		if (orig_node->router != 0)
-			add_del_route(orig_node->orig, orig_node->router, 1, orig_node->batman_if->dev, batman_if->sock);
+			add_del_route(orig_node->orig, orig_node->router, 1, orig_node->batman_if->dev, batman_if->send_sock);
 	}
 
 	set_forwarding(forward_old);

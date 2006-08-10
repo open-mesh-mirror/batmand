@@ -112,7 +112,7 @@ void close_all_sockets()
 
 	list_for_each(if_pos, &if_list) {
 		batman_if = list_entry(if_pos, struct batman_if, list);
-		close(batman_if->sock);
+		close(batman_if->recv_sock);
 	}
 }
 
@@ -124,8 +124,6 @@ void add_del_route(unsigned int dest, unsigned int router, int del, char *dev, i
 
 	inet_ntop(AF_INET, &dest, str1, sizeof (str1));
 	inet_ntop(AF_INET, &router, str2, sizeof (str2));
-
-	output("%s route to %s via %s\n", del ? "Deleting" : "Adding", str1, str2);
 
 	memset(&route, 0, sizeof (struct rtentry));
 
@@ -149,6 +147,10 @@ void add_del_route(unsigned int dest, unsigned int router, int del, char *dev, i
 		addr->sin_addr.s_addr = router;
 
 		route.rt_flags |= RTF_GATEWAY;
+
+		output("%s route to %s via %s\n", del ? "Deleting" : "Adding", str1, str2);
+	} else {
+		output("%s route to %s via 0.0.0.0\n", del ? "Deleting" : "Adding", str1);
 	}
 
 	route.rt_metric = 1;
@@ -219,8 +221,8 @@ int receive_packet(unsigned char *buff, int len, unsigned int *neigh, unsigned i
 
 		batman_if = list_entry(if_pos, struct batman_if, list);
 
-		FD_SET(batman_if->sock, &wait_set);
-		if ( batman_if->sock > max_sock ) max_sock = batman_if->sock;
+		FD_SET(batman_if->recv_sock, &wait_set);
+		if ( batman_if->recv_sock > max_sock ) max_sock = batman_if->recv_sock;
 
 	}
 
@@ -246,9 +248,9 @@ int receive_packet(unsigned char *buff, int len, unsigned int *neigh, unsigned i
 	list_for_each(if_pos, &if_list) {
 		batman_if = list_entry(if_pos, struct batman_if, list);
 
-		if ( FD_ISSET( batman_if->sock, &wait_set) ) {
+		if ( FD_ISSET( batman_if->recv_sock, &wait_set) ) {
 
-			if (recvfrom(batman_if->sock, buff, len, 0, (struct sockaddr *)&addr, &addr_len) < 0)
+			if (recvfrom(batman_if->recv_sock, buff, len, 0, (struct sockaddr *)&addr, &addr_len) < 0)
 			{
 				fprintf(stderr, "Cannot receive packet: %s\n", strerror(errno));
 				return -1;
@@ -281,53 +283,6 @@ int send_packet(unsigned char *buff, int len, struct sockaddr_in *broad, int soc
 static void handler(int sig)
 {
 	stop = 1;
-}
-
-static void usage(void)
-{
-	fprintf(stderr, "Usage: batman [options] interface [interface interface]\n" );
-	fprintf(stderr, "       -d debug level\n" );
-	fprintf(stderr, "       -g gateway class\n" );
-	fprintf(stderr, "       -h this help\n" );
-	fprintf(stderr, "       -H verbose help\n" );
-	fprintf(stderr, "       -o orginator interval in ms\n" );
-	fprintf(stderr, "       -p preferred gateway\n" );
-	fprintf(stderr, "       -r routing class\n" );
-	fprintf(stderr, "       -s visualisation server\n" );
-}
-
-static void verbose_usage(void)
-{
-	fprintf(stderr, "Usage: batman [options] interface [interface interface]\n\n" );
-	fprintf(stderr, "       -d debug level\n" );
-	fprintf(stderr, "          default: 0, allowed values: 0 - 3\n\n" );
-	fprintf(stderr, "       -g gateway class\n" );
-	fprintf(stderr, "          default:         0 -> this is not an internet gateway\n" );
-	fprintf(stderr, "          allowed values:  1 -> modem line\n" );
-	fprintf(stderr, "                           2 -> ISDN line\n" );
-	fprintf(stderr, "                           3 -> double ISDN\n" );
-	fprintf(stderr, "                           4 -> 256 KBit\n" );
-	fprintf(stderr, "                           5 -> UMTS / 0.5 MBit\n" );
-	fprintf(stderr, "                           6 -> 1 MBit\n" );
-	fprintf(stderr, "                           7 -> 2 MBit\n" );
-	fprintf(stderr, "                           8 -> 3 MBit\n" );
-	fprintf(stderr, "                           9 -> 5 MBit\n" );
-	fprintf(stderr, "                          10 -> 6 MBit\n" );
-	fprintf(stderr, "                          11 -> >6 MBit\n\n" );
-	fprintf(stderr, "       -h shorter help\n" );
-	fprintf(stderr, "       -H this help\n" );
-	fprintf(stderr, "       -o orginator interval in ms\n" );
-	fprintf(stderr, "          default: 1000, allowed values: >0\n\n" );
-	fprintf(stderr, "       -p preferred gateway\n" );
-	fprintf(stderr, "          default: none, allowed values: IP\n\n" );
-	fprintf(stderr, "       -r routing class (only needed if gateway class = 0)\n" );
-	fprintf(stderr, "          default:         0 -> set no default route\n" );
-	fprintf(stderr, "          allowed values:  1 -> use fast internet connection\n" );
-	fprintf(stderr, "                           2 -> use stable internet connection\n" );
-	fprintf(stderr, "                           3 -> use best statistic internet connection (olsr style)\n\n" );
-	fprintf(stderr, "       -s visualisation server\n" );
-	fprintf(stderr, "          default: none, allowed values: IP\n\n" );
-
 }
 
 int main(int argc, char *argv[])
@@ -441,7 +396,7 @@ int main(int argc, char *argv[])
 				usage();
 				return (0);
 
-          }
+		}
 
 	}
 
@@ -462,9 +417,9 @@ int main(int argc, char *argv[])
 			exit(EXIT_FAILURE);
 		}
 
-		batman_if->sock = socket(PF_INET, SOCK_DGRAM, 0);
+		batman_if->recv_sock = socket(PF_INET, SOCK_DGRAM, 0);
 
-		if (batman_if->sock < 0)
+		if (batman_if->recv_sock < 0)
 		{
 			fprintf(stderr, "Cannot create socket: %s", strerror(errno));
 			exit(EXIT_FAILURE);
@@ -473,7 +428,7 @@ int main(int argc, char *argv[])
 		memset(&int_req, 0, sizeof (struct ifreq));
 		strcpy(int_req.ifr_name, batman_if->dev);
 
-		if (ioctl(batman_if->sock, SIOCGIFADDR, &int_req) < 0)
+		if (ioctl(batman_if->recv_sock, SIOCGIFADDR, &int_req) < 0)
 		{
 			fprintf(stderr, "Cannot get IP address of interface %s\n", batman_if->dev);
 			close_all_sockets();
@@ -484,7 +439,7 @@ int main(int argc, char *argv[])
 		batman_if->addr.sin_port = htons(PORT);
 		batman_if->addr.sin_addr.s_addr = ((struct sockaddr_in *)&int_req.ifr_addr)->sin_addr.s_addr;
 
-		if (ioctl(batman_if->sock, SIOCGIFBRDADDR, &int_req) < 0)
+		if (ioctl(batman_if->recv_sock, SIOCGIFBRDADDR, &int_req) < 0)
 		{
 			fprintf(stderr, "Cannot get broadcast IP address of interface %s\n", batman_if->dev);
 			close_all_sockets();
@@ -495,19 +450,21 @@ int main(int argc, char *argv[])
 		batman_if->broad.sin_port = htons(PORT);
 		batman_if->broad.sin_addr.s_addr = ((struct sockaddr_in *)&int_req.ifr_broadaddr)->sin_addr.s_addr;
 
-		if (setsockopt(batman_if->sock, SOL_SOCKET, SO_BROADCAST, &on, sizeof (int)) < 0)
+		if (setsockopt(batman_if->recv_sock, SOL_SOCKET, SO_BROADCAST, &on, sizeof (int)) < 0)
 		{
 			fprintf(stderr, "Cannot enable broadcasts: %s\n", strerror(errno));
 			close_all_sockets();
 			exit(EXIT_FAILURE);
 		}
 
-		if (bind(batman_if->sock, (struct sockaddr *)&batman_if->broad, sizeof (struct sockaddr_in)) < 0)
+		if (bind(batman_if->recv_sock, (struct sockaddr *)&batman_if->broad, sizeof (struct sockaddr_in)) < 0)
 		{
 			fprintf(stderr, "Cannot bind socket: %s\n", strerror(errno));
 			close_all_sockets();
 			exit(EXIT_FAILURE);
 		}
+
+		batman_if->send_sock = batman_if->recv_sock;
 
 		addr_to_string(batman_if->addr.sin_addr.s_addr, str1, sizeof (str1));
 		addr_to_string(batman_if->broad.sin_addr.s_addr, str2, sizeof (str2));
@@ -554,17 +511,6 @@ int main(int argc, char *argv[])
 	stop = 0;
 
 	signal(SIGINT, handler);
-
-// 	null.sin_family = AF_INET;
-// 	null.sin_port = htons(PORT);
-// 	null.sin_addr.s_addr = 0;
-/*
-	if (bind(sock, (struct sockaddr *)&null, sizeof (struct sockaddr_in)) < 0)
-	{
-		fprintf(stderr, "Cannot bind socket: %s\n", strerror(errno));
-		close(sock);
-		return 1;
-	}*/
 
 	gettimeofday(&start_time, NULL);
 
