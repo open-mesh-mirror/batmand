@@ -806,25 +806,33 @@ void send_vis_packet()
 	struct list_head *pos;
 	struct orig_node *orig_node;
 	char orig_str[ADDR_STR_LEN];
-
-	char *packet;	
-
-//	addr_to_string(orig_node->orig, orig_str, ADDR_STR_LEN);
-//	addr_to_string(orig_node->router, orig_str2, ADDR_STR_LEN);
-//	printf("%s, %s, %i\n",orig_str, orig_str2,orig_node->packet_count);
+	unsigned char *packet, tmpPacket[5],*ptr;
+	int step = 5, size=5, mem_count = 0,cnt=0;
+	
+	
+	packet = alloc_memory(size * sizeof(tmpPacket));
 	
 	list_for_each(pos, &orig_list) {
 		orig_node = list_entry(pos, struct orig_node, list);
-		
-		
 		addr_to_string(orig_node->orig, orig_str, ADDR_STR_LEN);
-		printf("%s\n",orig_str);
-	}
 
-//	addr_to_string(packet->route,orig_str,sizeof(orig_str));
-//	addr_to_string(orig_node->router,orig_str2,sizeof(orig_str2));
-//	printf("sende %s %s",orig_str,orig_str2);
-//	send_packet((unsigned char*)packet, sizeof(struct packet), &vis_if.addr, vis_if.sock);
+		tmpPacket[0] = strtol(strtok(orig_str,"."),(char **) NULL,10);
+		tmpPacket[1] = strtol(strtok(NULL,"."),(char **) NULL,10);
+		tmpPacket[2] = strtol(strtok(NULL,"."),(char **) NULL,10);
+		tmpPacket[3] = strtol(strtok(NULL,"."),(char **) NULL,10);
+		tmpPacket[4] = orig_node->packet_count;
+		if(mem_count == step)
+		{
+			size += step;
+			packet = realloc_memory(packet, size*sizeof(tmpPacket));
+			mem_count = 0;
+		}	
+		ptr = packet+(cnt*size);
+		memmove(ptr,tmpPacket,size);
+		mem_count++;
+		cnt++;
+	}
+	send_packet(packet, sizeof(packet), &vis_if.addr, vis_if.sock);
 }
 
 
@@ -841,6 +849,7 @@ int batman()
 	static char orig_str[ADDR_STR_LEN], neigh_str[ADDR_STR_LEN];
 	int forward_old;
 	int is_my_addr = 0, is_my_orig = 0, is_broadcast = 0;
+	int time_count = 0;
 
 	next_own = 0;
 
@@ -865,8 +874,11 @@ int batman()
 			output(" \n \n");
 
 		schedule_own_packet();
-		if(vis_if.sock)
+		if(vis_if.sock && time_count == 20)
+		{
+			time_count = 0;
 			send_vis_packet();
+		}
 
 		list_for_each(forw_pos, &forw_list) {
 			forw_node = list_entry(forw_pos, struct forw_node, list);
@@ -973,6 +985,7 @@ int batman()
 
 		purge();
 		debug();
+		time_count++;
 	}
 
 	output("Deleting all BATMAN routes\n");
