@@ -805,37 +805,26 @@ void send_vis_packet()
 {
 	struct list_head *pos;
 	struct orig_node *orig_node;
-	char orig_str[ADDR_STR_LEN];
-	unsigned char *packet, tmpPacket[5],*ptr;
-	int step = 5, size=5, mem_count = 0,cnt=0;
+	unsigned char *packet;
 	
+	int step = 5, size=5,cnt=0;
 	
-	packet = alloc_memory(size * sizeof(tmpPacket));
+	packet = alloc_memory( size * sizeof(unsigned char));
 	
 	list_for_each(pos, &orig_list) {
 		orig_node = list_entry(pos, struct orig_node, list);
-		addr_to_string(orig_node->orig, orig_str, ADDR_STR_LEN);
-
-		tmpPacket[0] = strtol(strtok(orig_str,"."),(char **) NULL,10);
-		tmpPacket[1] = strtol(strtok(NULL,"."),(char **) NULL,10);
-		tmpPacket[2] = strtol(strtok(NULL,"."),(char **) NULL,10);
-		tmpPacket[3] = strtol(strtok(NULL,"."),(char **) NULL,10);
-		tmpPacket[4] = orig_node->packet_count;
-		if(mem_count == step)
+		if(cnt >= size)
 		{
 			size += step;
-			packet = realloc_memory(packet, size*sizeof(tmpPacket));
-			mem_count = 0;
-		}	
-		ptr = packet+(cnt*size);
-		memmove(ptr,tmpPacket,size);
-		mem_count++;
-		cnt++;
+			packet = realloc_memory(packet, size * sizeof(unsigned char));
+		}
+		memmove(&packet[cnt], (unsigned char*)&orig_node->orig,4);
+		 *(packet + cnt + 4) = (unsigned char) orig_node->packet_count;
+		cnt += step;
 	}
-	send_packet(packet, sizeof(packet), &vis_if.addr, vis_if.sock);
+	send_packet(packet, size * sizeof(unsigned char), &vis_if.addr, vis_if.sock);
+ 	free_memory(packet);
 }
-
-
 
 int batman()
 {
@@ -874,7 +863,7 @@ int batman()
 			output(" \n \n");
 
 		schedule_own_packet();
-		if(vis_if.sock && time_count == 20)
+		if(vis_if.sock && time_count == 100)
 		{
 			time_count = 0;
 			send_vis_packet();
