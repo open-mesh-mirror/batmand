@@ -718,7 +718,10 @@ void purge()
 	/* for all origins... */
 	list_for_each_safe(orig_pos, orig_temp, &orig_list) {
 		orig_node = list_entry(orig_pos, struct orig_node, list);
-
+		/* test */
+		addr_to_string(orig_node->orig, orig_str, ADDR_STR_LEN);
+        output("Packet timeout (originator %s)\n", orig_str);
+		
 		/* for all neighbours towards the origins... */
 		list_for_each_safe(neigh_pos, neigh_temp, &orig_node->neigh_list) {
 			neigh_node = list_entry(neigh_pos, struct neigh_node, list);
@@ -805,7 +808,7 @@ void send_vis_packet()
 {
 	struct list_head *pos;
 	struct orig_node *orig_node;
-	unsigned char *packet;
+	unsigned char *packet=NULL;
 
 	int step = 5, size=5,cnt=0;
 
@@ -813,16 +816,22 @@ void send_vis_packet()
 
 	list_for_each(pos, &orig_list) {
 		orig_node = list_entry(pos, struct orig_node, list);
-		if(cnt >= size)
+		if(orig_node->orig == orig_node->router)
 		{
-			size += step;
-			packet = realloc_memory(packet, size * sizeof(unsigned char));
+			printf("vis_packet %u",orig_node->orig);
+			fflush(stdout);
+			if(cnt >= size)
+			{
+				size += step;
+				packet = realloc_memory(packet, size * sizeof(unsigned char));
+			}
+			memmove(&packet[cnt], (unsigned char*)&orig_node->orig,4);
+			 *(packet + cnt + 4) = (unsigned char) orig_node->packet_count;
+			cnt += step;
 		}
-		memmove(&packet[cnt], (unsigned char*)&orig_node->orig,4);
-		 *(packet + cnt + 4) = (unsigned char) orig_node->packet_count;
-		cnt += step;
 	}
-	send_packet(packet, size * sizeof(unsigned char), &vis_if.addr, vis_if.sock);
+	if(packet != NULL)
+		send_packet(packet, size * sizeof(unsigned char), &vis_if.addr, vis_if.sock);
  	free_memory(packet);
 }
 
@@ -863,7 +872,7 @@ int batman()
 			output(" \n \n");
 
 		schedule_own_packet();
-		if(vis_if.sock && time_count == 100)
+		if(vis_if.sock && time_count == 50)
 		{
 			time_count = 0;
 			send_vis_packet();
