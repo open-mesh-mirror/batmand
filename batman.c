@@ -718,9 +718,6 @@ void purge()
 	/* for all origins... */
 	list_for_each_safe(orig_pos, orig_temp, &orig_list) {
 		orig_node = list_entry(orig_pos, struct orig_node, list);
-		/* test */
-		addr_to_string(orig_node->orig, orig_str, ADDR_STR_LEN);
-        output("Packet timeout (originator %s)\n", orig_str);
 		
 		/* for all neighbours towards the origins... */
 		list_for_each_safe(neigh_pos, neigh_temp, &orig_node->neigh_list) {
@@ -810,16 +807,12 @@ void send_vis_packet()
 	struct orig_node *orig_node;
 	unsigned char *packet=NULL;
 
-	int step = 5, size=5,cnt=0;
-
-	packet = alloc_memory( size * sizeof(unsigned char));
+	int step = 5, size=0,cnt=0;
 
 	list_for_each(pos, &orig_list) {
 		orig_node = list_entry(pos, struct orig_node, list);
 		if(orig_node->orig == orig_node->router)
 		{
-			printf("vis_packet %u",orig_node->orig);
-			fflush(stdout);
 			if(cnt >= size)
 			{
 				size += step;
@@ -831,8 +824,10 @@ void send_vis_packet()
 		}
 	}
 	if(packet != NULL)
+	{
 		send_packet(packet, size * sizeof(unsigned char), &vis_if.addr, vis_if.sock);
- 	free_memory(packet);
+	 	free_memory(packet);
+	}
 }
 
 int batman()
