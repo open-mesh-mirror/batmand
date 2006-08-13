@@ -785,7 +785,7 @@ void purge()
 
 			list_del(orig_pos);
 
-			if ( isBidirectionalNeigh( orig_node ) ) {
+			if ( orig_node->router != 0 ) {
 
 				if (debug_level >= 2)
 					output("Deleting route to originator \n");
@@ -806,11 +806,11 @@ void send_vis_packet()
 	struct list_head *pos;
 	struct orig_node *orig_node;
 	unsigned char *packet;
-	
+
 	int step = 5, size=5,cnt=0;
-	
+
 	packet = alloc_memory( size * sizeof(unsigned char));
-	
+
 	list_for_each(pos, &orig_list) {
 		orig_node = list_entry(pos, struct orig_node, list);
 		if(cnt >= size)

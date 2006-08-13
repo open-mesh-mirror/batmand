@@ -17,4 +17,4 @@ bug fixes:
 - performance improvement in update_routes()
 - performance improvement in purge()
 - JITTER removed
-- fix crash in purge() - check for bidirectional neighbour
+- fix crash in purge() - check for router before route is deleted
