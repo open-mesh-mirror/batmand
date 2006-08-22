@@ -315,7 +315,7 @@ static void update_routes( struct orig_node *orig_node )
 				if (debug_level >= 2)
 					output("Deleting previous route\n");
 
-				add_del_route(orig_node->orig, orig_node->router, 1, orig_node->batman_if->dev, orig_node->batman_if->send_sock);
+				add_del_route(orig_node->orig, orig_node->router, 1, orig_node->batman_if->dev, orig_node->batman_if->udp_send_sock);
 			}
 
 			if (debug_level >= 2) { output("Adding new route\n");  }
@@ -323,7 +323,7 @@ static void update_routes( struct orig_node *orig_node )
 
 			/* TODO: maybe the order delete, add should be changed ???? */
 			orig_node->batman_if = max_if;
-			add_del_route(orig_node->orig, next_hop->addr, 0, orig_node->batman_if->dev, orig_node->batman_if->send_sock);
+			add_del_route(orig_node->orig, next_hop->addr, 0, orig_node->batman_if->dev, orig_node->batman_if->udp_send_sock);
 
 			orig_node->router = next_hop->addr;
 		}
@@ -650,7 +650,7 @@ void send_outstanding_packets()
 
 				batman_if = list_entry(if_pos, struct batman_if, list);
 
-				if (send_packet((unsigned char *)pack, sizeof (struct packet), &batman_if->broad, batman_if->send_sock) < 0) {
+				if (send_packet((unsigned char *)pack, sizeof (struct packet), &batman_if->broad, batman_if->udp_send_sock) < 0) {
 					output("ERROR: send_packet returned -1 \n");
 					exit( -1);
 				}
@@ -718,7 +718,7 @@ void purge()
 	/* for all origins... */
 	list_for_each_safe(orig_pos, orig_temp, &orig_list) {
 		orig_node = list_entry(orig_pos, struct orig_node, list);
-		
+
 		/* for all neighbours towards the origins... */
 		list_for_each_safe(neigh_pos, neigh_temp, &orig_node->neigh_list) {
 			neigh_node = list_entry(neigh_pos, struct neigh_node, list);
@@ -790,7 +790,7 @@ void purge()
 				if (debug_level >= 2)
 					output("Deleting route to originator \n");
 
-				add_del_route(orig_node->orig, 0, 1, orig_node->batman_if->dev, orig_node->batman_if->send_sock);
+				add_del_route(orig_node->orig, 0, 1, orig_node->batman_if->dev, orig_node->batman_if->udp_send_sock);
 				free_memory(orig_node);
 
 			}
@@ -987,7 +987,7 @@ int batman()
 		orig_node = list_entry(orig_pos, struct orig_node, list);
 
 		if (orig_node->router != 0)
-			add_del_route(orig_node->orig, orig_node->router, 1, orig_node->batman_if->dev, batman_if->send_sock);
+			add_del_route(orig_node->orig, orig_node->router, 1, orig_node->batman_if->dev, batman_if->udp_send_sock);
 	}
 
 	set_forwarding(forward_old);

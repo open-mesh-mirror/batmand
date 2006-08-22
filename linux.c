@@ -114,9 +114,9 @@ void close_all_sockets()
 
 	list_for_each(if_pos, &if_list) {
 		batman_if = list_entry(if_pos, struct batman_if, list);
-		close(batman_if->recv_sock);
+		close(batman_if->udp_recv_sock);
 	}
-	
+
 	if(vis_if.sock)
 		close(vis_if.sock);
 }
@@ -239,8 +239,8 @@ int receive_packet(unsigned char *buff, int len, unsigned int *neigh, unsigned i
 
 		batman_if = list_entry(if_pos, struct batman_if, list);
 
-		FD_SET(batman_if->recv_sock, &wait_set);
-		if ( batman_if->recv_sock > max_sock ) max_sock = batman_if->recv_sock;
+		FD_SET(batman_if->udp_recv_sock, &wait_set);
+		if ( batman_if->udp_recv_sock > max_sock ) max_sock = batman_if->udp_recv_sock;
 
 	}
 
@@ -266,9 +266,9 @@ int receive_packet(unsigned char *buff, int len, unsigned int *neigh, unsigned i
 	list_for_each(if_pos, &if_list) {
 		batman_if = list_entry(if_pos, struct batman_if, list);
 
-		if ( FD_ISSET( batman_if->recv_sock, &wait_set) ) {
+		if ( FD_ISSET( batman_if->udp_recv_sock, &wait_set) ) {
 
-			if (recvfrom(batman_if->recv_sock, buff, len, 0, (struct sockaddr *)&addr, &addr_len) < 0)
+			if (recvfrom(batman_if->udp_recv_sock, buff, len, 0, (struct sockaddr *)&addr, &addr_len) < 0)
 			{
 				fprintf(stderr, "Cannot receive packet: %s\n", strerror(errno));
 				return -1;
@@ -305,7 +305,7 @@ static void handler(int sig)
 
 int main(int argc, char *argv[])
 {
-	struct in_addr tmp_pref_gw;
+	struct in_addr tmp_ip_holder;
 	struct batman_if *batman_if;
 	struct ifreq int_req;
 	int on = 1, res, optchar, found_args = 1;
@@ -313,7 +313,7 @@ int main(int argc, char *argv[])
 	unsigned int vis_server = 0;
 
 	dev = NULL;
-	memset(&tmp_pref_gw, 0, sizeof (struct in_addr));
+	memset(&tmp_ip_holder, 0, sizeof (struct in_addr));
 
 	printf( "B.A.T.M.A.N-II v%s (internal version %i)\n", VERSION, BATMAN_VERSION );
 
@@ -382,14 +382,14 @@ int main(int argc, char *argv[])
 			case 'p':
 
 				errno = 0;
-				if ( inet_pton(AF_INET, optarg, &tmp_pref_gw) < 1 ) {
+				if ( inet_pton(AF_INET, optarg, &tmp_ip_holder) < 1 ) {
 
 					printf( "Invalid preferred gateway IP specified: %s\n", optarg );
 					exit(EXIT_FAILURE);
 
 				}
 
-				pref_gateway = tmp_pref_gw.s_addr;
+				pref_gateway = tmp_ip_holder.s_addr;
 
 				found_args += 2;
 				break;
@@ -397,14 +397,14 @@ int main(int argc, char *argv[])
 			case 's':
 
 				errno = 0;
-				if ( inet_pton(AF_INET, optarg, &tmp_pref_gw) < 1 ) {
+				if ( inet_pton(AF_INET, optarg, &tmp_ip_holder) < 1 ) {
 
 					printf( "Invalid preferred visualation server IP specified: %s\n", optarg );
 					exit(EXIT_FAILURE);
 
 				}
 
-				vis_server = tmp_pref_gw.s_addr;
+				vis_server = tmp_ip_holder.s_addr;
 
 
 				found_args += 2;
@@ -436,9 +436,9 @@ int main(int argc, char *argv[])
 			exit(EXIT_FAILURE);
 		}
 
-		batman_if->recv_sock = socket(PF_INET, SOCK_DGRAM, 0);
+		batman_if->udp_recv_sock = socket(PF_INET, SOCK_DGRAM, 0);
 
-		if (batman_if->recv_sock < 0)
+		if (batman_if->udp_recv_sock < 0)
 		{
 			fprintf(stderr, "Cannot create socket: %s", strerror(errno));
 			exit(EXIT_FAILURE);
@@ -447,7 +447,7 @@ int main(int argc, char *argv[])
 		memset(&int_req, 0, sizeof (struct ifreq));
 		strcpy(int_req.ifr_name, batman_if->dev);
 
-		if (ioctl(batman_if->recv_sock, SIOCGIFADDR, &int_req) < 0)
+		if (ioctl(batman_if->udp_recv_sock, SIOCGIFADDR, &int_req) < 0)
 		{
 			fprintf(stderr, "Cannot get IP address of interface %s\n", batman_if->dev);
 			close_all_sockets();
@@ -458,7 +458,7 @@ int main(int argc, char *argv[])
 		batman_if->addr.sin_port = htons(PORT);
 		batman_if->addr.sin_addr.s_addr = ((struct sockaddr_in *)&int_req.ifr_addr)->sin_addr.s_addr;
 
-		if (ioctl(batman_if->recv_sock, SIOCGIFBRDADDR, &int_req) < 0)
+		if (ioctl(batman_if->udp_recv_sock, SIOCGIFBRDADDR, &int_req) < 0)
 		{
 			fprintf(stderr, "Cannot get broadcast IP address of interface %s\n", batman_if->dev);
 			close_all_sockets();
@@ -469,21 +469,34 @@ int main(int argc, char *argv[])
 		batman_if->broad.sin_port = htons(PORT);
 		batman_if->broad.sin_addr.s_addr = ((struct sockaddr_in *)&int_req.ifr_broadaddr)->sin_addr.s_addr;
 
-		if (setsockopt(batman_if->recv_sock, SOL_SOCKET, SO_BROADCAST, &on, sizeof (int)) < 0)
+		if (setsockopt(batman_if->udp_recv_sock, SOL_SOCKET, SO_BROADCAST, &on, sizeof (int)) < 0)
 		{
 			fprintf(stderr, "Cannot enable broadcasts: %s\n", strerror(errno));
 			close_all_sockets();
 			exit(EXIT_FAILURE);
 		}
 
-		if (bind(batman_if->recv_sock, (struct sockaddr *)&batman_if->broad, sizeof (struct sockaddr_in)) < 0)
+		if (bind(batman_if->udp_recv_sock, (struct sockaddr *)&batman_if->broad, sizeof (struct sockaddr_in)) < 0)
 		{
 			fprintf(stderr, "Cannot bind socket: %s\n", strerror(errno));
 			close_all_sockets();
 			exit(EXIT_FAILURE);
 		}
 
-		batman_if->send_sock = batman_if->recv_sock;
+		batman_if->udp_send_sock = batman_if->udp_recv_sock;
+
+		if ( gateway_class != 0 ) {
+
+			batman_if->tcp_gw_sock = socket(PF_INET, SOCK_STREAM, 0);
+
+			if (batman_if->tcp_gw_sock < 0) {
+				fprintf(stderr, "Cannot create socket: %s", strerror(errno));
+				exit(EXIT_FAILURE);
+			}
+
+
+
+		}
 
 		addr_to_string(batman_if->addr.sin_addr.s_addr, str1, sizeof (str1));
 		addr_to_string(batman_if->broad.sin_addr.s_addr, str2, sizeof (str2));
@@ -504,7 +517,7 @@ int main(int argc, char *argv[])
 		vis_if.sock = socket( PF_INET, SOCK_DGRAM, 0);
 	} else
 		memset(&vis_if, 0, sizeof(vis_if));
-		
+
 
 	if (found_ifs == 0)
 	{
@@ -523,6 +536,13 @@ int main(int argc, char *argv[])
 	if ( ( gateway_class != 0 ) && ( pref_gateway != 0 ) )
 	{
 		fprintf(stderr, "Error - preferred gateway can't be set while gateway class is in use !\n");
+		usage();
+		return 1;
+	}
+
+	if ( ( routing_class == 0 ) && ( pref_gateway != 0 ) )
+	{
+		fprintf(stderr, "Error - preferred gateway can't be set without specifying routing class !\n");
 		usage();
 		return 1;
 	}

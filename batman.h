@@ -52,7 +52,7 @@ extern int found_ifs;
 
 extern struct list_head if_list;
 extern struct vis_if vis_if;
-  
+
 struct packet
 {
 	unsigned long  orig;
@@ -113,8 +113,9 @@ struct batman_if
 {
 	struct list_head list;
 	char *dev;
-	int send_sock;
-	int recv_sock;
+	int udp_send_sock;
+	int udp_recv_sock;
+	int tcp_gw_sock;
 	int if_num;
 	struct sockaddr_in addr;
 	struct sockaddr_in broad;
