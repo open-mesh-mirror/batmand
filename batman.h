@@ -60,7 +60,6 @@ struct packet
 	unsigned char  flags;    /* 0xF0: UNIDIRECTIONAL link, 0x80: ip-gateway, ... */
 	unsigned char  ttl;
 	unsigned short seqno;
-	unsigned short interval; /* in ms until latest next emission */
 	unsigned char  gwflags;  /* flags related to gateway functions: gateway class */
 	unsigned char  version;  /* batman version field */
 } __attribute__((packed));
@@ -75,7 +74,6 @@ struct orig_node                 /* structure for orig_list maintaining nodes of
 	unsigned int last_seen;    /* when last originator packet (with new seq-number) from this node was received */
 	unsigned int last_reply;   /* if node is a neighbour, when my originator packet was last broadcasted (replied) by this node and received by me */
 	unsigned int last_aware;   /* if node is a neighbour, when last packet via this node was received */
-	unsigned short interval;   /* in ms until next emission */
 	unsigned char flags;
 	unsigned char gwflags;     /* flags related to gateway functions: gateway class */
 	struct list_head neigh_list;
@@ -85,6 +83,7 @@ struct neigh_node
 {
 	struct list_head list;
 	unsigned int addr;
+	unsigned short best_ttl;   /* ttl of last packet */
 	struct list_head pack_list;
 };
 

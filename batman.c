@@ -529,7 +529,6 @@ void update_originator(struct packet *in, unsigned int neigh, struct batman_if *
 	orig_node = get_orig_node( in->orig );
 
 	orig_node->last_seen = get_time();
-	orig_node->interval = in->interval;
 	orig_node->flags = in->flags;
 
 	if ( orig_node->gwflags != in->gwflags )
@@ -578,6 +577,7 @@ void update_originator(struct packet *in, unsigned int neigh, struct batman_if *
 	} else
 		output("ERROR - Updating existing packet\n");
 
+	neigh_node->best_ttl = in->ttl;
 	pack_node->ttl = in->ttl;
 	pack_node->time = get_time();
 
@@ -836,16 +836,17 @@ void send_vis_packet()
 
 int batman()
 {
-	struct list_head *forw_pos, *orig_pos, *if_pos;
+	struct list_head *forw_pos, *orig_pos, *if_pos, *neigh_pos;
 	struct forw_node *forw_node;
 	struct orig_node *orig_node, *orig_neigh_node;
 	struct batman_if *batman_if, *if_incoming;
+	struct neigh_node *neigh_node;
 	struct packet in;
 	int res;
 	unsigned int neigh;
 	static char orig_str[ADDR_STR_LEN], neigh_str[ADDR_STR_LEN];
 	int forward_old;
-	int is_my_addr, is_my_orig, is_broadcast, is_duplicate;
+	int is_my_addr, is_my_orig, is_broadcast, is_duplicate, forward_duplicate_packet;
 	int time_count = 0;
 
 	next_own = 0;
@@ -857,7 +858,6 @@ int batman()
 		batman_if->out.flags = 0x00;
 		batman_if->out.ttl = TTL;
 		batman_if->out.seqno = 0;
-		batman_if->out.interval = orginator_interval;
 		batman_if->out.gwflags = gateway_class;
 		batman_if->out.version = BATMAN_VERSION;
 	}
@@ -894,7 +894,7 @@ int batman()
 				output("Received BATMAN packet from %s (originator %s, seqno %d, TTL %d)\n", neigh_str, orig_str, in.seqno, in.ttl);
 			}
 
-			is_my_addr = is_my_orig = is_broadcast = is_duplicate = 0;
+			is_my_addr = is_my_orig = is_broadcast = is_duplicate = forward_duplicate_packet = 0;
 
 			list_for_each(if_pos, &if_list) {
 				batman_if = list_entry(if_pos, struct batman_if, list);
@@ -924,6 +924,26 @@ int batman()
 
 				orig_neigh_node = update_last_hop( &in, neigh );
 
+				/* we are forwarding duplicate o-packets if they come via our best neighbour and ttl is valid */
+				if ( ( is_duplicate ) && ( ( orig_node->router == neigh ) || ( orig_node->router == 0 ) ) ) {
+
+					list_for_each(neigh_pos, &orig_neigh_node->neigh_list) {
+
+						neigh_node = list_entry(neigh_pos, struct neigh_node, list);
+
+						if ( neigh_node->addr == neigh ) {
+
+							if ( neigh_node->best_ttl == in.ttl )
+								forward_duplicate_packet = 1;
+
+							break;
+
+						}
+
+					}
+
+				}
+
 				if (debug_level >= 2) {
 					if ( is_duplicate )
 						output("Duplicate packet \n");
@@ -952,25 +972,29 @@ int batman()
 
 				} else if ( in.orig == neigh && in.ttl == TTL &&
 						!isBidirectionalNeigh( orig_neigh_node )  &&
-						!is_duplicate &&
+						( !is_duplicate || forward_duplicate_packet ) &&
 						!(in.flags & UNIDIRECTIONAL) ) {
 
 					schedule_forward_packet(&in, 1, orig_neigh_node, neigh);
 
 				} else if ( in.orig == neigh && in.ttl == TTL &&
 						isBidirectionalNeigh( orig_neigh_node ) &&
-						!is_duplicate &&
+						( !is_duplicate || forward_duplicate_packet ) &&
 						!(in.flags & UNIDIRECTIONAL) ) {
 
-					update_originator( &in, neigh, if_incoming );
+					if ( !is_duplicate )
+						update_originator( &in, neigh, if_incoming );
+
 					schedule_forward_packet(&in, 1, orig_neigh_node, neigh);
 
 				} else if ( in.orig != neigh && is_my_orig != 1 &&
 						isBidirectionalNeigh( orig_neigh_node ) &&
-						!is_duplicate &&
+						( !is_duplicate || forward_duplicate_packet ) &&
 						!(in.flags & UNIDIRECTIONAL) ) {
 
-					update_originator( &in, neigh, if_incoming );
+					if ( !is_duplicate )
+						update_originator( &in, neigh, if_incoming );
+
 					schedule_forward_packet(&in, 1, orig_neigh_node, neigh);
 
 				} else {
