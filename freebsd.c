@@ -366,24 +366,6 @@ int receive_packet(unsigned char *buff, int len, unsigned int *neigh, unsigned i
 
 int send_packet(unsigned char *buff, int len, struct sockaddr_in *broad, int sock)
 {
-//#define STSP_DEBUG
-#ifdef STSP_DEBUG
-	struct ifreq int_req;
-	char str[16];
-
-	memset(&int_req, 0, sizeof (struct ifreq));
-	strcpy(int_req.ifr_name, "wi0");
-
-	if (ioctl(sock, SIOCGIFADDR, &int_req) < 0)
-	{
-		fprintf(stderr, "Cannot get IP address of interface %s\n", "wi0");
-		close_all_sockets();
-		exit(EXIT_FAILURE);
-	}
-
-	addr_to_string(((struct sockaddr_in *)&int_req.ifr_addr)->sin_addr.s_addr, str, sizeof (str));
-	printf("Sending packet with source IP %s\n", str);
-#endif
 	if (sendto(sock, buff, len, 0, (struct sockaddr *)broad, sizeof (struct sockaddr_in)) < 0)
 	{
 		fprintf(stderr, "Cannot send packet: %s\n", strerror(errno));
