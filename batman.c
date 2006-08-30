@@ -902,7 +902,7 @@ int batman()
 				if ( neigh == batman_if->broad.sin_addr.s_addr ) is_broadcast = 1;
 			}
 
-			is_duplicate = ( in.orig, in.seqno );
+			is_duplicate = isDuplicate( in.orig, in.seqno );
 
 			if (is_my_addr == 1 /* && in.orig == my_addr */) {
 
