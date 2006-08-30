@@ -498,7 +498,6 @@ struct orig_node *update_last_hop(struct packet *in, unsigned int neigh)
 	orig_neigh_node->last_aware = get_time();
 
 
-
 	list_for_each(if_pos, &if_list) {
 		batman_if = list_entry(if_pos, struct batman_if, list);
 
@@ -586,7 +585,7 @@ void update_originator(struct packet *in, unsigned int neigh, struct batman_if *
 
 }
 
-void schedule_forward_packet( struct packet *in, int unidirectional)
+void schedule_forward_packet( struct packet *in, int unidirectional,  struct orig_node *orig_node, unsigned int neigh )
 {
 	struct forw_node *forw_node, *forw_node_new;
 	struct list_head *forw_pos;
@@ -597,6 +596,9 @@ void schedule_forward_packet( struct packet *in, int unidirectional)
 	if (in->ttl <= 1) {
 		if (debug_level >= 2)
 			output("ttl exceeded \n");
+	} else if ( orig_node->router != neigh ) {
+		if (debug_level >= 2)
+			output("not my best neighbour\n");
 	} else {
 		forw_node_new = alloc_memory(sizeof (struct forw_node));
 		INIT_LIST_HEAD(&forw_node_new->list);
@@ -953,7 +955,7 @@ int batman()
 						!is_duplicate &&
 						!(in.flags & UNIDIRECTIONAL) ) {
 
-					schedule_forward_packet(&in, 1);
+					schedule_forward_packet(&in, 1, orig_neigh_node, neigh);
 
 				} else if ( in.orig == neigh && in.ttl == TTL &&
 						isBidirectionalNeigh( orig_neigh_node ) &&
@@ -961,7 +963,7 @@ int batman()
 						!(in.flags & UNIDIRECTIONAL) ) {
 
 					update_originator( &in, neigh, if_incoming );
-					schedule_forward_packet(&in, 0);
+					schedule_forward_packet(&in, 1, orig_neigh_node, neigh);
 
 				} else if ( in.orig != neigh && is_my_orig != 1 &&
 						isBidirectionalNeigh( orig_neigh_node ) &&
@@ -969,7 +971,7 @@ int batman()
 						!(in.flags & UNIDIRECTIONAL) ) {
 
 					update_originator( &in, neigh, if_incoming );
-					schedule_forward_packet(&in, 0);
+					schedule_forward_packet(&in, 1, orig_neigh_node, neigh);
 
 				} else {
 					if (debug_level >= 3)
