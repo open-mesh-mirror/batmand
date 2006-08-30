@@ -23,15 +23,15 @@ LDFLAGS =	-lpthread
 UNAME=$(shell uname)
 
 ifeq ($(UNAME),Linux)
-OS_OBJ=	linux.o
+OS_OBJ=	posix.o linux.o
 endif
 
 ifeq ($(UNAME),Darwin)
-OS_OBJ=	freebsd.o
+OS_OBJ=	posix.o freebsd.o
 endif
 
 ifeq ($(UNAME),FreeBSD)
-OS_OBJ=	freebsd.o
+OS_OBJ=	posix.o freebsd.o
 endif
 
 batman:		batman.o $(OS_OBJ)
