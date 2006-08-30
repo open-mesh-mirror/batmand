@@ -21,6 +21,7 @@
 #define _BATMAN_BATMAN_H
 
 #include <netinet/in.h>
+#include <pthread.h>
 #include "list.h"
 
 #define VERSION "0.1"
@@ -117,6 +118,7 @@ struct batman_if
 	int udp_recv_sock;
 	int tcp_gw_sock;
 	int if_num;
+	pthread_t listen_thread_id;
 	struct sockaddr_in addr;
 	struct sockaddr_in broad;
 	struct packet out;

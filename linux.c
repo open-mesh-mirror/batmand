@@ -114,6 +114,8 @@ void close_all_sockets()
 
 	list_for_each(if_pos, &if_list) {
 		batman_if = list_entry(if_pos, struct batman_if, list);
+// 		pthread_join( batman_if->listen_thread_id, NULL );
+		close(batman_if->tcp_gw_sock);
 		close(batman_if->udp_recv_sock);
 	}
 
@@ -303,6 +305,35 @@ static void handler(int sig)
 	stop = 1;
 }
 
+void *gw_listen( void *arg ) {
+
+	struct batman_if *batman_if = (struct batman_if *)arg;
+	struct sockaddr_in client_addr;
+	socklen_t sin_size = sizeof(struct sockaddr_in);
+	char str1[16], str2[16];
+	int client_fd;
+
+	while (!is_aborted()) {
+
+		if ( ( client_fd = accept(batman_if->tcp_gw_sock, (struct sockaddr *)&client_addr, &sin_size) ) == -1 ) {
+			perror("accept");
+			continue;
+		}
+
+		if ( debug_level >= 0 ) {
+			addr_to_string(batman_if->addr.sin_addr.s_addr, str1, sizeof (str1));
+			addr_to_string(client_addr.sin_addr.s_addr, str2, sizeof (str2));
+			printf( "gateway: %s got connection from %s\n", str1, str2 );
+		}
+
+		close( client_fd );
+
+	}
+
+	return NULL;
+
+}
+
 int main(int argc, char *argv[])
 {
 	struct in_addr tmp_ip_holder;
@@ -312,6 +343,7 @@ int main(int argc, char *argv[])
 	char str1[16], str2[16], *dev;
 	unsigned int vis_server = 0;
 
+	stop = 0;
 	dev = NULL;
 	memset(&tmp_ip_holder, 0, sizeof (struct in_addr));
 
@@ -433,6 +465,7 @@ int main(int argc, char *argv[])
 
 		if ( strlen(batman_if->dev) > IFNAMSIZ - 1 ) {
 			fprintf(stderr, "Interface name too long: %s\n", batman_if->dev);
+			close_all_sockets();
 			exit(EXIT_FAILURE);
 		}
 
@@ -441,6 +474,7 @@ int main(int argc, char *argv[])
 		if (batman_if->udp_recv_sock < 0)
 		{
 			fprintf(stderr, "Cannot create socket: %s", strerror(errno));
+			close_all_sockets();
 			exit(EXIT_FAILURE);
 		}
 
@@ -485,23 +519,42 @@ int main(int argc, char *argv[])
 
 		batman_if->udp_send_sock = batman_if->udp_recv_sock;
 
+		addr_to_string(batman_if->addr.sin_addr.s_addr, str1, sizeof (str1));
+		addr_to_string(batman_if->broad.sin_addr.s_addr, str2, sizeof (str2));
+
+		printf("Using interface %s with address %s and broadcast address %s\n", batman_if->dev, str1, str2);
+
 		if ( gateway_class != 0 ) {
 
 			batman_if->tcp_gw_sock = socket(PF_INET, SOCK_STREAM, 0);
 
 			if (batman_if->tcp_gw_sock < 0) {
 				fprintf(stderr, "Cannot create socket: %s", strerror(errno));
+				close_all_sockets();
 				exit(EXIT_FAILURE);
 			}
 
+			if (setsockopt(batman_if->tcp_gw_sock, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(int)) < 0) {
+				printf("Cannot enable reuse of address: %s\n", strerror(errno));
+				close_all_sockets();
+				exit(EXIT_FAILURE);
+			}
 
+			if (bind( batman_if->tcp_gw_sock, (struct sockaddr*)&batman_if->addr, sizeof(struct sockaddr_in)) < 0) {
+				printf("Cannot bind socket: %s\n",strerror(errno));
+				close_all_sockets();
+				exit(EXIT_FAILURE);
+			}
+
+			if (listen( batman_if->tcp_gw_sock, 10 ) < 0) {
+				printf("Cannot listen socket: %s\n",strerror(errno));
+				close_all_sockets();
+				exit(EXIT_FAILURE);
+			}
+
+			pthread_create(&batman_if->listen_thread_id, NULL, &gw_listen, batman_if);
 
 		}
-
-		addr_to_string(batman_if->addr.sin_addr.s_addr, str1, sizeof (str1));
-		addr_to_string(batman_if->broad.sin_addr.s_addr, str2, sizeof (str2));
-
-		printf("Using interface %s with address %s and broadcast address %s\n", batman_if->dev, str1, str2);
 
 		found_ifs++;
 		found_args++;
@@ -556,9 +609,6 @@ int main(int argc, char *argv[])
 		printf( "preferred gateway: %s\n", str1 );
 	}
 
-
-	stop = 0;
-
 	signal(SIGINT, handler);
 
 	gettimeofday(&start_time, NULL);
@@ -569,4 +619,5 @@ int main(int argc, char *argv[])
 
 	close_all_sockets();
 	return res;
+
 }
