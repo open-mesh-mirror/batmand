@@ -20,7 +20,17 @@ CC =		gcc
 CFLAGS =	-Wall -O0 -g3
 LDFLAGS =	-lpthread
 
-batman:		batman.o linux.o
+UNAME=$(shell uname)
+
+ifeq ($(UNAME),Linux)
+OS_OBJ=	linux.o
+endif
+
+ifeq ($(UNAME),FreeBSD)
+OS_OBJ=	freebsd.o
+endif
+
+batman:		batman.o $(OS_OBJ)
 
 clean:
 		rm -f batman *.o *~

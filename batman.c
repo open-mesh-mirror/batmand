@@ -80,7 +80,7 @@ static LIST_HEAD(gw_list);
 LIST_HEAD(if_list);
 static unsigned int next_own;
 
-
+struct vis_if vis_if;
 
 void usage(void)
 {
