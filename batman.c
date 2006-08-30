@@ -596,7 +596,7 @@ void schedule_forward_packet( struct packet *in, int unidirectional,  struct ori
 	if (in->ttl <= 1) {
 		if (debug_level >= 2)
 			output("ttl exceeded \n");
-	} else if ( orig_node->router != neigh ) {
+	} else if ( ( orig_node->router != neigh ) && ( orig_node->router != 0 ) ) {
 		if (debug_level >= 2)
 			output("not my best neighbour\n");
 	} else {
