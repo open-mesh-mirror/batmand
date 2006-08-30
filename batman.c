@@ -925,7 +925,7 @@ int batman()
 				orig_neigh_node = update_last_hop( &in, neigh );
 
 				/* we are forwarding duplicate o-packets if they come via our best neighbour and ttl is valid */
-				if ( ( is_duplicate ) && ( ( orig_node->router == neigh ) || ( orig_node->router == 0 ) ) ) {
+				if ( ( is_duplicate ) && ( ( orig_neigh_node->router == neigh ) || ( orig_neigh_node->router == 0 ) ) ) {
 
 					list_for_each(neigh_pos, &orig_neigh_node->neigh_list) {
 
