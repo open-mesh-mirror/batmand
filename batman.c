@@ -442,28 +442,30 @@ int isDuplicate(unsigned int orig, unsigned short seqno)
 	struct neigh_node *neigh_node;
 	struct pack_node *pack_node;
 
-/* 	if (debug_level >= 2)  {  output("isDuplicate(): every originator \n");  } */
 	list_for_each(orig_pos, &orig_list) {
 		orig_node = list_entry(orig_pos, struct orig_node, list);
 
-/* 		if (debug_level >= 2)  {  output("isDuplicate(): every neighbour \n");  } */
-		list_for_each(neigh_pos, &orig_node->neigh_list) {
-			neigh_node = list_entry(neigh_pos, struct neigh_node, list);
+		if ( orig == orig_node->orig ) {
 
-/*     		if (debug_level >= 2)  {  output("isDuplicate(): every packet \n");  } */
+			list_for_each(neigh_pos, &orig_node->neigh_list) {
+				neigh_node = list_entry(neigh_pos, struct neigh_node, list);
 
-			list_for_each(pack_pos, &neigh_node->pack_list) {
-				pack_node = list_entry(pack_pos, struct pack_node, list);
+				list_for_each(pack_pos, &neigh_node->pack_list) {
+					pack_node = list_entry(pack_pos, struct pack_node, list);
 
-				if (orig_node->orig == orig && pack_node->seqno == seqno){
-/* 					if (debug_level >= 2)  {  output("isDuplicate(): YES \n");  } */
-					return 1;
+					if (orig_node->orig == orig && pack_node->seqno == seqno){
+	/* 					if (debug_level >= 2)  {  output("isDuplicate(): YES \n");  } */
+						return 1;
+					}
+
 				}
+
 			}
+
 		}
+
 	}
 
-/* 	if (debug_level >= 2)  {  output("isDuplicate(): NO \n");  } */
 	return 0;
 }
 
@@ -841,7 +843,7 @@ int batman()
 	unsigned int neigh;
 	static char orig_str[ADDR_STR_LEN], neigh_str[ADDR_STR_LEN];
 	int forward_old;
-	int is_my_addr = 0, is_my_orig = 0, is_broadcast = 0;
+	int is_my_addr, is_my_orig, is_broadcast, is_duplicate;
 	int time_count = 0;
 
 	next_own = 0;
@@ -890,7 +892,7 @@ int batman()
 				output("Received BATMAN packet from %s (originator %s, seqno %d, TTL %d)\n", neigh_str, orig_str, in.seqno, in.ttl);
 			}
 
-			is_my_addr = is_my_orig = is_broadcast = 0;
+			is_my_addr = is_my_orig = is_broadcast = is_duplicate = 0;
 
 			list_for_each(if_pos, &if_list) {
 				batman_if = list_entry(if_pos, struct batman_if, list);
@@ -899,6 +901,8 @@ int batman()
 				if ( in.orig == batman_if->addr.sin_addr.s_addr ) is_my_orig = 1;
 				if ( neigh == batman_if->broad.sin_addr.s_addr ) is_broadcast = 1;
 			}
+
+			is_duplicate = ( in.orig, in.seqno );
 
 			if (is_my_addr == 1 /* && in.orig == my_addr */) {
 
@@ -919,7 +923,7 @@ int batman()
 				orig_neigh_node = update_last_hop( &in, neigh );
 
 				if (debug_level >= 2) {
-					if (isDuplicate(in.orig, in.seqno))
+					if ( is_duplicate )
 						output("Duplicate packet \n");
 
 					if ( in.orig == neigh )
@@ -946,14 +950,14 @@ int batman()
 
 				} else if ( in.orig == neigh && in.ttl == TTL &&
 						!isBidirectionalNeigh( orig_neigh_node )  &&
-						!isDuplicate(in.orig, in.seqno) &&
+						!is_duplicate &&
 						!(in.flags & UNIDIRECTIONAL) ) {
 
 					schedule_forward_packet(&in, 1);
 
 				} else if ( in.orig == neigh && in.ttl == TTL &&
 						isBidirectionalNeigh( orig_neigh_node ) &&
-						!isDuplicate(in.orig, in.seqno) &&
+						!is_duplicate &&
 						!(in.flags & UNIDIRECTIONAL) ) {
 
 					update_originator( &in, neigh, if_incoming );
@@ -961,7 +965,7 @@ int batman()
 
 				} else if ( in.orig != neigh && is_my_orig != 1 &&
 						isBidirectionalNeigh( orig_neigh_node ) &&
-						!isDuplicate(in.orig, in.seqno) &&
+						!is_duplicate &&
 						!(in.flags & UNIDIRECTIONAL) ) {
 
 					update_originator( &in, neigh, if_incoming );

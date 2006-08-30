@@ -16,6 +16,7 @@ bug fixes:
 - fix bug neighbour in select ( max packet && ttl )
 - performance improvement in update_routes()
 - performance improvement in purge()
+- performance improvement in isDuplicate
 - JITTER removed
 - fix crash in purge() - check for router before route is deleted
 - ignore all packets with broadcast source IP
