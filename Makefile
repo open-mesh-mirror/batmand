@@ -26,6 +26,10 @@ ifeq ($(UNAME),Linux)
 OS_OBJ=	linux.o
 endif
 
+ifeq ($(UNAME),Darwin)
+OS_OBJ=	freebsd.o
+endif
+
 ifeq ($(UNAME),FreeBSD)
 OS_OBJ=	freebsd.o
 endif
