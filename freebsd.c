@@ -20,22 +20,14 @@
 #include <sys/types.h>
 #include <sys/sysctl.h>
 #include <sys/socket.h>
-#include <sys/time.h>
-#include <sys/ioctl.h>
-#include <net/route.h>
-#include <net/if.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
-#include <stdio.h>
-#include <time.h>
+#include <net/route.h>
 #include <string.h>
 #include <errno.h>
-#include <stdarg.h>
 #include <unistd.h>
-#include <signal.h>
 #include <stdlib.h>
 #include <err.h>
-#include <limits.h>
 
 /* Resolve namespace pollution from sys/queue.h */
 #ifdef LIST_HEAD
