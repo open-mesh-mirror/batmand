@@ -19,6 +19,7 @@
 CC =		gcc
 CFLAGS =	-Wall -O0 -g3
 LDFLAGS =	-lpthread
+#LDFLAGS =	-static -lpthread
 
 UNAME=$(shell uname)
 
@@ -35,6 +36,7 @@ OS_OBJ=	posix.o freebsd.o
 endif
 
 batman:		batman.o $(OS_OBJ)
+	$(CC) -o $@ batman.o $(OS_OBJ) $(LDFLAGS)
 
 clean:
 		rm -f batman *.o *~
