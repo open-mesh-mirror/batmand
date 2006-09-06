@@ -310,7 +310,6 @@ void *gw_listen( void *arg ) {
 
 		}
 
-
 	}
 
 	return NULL;

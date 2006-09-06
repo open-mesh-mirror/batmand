@@ -488,29 +488,12 @@ int hasUnidirectionalFlag( struct packet *in )
 struct orig_node *update_last_hop(struct packet *in, unsigned int neigh)
 {
 	struct orig_node *orig_neigh_node;
-	struct list_head *if_pos;
-	struct batman_if *batman_if;
-	int is_my_addr = 0, is_my_orig = 0;
 
 	if (debug_level >= 3) {
 		output("update_last_hop(): Searching originator entry of last-hop neighbour of received packet \n"); }
 	orig_neigh_node = get_orig_node( neigh );
+
 	orig_neigh_node->last_aware = get_time();
-
-
-	list_for_each(if_pos, &if_list) {
-		batman_if = list_entry(if_pos, struct batman_if, list);
-
-		if ( neigh == batman_if->addr.sin_addr.s_addr ) is_my_addr = 1;
-		if ( in->orig == batman_if->addr.sin_addr.s_addr ) is_my_orig = 1;
-	}
-
-	if (is_my_addr != 1 && is_my_orig == 1 && in->ttl == TTL-1)	{
-		if (debug_level >= 2)	{
-			output("received my own packet from neighbour indicating bidirectional link, updating last_reply stamp \n");
-		}
-		orig_neigh_node->last_reply = get_time();
-	}
 
 	return orig_neigh_node;
 
@@ -585,7 +568,7 @@ void update_originator(struct packet *in, unsigned int neigh, struct batman_if *
 
 }
 
-void schedule_forward_packet( struct packet *in, int unidirectional,  struct orig_node *orig_node, unsigned int neigh )
+void schedule_forward_packet( struct packet *in, int unidirectional, struct orig_node *orig_node, unsigned int neigh )
 {
 	struct forw_node *forw_node, *forw_node_new;
 	struct list_head *forw_pos;
@@ -596,9 +579,9 @@ void schedule_forward_packet( struct packet *in, int unidirectional,  struct ori
 	if (in->ttl <= 1) {
 		if (debug_level >= 2)
 			output("ttl exceeded \n");
-/*	} else if ( ( orig_node->router != neigh ) && ( orig_node->router != 0 ) ) {
+	} else if ( ( orig_node->router != neigh ) && ( orig_node->router != 0 ) ) {
 		if (debug_level >= 2)
-			output("not my best neighbour\n");*/
+			output("not my best neighbour\n");
 	} else {
 		forw_node_new = alloc_memory(sizeof (struct forw_node));
 		INIT_LIST_HEAD(&forw_node_new->list);
@@ -925,26 +908,31 @@ int batman()
 				orig_neigh_node = update_last_hop( &in, neigh );
 
 				/* we are forwarding duplicate o-packets if they come via our best neighbour and ttl is valid */
-// 				if ( ( is_duplicate ) && ( ( orig_neigh_node->router == neigh ) || ( orig_neigh_node->router == 0 ) ) ) {
-//
-// 					list_for_each(neigh_pos, &orig_neigh_node->neigh_list) {
-//
-// 						neigh_node = list_entry(neigh_pos, struct neigh_node, list);
-//
-// 						if ( neigh_node->addr == neigh ) {
-//
-// 							if ( neigh_node->best_ttl == in.ttl )
-// 								forward_duplicate_packet = 1;
-//
-// 							break;
-//
-// 						}
-//
-// 					}
-//
-// 				}
+				if ( ( is_duplicate ) && ( ( orig_neigh_node->router == neigh ) || ( orig_neigh_node->router == 0 ) ) ) {
 
-				if (debug_level >= 0) {
+					list_for_each(neigh_pos, &orig_neigh_node->neigh_list) {
+
+						neigh_node = list_entry(neigh_pos, struct neigh_node, list);
+
+						if ( neigh_node->addr == neigh ) {
+
+							if ( neigh_node->best_ttl == in.ttl )
+								forward_duplicate_packet = 1;
+
+							break;
+
+						}
+
+					}
+
+				}
+
+				if (debug_level >= 2) {
+
+					addr_to_string(in.orig, orig_str, sizeof (orig_str));
+					addr_to_string(neigh, neigh_str, sizeof (neigh_str));
+					output("new packet - orig: %s, sender: %s\n",orig_str , neigh_str);
+
 					if ( is_duplicate )
 						output("Duplicate packet \n");
 
@@ -962,6 +950,7 @@ int batman()
 
 					if ( in.gwflags != 0 )
 						output("Is an internet gateway (class %i) \n", in.gwflags);
+
 				}
 
 
@@ -970,37 +959,45 @@ int batman()
 					if (debug_level >= 1)
 						output( "Incompatible batman version (%i) - ignoring packet... \n", in.version );
 
-				} else if ( in.orig == neigh && in.ttl == TTL &&
-						!isBidirectionalNeigh( orig_neigh_node )  &&
-						( !is_duplicate || forward_duplicate_packet ) &&
-						!(in.flags & UNIDIRECTIONAL) ) {
+				} else if ( in.flags & UNIDIRECTIONAL ) {
 
-					schedule_forward_packet(&in, 1, orig_neigh_node, neigh);
+					if ( ( is_my_orig == 1 ) && ( !isBidirectionalNeigh( orig_neigh_node ) ) ) {
 
-				} else if ( in.orig == neigh && in.ttl == TTL &&
-						isBidirectionalNeigh( orig_neigh_node ) &&
-						( !is_duplicate || forward_duplicate_packet ) &&
-						!(in.flags & UNIDIRECTIONAL) ) {
+						orig_neigh_node->last_reply = get_time();
 
-					if ( !is_duplicate )
-						update_originator( &in, neigh, if_incoming );
+						if (debug_level >= 2)
+							output("received my own packet from neighbour indicating bidirectional link, updating last_reply stamp \n");
 
-					schedule_forward_packet(&in, 1, orig_neigh_node, neigh);
+					}
 
-				} else if ( in.orig != neigh && is_my_orig != 1 &&
-						isBidirectionalNeigh( orig_neigh_node ) &&
-						( !is_duplicate || forward_duplicate_packet ) &&
-						!(in.flags & UNIDIRECTIONAL) ) {
+				} else if ( !is_duplicate || forward_duplicate_packet ) {
 
-					if ( !is_duplicate )
-						update_originator( &in, neigh, if_incoming );
+					/* if a unidirectional neighbour sends us a packet - retransmit it with unidirectional flag
+					   to tell him that we get its packets */
+					if ( ( in.orig == neigh ) && ( !isBidirectionalNeigh( orig_neigh_node ) ) ) {
 
-					schedule_forward_packet(&in, 1, orig_neigh_node, neigh);
+						schedule_forward_packet(&in, 1, orig_neigh_node, neigh);
+
+					/* bidirectional link - retransmit packet and update ranking */
+					} else if ( ( isBidirectionalNeigh( orig_neigh_node ) ) && ( is_my_orig != 1 ) ) {
+
+						schedule_forward_packet(&in, 0, orig_neigh_node, neigh);
+
+						if ( !is_duplicate )
+							update_originator( &in, neigh, if_incoming );
+
+					/* received my own packet from neighbour indicating bidirectional link */
+					} else if ( is_my_orig == 1 ) {
+
+						orig_neigh_node->last_reply = get_time();
+
+					}
 
 				} else {
-					if (debug_level >= 3)
+					if (debug_level >= 2)
 						output("Ignoring packet... \n");
 				}
+
 			}
 		}
 
