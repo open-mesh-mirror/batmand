@@ -596,9 +596,9 @@ void schedule_forward_packet( struct packet *in, int unidirectional,  struct ori
 	if (in->ttl <= 1) {
 		if (debug_level >= 2)
 			output("ttl exceeded \n");
-	} else if ( ( orig_node->router != neigh ) && ( orig_node->router != 0 ) ) {
+/*	} else if ( ( orig_node->router != neigh ) && ( orig_node->router != 0 ) ) {
 		if (debug_level >= 2)
-			output("not my best neighbour\n");
+			output("not my best neighbour\n");*/
 	} else {
 		forw_node_new = alloc_memory(sizeof (struct forw_node));
 		INIT_LIST_HEAD(&forw_node_new->list);
@@ -925,24 +925,24 @@ int batman()
 				orig_neigh_node = update_last_hop( &in, neigh );
 
 				/* we are forwarding duplicate o-packets if they come via our best neighbour and ttl is valid */
-				if ( ( is_duplicate ) && ( ( orig_neigh_node->router == neigh ) || ( orig_neigh_node->router == 0 ) ) ) {
-
-					list_for_each(neigh_pos, &orig_neigh_node->neigh_list) {
-
-						neigh_node = list_entry(neigh_pos, struct neigh_node, list);
-
-						if ( neigh_node->addr == neigh ) {
-
-							if ( neigh_node->best_ttl == in.ttl )
-								forward_duplicate_packet = 1;
-
-							break;
-
-						}
-
-					}
-
-				}
+// 				if ( ( is_duplicate ) && ( ( orig_neigh_node->router == neigh ) || ( orig_neigh_node->router == 0 ) ) ) {
+//
+// 					list_for_each(neigh_pos, &orig_neigh_node->neigh_list) {
+//
+// 						neigh_node = list_entry(neigh_pos, struct neigh_node, list);
+//
+// 						if ( neigh_node->addr == neigh ) {
+//
+// 							if ( neigh_node->best_ttl == in.ttl )
+// 								forward_duplicate_packet = 1;
+//
+// 							break;
+//
+// 						}
+//
+// 					}
+//
+// 				}
 
 				if (debug_level >= 0) {
 					if ( is_duplicate )

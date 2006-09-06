@@ -246,25 +246,25 @@ void *gw_listen( void *arg ) {
 	socklen_t sin_size = sizeof(struct sockaddr_in);
 	char str1[16], str2[16];
 	int res, max_sock;
-	fd_set wait_sockets;
+	fd_set wait_sockets, tmp_wait_sockets;
 
 
-
+	FD_ZERO(&wait_sockets);
+	FD_SET(batman_if->tcp_gw_sock, &wait_sockets);
 	max_sock = batman_if->tcp_gw_sock;
 
 	while (!is_aborted()) {
 
 		tv.tv_sec = 1;
 		tv.tv_usec = 0;
+		tmp_wait_sockets = wait_sockets;
 
-		FD_ZERO(&wait_sockets);
-		FD_SET(batman_if->tcp_gw_sock, &wait_sockets);
-		res = select(max_sock + 1, &wait_sockets, NULL, NULL, &tv);
+		res = select(max_sock + 1, &tmp_wait_sockets, NULL, NULL, &tv);
 
 		if (res > 0) {
 
 			/* new client */
-			if ( FD_ISSET( batman_if->tcp_gw_sock, &wait_sockets ) ) {
+			if ( FD_ISSET( batman_if->tcp_gw_sock, &tmp_wait_sockets ) ) {
 
 				gw_client = alloc_memory(sizeof(struct gw_client));
 				memset(gw_client, 0, sizeof(struct gw_client));
