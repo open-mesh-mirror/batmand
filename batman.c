@@ -1,7 +1,7 @@
 /*
  * Copyright (C) 2006 BATMAN contributors:
  * Thomas Lopatic, Corinna 'Elektra' Aichele, Axel Neumann,
- * Felix Fietkau
+ * Felix Fietkau, Marek Lindner
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of version 2 of the GNU General Public
@@ -944,7 +944,7 @@ int batman()
 
 				}
 
-				if (debug_level >= 2) {
+				if (debug_level >= 0) {
 					if ( is_duplicate )
 						output("Duplicate packet \n");
 

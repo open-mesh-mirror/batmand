@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2006 BATMAN contributors:
- * Thomas Lopatic, Corinna 'Elektra' Aichele, Axel Neumann
+ * Thomas Lopatic, Corinna 'Elektra' Aichele, Axel Neumann, Marek Lindner
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of version 2 of the GNU General Public
  * License as published by the Free Software Foundation.
@@ -121,6 +121,15 @@ struct batman_if
 	struct sockaddr_in addr;
 	struct sockaddr_in broad;
 	struct packet out;
+	struct list_head client_list;
+};
+
+struct gw_client
+{
+	struct list_head list;
+	struct batman_if *batman_if;
+	int sock;
+	struct sockaddr_in addr;
 };
 
 struct vis_if {

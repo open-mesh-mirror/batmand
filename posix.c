@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2006 BATMAN contributors:
- * Thomas Lopatic
+ * Thomas Lopatic, Marek Lindner
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of version 2 of the GNU General Public
  * License as published by the Free Software Foundation.
@@ -89,9 +89,14 @@ void close_all_sockets()
 
 	list_for_each(if_pos, &if_list) {
 		batman_if = list_entry(if_pos, struct batman_if, list);
-// 		pthread_join( batman_if->listen_thread_id, NULL );
-		close(batman_if->tcp_gw_sock);
+
+		if ( gateway_class != 0 ) {
+			pthread_join( batman_if->listen_thread_id, NULL );
+			close(batman_if->tcp_gw_sock);
+		}
+
 		close(batman_if->udp_recv_sock);
+		close(batman_if->udp_send_sock);
 	}
 
 	if(vis_if.sock)
@@ -169,7 +174,8 @@ int receive_packet(unsigned char *buff, int len, unsigned int *neigh, unsigned i
 		batman_if = list_entry(if_pos, struct batman_if, list);
 
 		FD_SET(batman_if->udp_recv_sock, &wait_set);
-		if ( batman_if->udp_recv_sock > max_sock ) max_sock = batman_if->udp_recv_sock;
+		if ( batman_if->udp_recv_sock > max_sock )
+			max_sock = batman_if->udp_recv_sock;
 
 	}
 
@@ -235,25 +241,75 @@ static void handler(int sig)
 void *gw_listen( void *arg ) {
 
 	struct batman_if *batman_if = (struct batman_if *)arg;
-	struct sockaddr_in client_addr;
+	struct gw_client *gw_client;
+	struct timeval tv;
 	socklen_t sin_size = sizeof(struct sockaddr_in);
 	char str1[16], str2[16];
-	int client_fd;
+	int res, max_sock;
+	fd_set wait_sockets;
+
+
+
+	max_sock = batman_if->tcp_gw_sock;
 
 	while (!is_aborted()) {
 
-		if ( ( client_fd = accept(batman_if->tcp_gw_sock, (struct sockaddr *)&client_addr, &sin_size) ) == -1 ) {
-			perror("accept");
-			continue;
+		tv.tv_sec = 1;
+		tv.tv_usec = 0;
+
+		FD_ZERO(&wait_sockets);
+		FD_SET(batman_if->tcp_gw_sock, &wait_sockets);
+		res = select(max_sock + 1, &wait_sockets, NULL, NULL, &tv);
+
+		if (res > 0) {
+
+			/* new client */
+			if ( FD_ISSET( batman_if->tcp_gw_sock, &wait_sockets ) ) {
+
+				gw_client = alloc_memory(sizeof(struct gw_client));
+				memset(gw_client, 0, sizeof(struct gw_client));
+
+				if ( ( gw_client->sock = accept(batman_if->tcp_gw_sock, (struct sockaddr *)&gw_client->addr, &sin_size) ) == -1 ) {
+					perror("accept");
+					continue;
+				}
+
+				INIT_LIST_HEAD(&gw_client->list);
+				gw_client->batman_if = batman_if;
+
+				FD_SET(gw_client->sock, &wait_sockets);
+				if ( gw_client->sock > max_sock )
+					max_sock = gw_client->sock;
+
+				if ( debug_level >= 0 ) {
+					addr_to_string(batman_if->addr.sin_addr.s_addr, str1, sizeof (str1));
+					addr_to_string(gw_client->addr.sin_addr.s_addr, str2, sizeof (str2));
+					printf( "gateway: %s got connection from %s\n", str1, str2 );
+				}
+
+				list_add_tail(&gw_client->list, &batman_if->client_list);
+
+			/* client sent keep alive */
+			} else {
+
+// 				list_for_each(if_pos, &if_list) {
+//
+// 					batman_if = list_entry(if_pos, struct batman_if, list);
+//
+// 					FD_SET(batman_if->udp_recv_sock, &wait_set);
+// 					if ( batman_if->udp_recv_sock > max_sock ) max_sock = batman_if->udp_recv_sock;
+//
+// 				}
+
+			}
+
+		} else if ( ( res < 0 ) && (errno != EINTR) ) {
+
+			fprintf(stderr, "Cannot select: %s\n", strerror(errno));
+			return NULL;
+
 		}
 
-		if ( debug_level >= 0 ) {
-			addr_to_string(batman_if->addr.sin_addr.s_addr, str1, sizeof (str1));
-			addr_to_string(client_addr.sin_addr.s_addr, str2, sizeof (str2));
-			printf( "gateway: %s got connection from %s\n", str1, str2 );
-		}
-
-		close( client_fd );
 
 	}
 
@@ -384,6 +440,7 @@ int main(int argc, char *argv[])
 		batman_if = alloc_memory(sizeof(struct batman_if));
 		memset(batman_if, 0, sizeof(struct batman_if));
 		INIT_LIST_HEAD(&batman_if->list);
+		INIT_LIST_HEAD(&batman_if->client_list);
 
 		batman_if->dev = argv[found_args];
 		batman_if->if_num = found_ifs;
@@ -455,7 +512,7 @@ int main(int argc, char *argv[])
 			close_all_sockets();
 			exit(EXIT_FAILURE);
 		}
- 
+
 		addr_to_string(batman_if->addr.sin_addr.s_addr, str1, sizeof (str1));
 		addr_to_string(batman_if->broad.sin_addr.s_addr, str2, sizeof (str2));
 

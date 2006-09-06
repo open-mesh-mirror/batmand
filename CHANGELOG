@@ -10,6 +10,8 @@ new functions:
 - set orginator interval via command line switch
 - batman version check added
 - preferred gateway funtion added
+- FreeBSD support added
+- Mac OS X support added
 
 
 bug fixes:
@@ -18,6 +20,7 @@ bug fixes:
 - performance improvement in purge()
 - performance improvement in isDuplicate()
 - JITTER removed
+- interval removed
 - fix crash in purge() - check for router before route is deleted
 - ignore all packets with broadcast source IP
 - prevent routing loop by forwarding o-packets only from best neighbour
