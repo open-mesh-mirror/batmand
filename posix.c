@@ -242,10 +242,12 @@ void *gw_listen( void *arg ) {
 
 	struct batman_if *batman_if = (struct batman_if *)arg;
 	struct gw_client *gw_client;
+	struct list_head *client_pos, *client_pos_tmp;
 	struct timeval tv;
 	socklen_t sin_size = sizeof(struct sockaddr_in);
 	char str1[16], str2[16];
 	int res, max_sock;
+	unsigned int client_timeout = get_time();
 	fd_set wait_sockets, tmp_wait_sockets;
 
 
@@ -276,6 +278,7 @@ void *gw_listen( void *arg ) {
 
 				INIT_LIST_HEAD(&gw_client->list);
 				gw_client->batman_if = batman_if;
+				gw_client->last_keep_alive = get_time();
 
 				FD_SET(gw_client->sock, &wait_sockets);
 				if ( gw_client->sock > max_sock )
@@ -292,14 +295,24 @@ void *gw_listen( void *arg ) {
 			/* client sent keep alive */
 			} else {
 
-// 				list_for_each(if_pos, &if_list) {
-//
-// 					batman_if = list_entry(if_pos, struct batman_if, list);
-//
-// 					FD_SET(batman_if->udp_recv_sock, &wait_set);
-// 					if ( batman_if->udp_recv_sock > max_sock ) max_sock = batman_if->udp_recv_sock;
-//
-// 				}
+				list_for_each(client_pos, &batman_if->client_list) {
+
+					gw_client = list_entry(client_pos, struct gw_client, list);
+
+					if ( FD_ISSET( gw_client->sock, &tmp_wait_sockets ) ) {
+
+						gw_client->last_keep_alive = get_time();
+
+						if ( debug_level >= 0 ) {
+							addr_to_string(gw_client->addr.sin_addr.s_addr, str2, sizeof (str2));
+							printf( "gateway: client %s sent keep alive on interface %s\n", str2, batman_if->dev );
+						}
+
+						break;
+
+					}
+
+				}
 
 			}
 
@@ -307,6 +320,41 @@ void *gw_listen( void *arg ) {
 
 			fprintf(stderr, "Cannot select: %s\n", strerror(errno));
 			return NULL;
+
+		}
+
+
+		/* close unresponsive client connections */
+		if ( ( client_timeout + 59000 ) < get_time() ) {
+
+			client_timeout = get_time();
+			max_sock = batman_if->tcp_gw_sock;
+
+			list_for_each_safe(client_pos, client_pos_tmp, &batman_if->client_list) {
+
+				gw_client = list_entry(client_pos, struct gw_client, list);
+
+				if ( ( gw_client->last_keep_alive + 120000 ) < client_timeout ) {
+
+					FD_CLR(gw_client->sock, &wait_sockets);
+					close( gw_client->sock );
+
+					if ( debug_level >= 0 ) {
+						addr_to_string(gw_client->addr.sin_addr.s_addr, str2, sizeof (str2));
+						printf( "gateway: client %s timeout on interface %s\n", str2, batman_if->dev );
+					}
+
+					list_del(client_pos);
+					free_memory(client_pos);
+
+				} else {
+
+					if ( gw_client->sock > max_sock )
+						max_sock = gw_client->sock;
+
+				}
+
+			}
 
 		}
 

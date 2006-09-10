@@ -129,6 +129,7 @@ struct gw_client
 	struct list_head list;
 	struct batman_if *batman_if;
 	int sock;
+	unsigned int last_keep_alive;
 	struct sockaddr_in addr;
 };
 

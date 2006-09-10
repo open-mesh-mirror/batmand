@@ -994,8 +994,10 @@ int batman()
 					}
 
 				} else {
+
 					if (debug_level >= 2)
 						output("Ignoring packet... \n");
+
 				}
 
 			}
