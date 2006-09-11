@@ -49,6 +49,14 @@ extern int gateway_class;
 extern int routing_class;
 extern unsigned int pref_gateway;
 
+extern struct gw_node *curr_gateway;
+extern struct batman_if *curr_gateway_batman_if;
+extern unsigned int curr_gateway_ip;
+extern char *curr_gateway_ipip_if;
+pthread_t curr_gateway_thread_id;
+extern int curr_gateway_tcp_sock;
+extern int curr_gateway_ipip_fd;
+
 extern int found_ifs;
 
 extern struct list_head if_list;
@@ -130,6 +138,8 @@ struct gw_client
 	struct batman_if *batman_if;
 	int sock;
 	unsigned int last_keep_alive;
+	char *tun_dev;
+	int tun_fd;
 	struct sockaddr_in addr;
 };
 
@@ -147,5 +157,7 @@ static void debug();
 int batman();
 void usage(void);
 void verbose_usage(void);
+void del_default_route();
+int add_default_route();
 
 #endif
