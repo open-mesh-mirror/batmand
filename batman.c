@@ -175,7 +175,8 @@ static void choose_gw()
 	static char orig_str[ADDR_STR_LEN];
 
 
-	if ( routing_class == 0 ) return;
+	if ( routing_class == 0 )
+		return;
 
 	if ( list_empty(&gw_list) ) {
 
@@ -384,8 +385,8 @@ static void update_gw_list( struct orig_node *orig_node, unsigned char new_gwfla
 
 	}
 
-	if (debug_level >= 0) {
-		addr_to_string( gw_node->orig_node->orig, orig_str, ADDR_STR_LEN );
+	if (debug_level >= 1) {
+		addr_to_string( orig_node->orig, orig_str, ADDR_STR_LEN );
 		output( "Found new gateway %s with class %i\n", orig_str, new_gwflags );
 	}
 
@@ -394,9 +395,9 @@ static void update_gw_list( struct orig_node *orig_node, unsigned char new_gwfla
 	INIT_LIST_HEAD(&gw_node->list);
 
 	gw_node->orig_node = orig_node;
-	choose_gw();
-
 	list_add_tail(&gw_node->list, &gw_list);
+
+	choose_gw();
 
 }
 
@@ -410,7 +411,7 @@ static void debug()
 	static char str[ADDR_STR_LEN];
 	int l;
 
-	if (debug_level < 1)
+	if (debug_level < 2)
 		return;
 
 	if (debug_level >= 2) {
