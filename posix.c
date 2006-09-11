@@ -703,6 +703,24 @@ int main(int argc, char *argv[])
 				found_args += 2;
 				break;
 
+			case 'r':
+
+				errno = 0;
+				routing_class = strtol (optarg, NULL , 10);
+
+				if ( (errno == ERANGE && (routing_class == LONG_MAX || routing_class == LONG_MIN) ) || (errno != 0 && routing_class == 0) ) {
+					perror("strtol");
+					exit(EXIT_FAILURE);
+				}
+
+				if (routing_class < 0 || routing_class > 3) {
+					printf( "Invalid routing class specified: %i.\nThe class is a value between 0 and 3.\n", routing_class );
+					exit(EXIT_FAILURE);
+				}
+
+				found_args += 2;
+				break;
+
 			case 's':
 
 				errno = 0;
