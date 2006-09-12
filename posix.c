@@ -164,7 +164,7 @@ int add_ipip_tun( struct batman_if *batman_if, unsigned int dest_addr, char *tun
 		return -1;
 
 	}
-
+	printf( "1\n" );
 	if ( ( ioctl( *fd, TUNSETIFF, (void *) &ifr ) ) < 0 ) {
 
 		perror("TUNSETIFF");
@@ -172,7 +172,7 @@ int add_ipip_tun( struct batman_if *batman_if, unsigned int dest_addr, char *tun
 		return -1;
 
 	}
-
+	printf( "2\n" );
 	if ( ioctl( *fd, TUNSETPERSIST, 1 ) < 0 ) {
 
 		perror("TUNSETPERSIST");
@@ -181,7 +181,7 @@ int add_ipip_tun( struct batman_if *batman_if, unsigned int dest_addr, char *tun
 
 	}
 
-
+	printf( "3\n" );
 	tmp_fd = socket(AF_INET, SOCK_DGRAM, 0);
 
 	if ( tmp_fd < 0 ) {
@@ -197,7 +197,7 @@ int add_ipip_tun( struct batman_if *batman_if, unsigned int dest_addr, char *tun
 	addr.sin_family = AF_INET;
 	memcpy( &ifr.ifr_addr, &addr, sizeof(struct sockaddr) );
 
-
+	printf( "4\n" );
 	if ( ioctl( tmp_fd, SIOCSIFADDR, &ifr) < 0 ) {
 
 		perror("SIOCSIFADDR");
@@ -206,7 +206,7 @@ int add_ipip_tun( struct batman_if *batman_if, unsigned int dest_addr, char *tun
 		return -1;
 
 	}
-
+	printf( "5\n" );
 	/* set ip of this remote point of tunnel */
 	memset( &addr, 0, sizeof(addr) );
 	addr.sin_addr.s_addr = dest_addr;
@@ -216,6 +216,27 @@ int add_ipip_tun( struct batman_if *batman_if, unsigned int dest_addr, char *tun
 	if ( ioctl( tmp_fd, SIOCSIFDSTADDR, &ifr) < 0 ) {
 
 		perror("SIOCSIFDSTADDR");
+		del_ipip_tun( *fd );
+		close( tmp_fd );
+		return -1;
+
+	}
+
+	if ( ioctl( tmp_fd, SIOCGIFFLAGS, &ifr) < 0 ) {
+
+		perror("SIOCGIFFLAGS");
+		del_ipip_tun( *fd );
+		close( tmp_fd );
+		return -1;
+
+	}
+
+	ifr.ifr_flags |= IFF_UP;
+	ifr.ifr_flags |= IFF_RUNNING;
+
+	if ( ioctl( tmp_fd, SIOCSIFFLAGS, &ifr) < 0 ) {
+
+		perror("SIOCSIFFLAGS");
 		del_ipip_tun( *fd );
 		close( tmp_fd );
 		return -1;

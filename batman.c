@@ -170,7 +170,7 @@ struct orig_node *get_orig_node( unsigned int addr )
 static void choose_gw()
 {
 	struct list_head *pos;
-	struct gw_node *gw_node, *tmp_curr_gw;
+	struct gw_node *gw_node, *tmp_curr_gw = NULL;
 	int max_gw_class = 0, max_packets = 0, max_gw_factor = 0;
 	static char orig_str[ADDR_STR_LEN];
 
@@ -203,22 +203,30 @@ static void choose_gw()
 		switch ( routing_class ) {
 
 			case 1:   /* fast connection */
-				if ( ( gw_node->orig_node->gwflags > max_gw_class ) || ( ( gw_node->orig_node->gwflags == max_gw_class ) && ( gw_node->orig_node->packet_count > max_packets ) ) ) tmp_curr_gw = gw_node;
+				if ( ( gw_node->orig_node->gwflags > max_gw_class ) || ( ( gw_node->orig_node->gwflags == max_gw_class ) && ( gw_node->orig_node->packet_count > max_packets ) ) )
+					tmp_curr_gw = gw_node;
 				break;
 
 			case 2:   /* stable connection */
-				if ( ( ( gw_node->orig_node->packet_count * gw_node->orig_node->gwflags ) > max_gw_factor ) || ( ( ( gw_node->orig_node->packet_count * gw_node->orig_node->gwflags ) == max_gw_factor ) && ( gw_node->orig_node->packet_count > max_packets ) ) ) tmp_curr_gw = gw_node;
+				if ( ( ( gw_node->orig_node->packet_count * gw_node->orig_node->gwflags ) > max_gw_factor ) || ( ( ( gw_node->orig_node->packet_count * gw_node->orig_node->gwflags ) == max_gw_factor ) && ( gw_node->orig_node->packet_count > max_packets ) ) )
+					tmp_curr_gw = gw_node;
 				break;
 
 			default:  /* use best statistic (olsr style) */
-				if ( gw_node->orig_node->packet_count > max_packets ) tmp_curr_gw = gw_node;
+				if ( gw_node->orig_node->packet_count > max_packets )
+					tmp_curr_gw = gw_node;
 				break;
 
 		}
 
-		if ( gw_node->orig_node->gwflags > max_gw_class ) max_gw_class = gw_node->orig_node->gwflags;
-		if ( gw_node->orig_node->packet_count > max_packets ) max_packets = gw_node->orig_node->packet_count;
-		if ( ( gw_node->orig_node->packet_count * gw_node->orig_node->gwflags ) > max_gw_class ) max_gw_factor = ( gw_node->orig_node->packet_count * gw_node->orig_node->gwflags );
+		if ( gw_node->orig_node->gwflags > max_gw_class )
+			max_gw_class = gw_node->orig_node->gwflags;
+
+		if ( gw_node->orig_node->packet_count > max_packets )
+			max_packets = gw_node->orig_node->packet_count;
+
+		if ( ( gw_node->orig_node->packet_count * gw_node->orig_node->gwflags ) > max_gw_class )
+			max_gw_factor = ( gw_node->orig_node->packet_count * gw_node->orig_node->gwflags );
 
 		if ( ( pref_gateway != 0 ) && ( pref_gateway == gw_node->orig_node->orig ) ) {
 
@@ -247,14 +255,20 @@ static void choose_gw()
 
 		}
 
-		if (debug_level >= 1) {
-			addr_to_string( tmp_curr_gw->orig_node->orig, orig_str, ADDR_STR_LEN );
-			output( "Adding default route to %s (%i,%i,%i)\n", orig_str, max_gw_class, max_packets, max_gw_factor );
-		}
-
 		curr_gateway = tmp_curr_gw;
-		curr_gateway_ip = curr_gateway->orig_node->orig;
-		curr_gateway_batman_if = curr_gateway->orig_node->batman_if;
+
+		/* may be the last gateway is now gone */
+		if ( curr_gateway != NULL ) {
+
+			if (debug_level >= 1) {
+				addr_to_string( curr_gateway->orig_node->orig, orig_str, ADDR_STR_LEN );
+				output( "Adding default route to %s (%i,%i,%i)\n", orig_str, max_gw_class, max_packets, max_gw_factor );
+			}
+
+			curr_gateway_ip = curr_gateway->orig_node->orig;
+			curr_gateway_batman_if = curr_gateway->orig_node->batman_if;
+
+		}
 
 		add_default_route();
 
@@ -1037,6 +1051,9 @@ int batman()
 		}
 
 		send_outstanding_packets();
+
+		if ( ( routing_class != 0 ) && ( curr_gateway == NULL ) )
+			choose_gw();
 
 		purge();
 		debug();
