@@ -93,9 +93,9 @@ void add_del_route(unsigned int dest, unsigned int router, int del, char *dev, i
 
 		route.rt_flags |= RTF_GATEWAY;
 
-		output("%s route to %s via %s\n", del ? "Deleting" : "Adding", str1, str2);
+		output("%s route to %s via %s (%s)\n", del ? "Deleting" : "Adding", str1, str2, dev);
 	} else {
-		output("%s route to %s via 0.0.0.0\n", del ? "Deleting" : "Adding", str1);
+		output("%s route to %s via 0.0.0.0 (%s)\n", del ? "Deleting" : "Adding", str1, dev);
 	}
 
 	route.rt_metric = 1;

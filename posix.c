@@ -256,7 +256,7 @@ void del_default_route() {
 
 	curr_gateway = NULL;
 
-// 	add_del_route( 0, curr_gateway_ip, 1, curr_gateway_ipip_if, curr_gateway_ipip_fd );
+	add_del_route( 0, curr_gateway_ip, 1, curr_gateway_ipip_if, curr_gateway_ipip_fd );
 
 	close( curr_gateway_tcp_sock );
 	del_ipip_tun( curr_gateway_ipip_fd );
@@ -305,7 +305,7 @@ int add_default_route() {
 
 	if ( add_ipip_tun( curr_gateway_batman_if, curr_gateway_ip, curr_gateway_ipip_if, &curr_gateway_ipip_fd ) > 0 ) {
 
-// 		add_del_route( 0, curr_gateway_ip, 0, curr_gateway_ipip_if, curr_gateway_ipip_fd );
+		add_del_route( 0, curr_gateway_ip, 0, curr_gateway_ipip_if, curr_gateway_ipip_fd );
 		return 1;
 
 	} else {
