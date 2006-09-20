@@ -774,7 +774,7 @@ int main(int argc, char *argv[])
 
 	if (found_ifs == 0)
 	{
-	  fprintf(stderr, "Error - no interface specified\n");
+		fprintf(stderr, "Error - no interface specified\n");
 		usage();
 		close_all_sockets();
 		exit(EXIT_FAILURE);
@@ -804,8 +804,10 @@ int main(int argc, char *argv[])
 		exit(EXIT_FAILURE);
 	}
 
-	if(!probe_tun()) 
+	if ( ( ( routing_class != 0 ) || ( gateway_class != 0 ) ) && ( !probe_tun() ) ) {
+		close_all_sockets();
 		exit(EXIT_FAILURE);
+	}
 
 	close( fd );
 

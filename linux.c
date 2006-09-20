@@ -36,6 +36,8 @@
 #include <asm/types.h>
 #include <linux/if_tun.h>
 #include <linux/if_tunnel.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 
 #include "os.h"
 #include "batman.h"
@@ -116,13 +118,17 @@ void add_del_route(unsigned int dest, unsigned int router, int del, char *dev, i
 /* Probe for tun interface availability */
 int probe_tun()
 {
+	int fd;
+
 	if ( ( fd = open( "/dev/net/tun", O_RDWR ) ) < 0 ) {
 
 		fprintf( stderr, "Error - could not open '/dev/net/tun' ! Is the tun kernel module loaded ?\n" );
-		close_all_sockets();
 		return 0;
+
 	}
+
 	return 1;
+
 }
 
 int del_ipip_tun( int fd ) {

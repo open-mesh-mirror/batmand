@@ -1023,7 +1023,7 @@ int batman()
 					/* if a unidirectional neighbour sends us a packet - retransmit it with unidirectional flag
 					   to tell him that we get its packets */
 					/* if a bidirectional neighbour sends us a packet - retransmit it with unidirectional flag
-					if it is not our best link to it in order to prevent routing problems */
+					   if it is not our best link to it in order to prevent routing problems */
 					if ( ( in.orig == neigh ) && ( ( !isBidirectionalNeigh( orig_neigh_node ) ) || ( orig_neigh_node->router != 0 ) ) ) {
 
 						schedule_forward_packet(&in, 1, orig_neigh_node, neigh);

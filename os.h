@@ -35,5 +35,8 @@ void addr_to_string(unsigned int addr, char *str, int len);
 int receive_packet(unsigned char *buff, int len, unsigned int *neigh, unsigned int timeout, struct batman_if **if_incoming);
 int send_packet(unsigned char *buff, int len, struct sockaddr_in *broad, int sock);
 int rand_num(int limit);
+int probe_tun();
+int del_ipip_tun( int fd );
+int add_ipip_tun( struct batman_if *batman_if, unsigned int dest_addr, char *tun_dev, int *fd );
 
 #endif
