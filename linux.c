@@ -113,6 +113,18 @@ void add_del_route(unsigned int dest, unsigned int router, int del, char *dev, i
 	}
 }
 
+/* Probe for tun interface availability */
+int probe_tun()
+{
+	if ( ( fd = open( "/dev/net/tun", O_RDWR ) ) < 0 ) {
+
+		fprintf( stderr, "Error - could not open '/dev/net/tun' ! Is the tun kernel module loaded ?\n" );
+		close_all_sockets();
+		return 0;
+	}
+	return 1;
+}
+
 int del_ipip_tun( int fd ) {
 
 	if ( ioctl( fd, TUNSETPERSIST, 0 ) < 0 ) {

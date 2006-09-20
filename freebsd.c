@@ -184,7 +184,8 @@ void add_del_route(unsigned int dest, unsigned int router, int del,
 }
 
 
-int del_ipip_tun(int fd) {
+int del_ipip_tun(int fd)
+{
 	return 1;
 }
 
@@ -193,3 +194,7 @@ int add_ipip_tun( struct batman_if *batman_if, unsigned int dest_addr, char *tun
 	return 0;
 }
 
+int probe_tun()
+{
+	return 1;
+}

@@ -804,13 +804,8 @@ int main(int argc, char *argv[])
 		exit(EXIT_FAILURE);
 	}
 
-	if ( ( fd = open( "/dev/net/tun", O_RDWR ) ) < 0 ) {
-
-		fprintf( stderr, "Error - could not open '/dev/net/tun' ! Is the tun kernel module loaded ?\n" );
-		close_all_sockets();
+	if(!probe_tun()) 
 		exit(EXIT_FAILURE);
-
-	}
 
 	close( fd );
 
