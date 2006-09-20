@@ -32,6 +32,10 @@
 #include <signal.h>
 #include <stdlib.h>
 #include <linux/if.h>
+#include <netinet/ip.h>
+#include <asm/types.h>
+#include <linux/if_tun.h>
+#include <linux/if_tunnel.h>
 
 #include "os.h"
 #include "batman.h"
@@ -108,4 +112,122 @@ void add_del_route(unsigned int dest, unsigned int router, int del, char *dev, i
 			del ? "delete" : "add", str1, str2, strerror(errno));
 	}
 }
+
+int del_ipip_tun( int fd ) {
+
+	if ( ioctl( fd, TUNSETPERSIST, 0 ) < 0 ) {
+
+		perror("TUNSETPERSIST");
+		return -1;
+
+	}
+
+	close( fd );
+
+	return 1;
+
+}
+
+int add_ipip_tun( struct batman_if *batman_if, unsigned int dest_addr, char *tun_dev, int *fd ) {
+
+	int tmp_fd;
+	struct ifreq ifr;
+	struct sockaddr_in addr;
+
+	/* set up tunnel device */
+	memset( &ifr, 0, sizeof(ifr) );
+	ifr.ifr_flags = IFF_TUN;
+
+	if ( ( *fd = open( "/dev/net/tun", O_RDWR ) ) < 0 ) {
+
+		perror("/dev/net/tun");
+		return -1;
+
+	}
+
+	if ( ( ioctl( *fd, TUNSETIFF, (void *) &ifr ) ) < 0 ) {
+
+		perror("TUNSETIFF");
+		close(*fd);
+		return -1;
+
+	}
+
+	if ( ioctl( *fd, TUNSETPERSIST, 1 ) < 0 ) {
+
+		perror("TUNSETPERSIST");
+		close(*fd);
+		return -1;
+
+	}
+
+
+	tmp_fd = socket(AF_INET, SOCK_DGRAM, 0);
+
+	if ( tmp_fd < 0 ) {
+		fprintf(stderr, "Cannot create send socket: %s", strerror(errno));
+		del_ipip_tun( *fd );
+		return -1;
+	}
+
+
+	/* set ip of this end point of tunnel */
+	memset( &addr, 0, sizeof(addr) );
+	addr.sin_addr.s_addr = batman_if->addr.sin_addr.s_addr;
+	addr.sin_family = AF_INET;
+	memcpy( &ifr.ifr_addr, &addr, sizeof(struct sockaddr) );
+
+
+	if ( ioctl( tmp_fd, SIOCSIFADDR, &ifr) < 0 ) {
+
+		perror("SIOCSIFADDR");
+		del_ipip_tun( *fd );
+		close( tmp_fd );
+		return -1;
+
+	}
+
+	/* set ip of this remote point of tunnel */
+	memset( &addr, 0, sizeof(addr) );
+	addr.sin_addr.s_addr = dest_addr;
+	addr.sin_family = AF_INET;
+	memcpy( &ifr.ifr_addr, &addr, sizeof(struct sockaddr) );
+
+	if ( ioctl( tmp_fd, SIOCSIFDSTADDR, &ifr) < 0 ) {
+
+		perror("SIOCSIFDSTADDR");
+		del_ipip_tun( *fd );
+		close( tmp_fd );
+		return -1;
+
+	}
+
+	if ( ioctl( tmp_fd, SIOCGIFFLAGS, &ifr) < 0 ) {
+
+		perror("SIOCGIFFLAGS");
+		del_ipip_tun( *fd );
+		close( tmp_fd );
+		return -1;
+
+	}
+
+	ifr.ifr_flags |= IFF_UP;
+	ifr.ifr_flags |= IFF_RUNNING;
+
+	if ( ioctl( tmp_fd, SIOCSIFFLAGS, &ifr) < 0 ) {
+
+		perror("SIOCSIFFLAGS");
+		del_ipip_tun( *fd );
+		close( tmp_fd );
+		return -1;
+
+	}
+
+	close( tmp_fd );
+	strncpy( tun_dev, ifr.ifr_name, IFNAMSIZ );
+
+	return 1;
+
+}
+
 
