@@ -18,6 +18,7 @@
  */
 
 #include <sys/types.h>
+#include <sys/param.h>
 #include <sys/sysctl.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -29,11 +30,6 @@
 #include <stdlib.h>
 #include <err.h>
 
-/* Resolve namespace pollution from sys/queue.h */
-#ifdef LIST_HEAD
-#undef LIST_HEAD
-#endif
-
 #include "os.h"
 #include "batman.h"
 
@@ -41,6 +37,8 @@
 
 void set_forwarding(int state)
 {
+	int mib[4];
+
 	/* FreeBSD allows us to set the boolean IP forwarding
 	 * sysctl to anything. Check the value for sanity. */
 	if (state < 0 || state > 1)
@@ -49,7 +47,12 @@ void set_forwarding(int state)
 		err(1, "set_forwarding: %i", state);
 	}
 
-	if (sysctlbyname(SYSCTL_FORWARDING, NULL, NULL, &state, sizeof(state)) == -1)
+	mib[0] = CTL_NET;
+	mib[1] = PF_INET;
+	mib[2] = IPPROTO_IP;
+	mib[3] = IPCTL_FORWARDING;
+
+	if (sysctl(mib, 4, NULL, 0, (void*)&state, sizeof(state)) == -1)
 	{
 		err(1, "Cannot enable packet forwarding");
 	}
@@ -59,9 +62,15 @@ int get_forwarding(void)
 {
 	int state;
 	size_t len;
-	
-	len = sizeof(state);
-	if (sysctlbyname(SYSCTL_FORWARDING, &state, &len, NULL, 0) == -1)
+	int mib[4];
+
+	mib[0] = CTL_NET;
+	mib[1] = PF_INET;
+	mib[2] = IPPROTO_IP;
+	mib[3] = IPCTL_FORWARDING;
+	len = sizeof(int);
+
+	if (sysctl(mib, 4, &state, &len, NULL, 0) == -1)
 	{
 		err(1, "Cannot tell if packet forwarding is enabled");
 	}

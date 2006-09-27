@@ -1,6 +1,13 @@
 #ifndef _LINUX_LIST_H
 #define _LINUX_LIST_H
 
+/* 
+ * XXX: Resolve conflict between this file and <sys/queue.h> on BSD systems.
+ */
+#ifdef LIST_HEAD
+#undef LIST_HEAD
+#endif
+
 /*
  * Simple doubly linked list implementation.
  *

@@ -35,6 +35,10 @@ ifeq ($(UNAME),FreeBSD)
 OS_OBJ=	posix.o freebsd.o
 endif
 
+ifeq ($(UNAME),OpenBSD)
+OS_OBJ=	posix.o freebsd.o
+endif
+
 batman:		batman.o $(OS_OBJ)
 	$(CC) -o $@ batman.o $(OS_OBJ) $(LDFLAGS)
 
