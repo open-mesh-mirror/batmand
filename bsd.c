@@ -33,8 +33,6 @@
 #include "os.h"
 #include "batman.h"
 
-#define SYSCTL_FORWARDING "net.inet.ip.forwarding"
-
 void set_forwarding(int state)
 {
 	int mib[4];
@@ -47,6 +45,7 @@ void set_forwarding(int state)
 		err(1, "set_forwarding: %i", state);
 	}
 
+	/* "net.inet.ip.forwarding" */
 	mib[0] = CTL_NET;
 	mib[1] = PF_INET;
 	mib[2] = IPPROTO_IP;
@@ -64,10 +63,12 @@ int get_forwarding(void)
 	size_t len;
 	int mib[4];
 
+	/* "net.inet.ip.forwarding" */
 	mib[0] = CTL_NET;
 	mib[1] = PF_INET;
 	mib[2] = IPPROTO_IP;
 	mib[3] = IPCTL_FORWARDING;
+
 	len = sizeof(int);
 
 	if (sysctl(mib, 4, &state, &len, NULL, 0) == -1)
@@ -79,7 +80,7 @@ int get_forwarding(void)
 
 /* Message structure used to interface the kernel routing table.
  * See route(4) for details on the message passing interface for
- * manipulating the kernel routing table in FreeBSD.
+ * manipulating the kernel routing table.
  * We transmit at most two addresses at once: a destination host
  * and a gateway.
  */
@@ -192,18 +193,20 @@ void add_del_route(unsigned int dest, unsigned int router, int del,
 	}
 }
 
-
 int del_ipip_tun(int fd)
 {
+	/* Implement me! */
 	return 1;
 }
 
 int add_ipip_tun( struct batman_if *batman_if, unsigned int dest_addr, char *tun_dev, int *fd )
 {
+	/* Implement me! */
 	return 0;
 }
 
 int probe_tun()
 {
+	/* Implement me! */
 	return 1;
 }
