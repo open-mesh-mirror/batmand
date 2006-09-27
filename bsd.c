@@ -208,5 +208,5 @@ int add_ipip_tun( struct batman_if *batman_if, unsigned int dest_addr, char *tun
 int probe_tun()
 {
 	/* Implement me! */
-	return 1;
+	return 0;
 }
