@@ -28,15 +28,15 @@ OS_OBJ=	posix.o linux.o
 endif
 
 ifeq ($(UNAME),Darwin)
-OS_OBJ=	posix.o freebsd.o
+OS_OBJ=	posix.o bsd.o
 endif
 
 ifeq ($(UNAME),FreeBSD)
-OS_OBJ=	posix.o freebsd.o
+OS_OBJ=	posix.o bsd.o
 endif
 
 ifeq ($(UNAME),OpenBSD)
-OS_OBJ=	posix.o freebsd.o
+OS_OBJ=	posix.o bsd.o
 endif
 
 batman:		batman.o $(OS_OBJ)
