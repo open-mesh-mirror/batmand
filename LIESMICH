@@ -1,6 +1,21 @@
+
+
+
+----------------------------------------------------------------------------
+HINWEIS HINWEIS HINWEIS HINWEIS HINWEIS HINWEIS HINWEIS HINWEIS HINWEIS 
+
+Die deutschsprachige Doku (dieser Text) ist veraltet. Die englische Version
+'Readme' ist dagegen up-to-date. 
+
+HINWEIS HINWEIS HINWEIS HINWEIS HINWEIS HINWEIS HINWEIS HINWEIS HINWEIS
+----------------------------------------------------------------------------
+
 B.A.T.M.A.N-II
 
 BETTER APPROACH TO MOBILE AD-HOC NETWORKING
+
+
+
 
 B.A.T.M.A.N ist eine völlig neue Herangehensweise an Ad-Hoc-Routing, deren
 Durchführbarkeit wir mit diesem Code testen wollen. Alle bisherigen uns

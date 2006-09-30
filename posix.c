@@ -518,7 +518,7 @@ int main(int argc, char *argv[])
 	dev = NULL;
 	memset(&tmp_ip_holder, 0, sizeof (struct in_addr));
 
-	printf( "B.A.T.M.A.N-II v%s (internal version %i)\n", VERSION, BATMAN_VERSION );
+	printf( "B.A.T.M.A.N-III v%s (internal version %i)\n", VERSION, BATMAN_VERSION );
 
 	while ( ( optchar = getopt ( argc, argv, "d:hHo:g:p:r:s:" ) ) != -1 ) {
 

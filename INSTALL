@@ -2,7 +2,9 @@
 B.A.T.M.A.N Installation and Use
 #################################
 
-Axel Neumann (neumann@tkn.tu-berlin.de)
+Marek Lindner
+Stefan Sperling
+Axel Neumann (neumann@nomail.net)
 Corinna 'Elektra' Aichele (onelektra@gmx.net)
 Thomas Lopatic  (thomas@lopatic.de)
 Felix Fietkau (nbd@nbd.name)
@@ -12,64 +14,73 @@ Felix Fietkau (nbd@nbd.name)
 Preface
 -------
 
-This is a minimalistic and experimental piece of code to test the viability
-of the B.A.T.M.A.N-II routing algorithm based on ideas of Thomas Lopatic and
-Corinna 'Elektra' Aichele.
+This is still a experimental piece of code to test the viability of the
+B.A.T.M.A.N routing algorithm based on initial ideas of Thomas Lopatic
+and Corinna 'Elektra' Aichele.
 
-This is implementation 0.06 of the improved B.A.T.M.A.N algorithm with
-bidirectional link check mechanism. It is not unlikely that we have to
-fix some bugs. So far the deamon seems to behave well...
+This is implementation 0.1-rc0 of the improved B.A.T.M.A.N-III algorithm. It
+is not unlikely that we have to fix some bugs.
+
+Use - like always - at your own risk!
 
 
 --------
 Features
 --------
 
-At the moment this code implements just the bare routing algorithm. It will only work on a
-single interface (of course it could be a virtual one, to run a deathmatch
-against other routing protocols like olsrd) ;-) 
-
-There is no gateway-feature yet. So set up an IPIP-tunnel by hand.
+Improved B.A.T.M.A.N-III algorithm 
+Free-BSD support 
+Mac OS-X support
+IP-Tunnels 
+Gateway detection 
+Multiple Interfaces support
+Support for a server that collects link-state information from each node to generate two
+dimensional or three dimensional topology graphs.
 
 
 -------
 Roadmap
 -------
 
-If the tests with this algorithm are sucessful, implementing a gateway feature should not
-take too long. We will definitely go for a way to semi-automatically set up
-IPIP-Tunnels to avoid too much gateway-switching. This is a real annoyance if you
-are behind a NATed gateway - which is the default in most environments -
-because your SSH, VOIP, FTP, IM-Sessions, Downloads... are interrupted every time
-the protocol chooses to switch the gateway.
+So far IP-Tunnels use TCP in TCP - which is known to have bad performance
+when links are lossy. We are going to move to UDP for the IP-Tunnels.
 
-Supporting multiple interfaces should be the next step after implementing the gateway feature. 
+Testing, improvements in the documentation. 
 
-This process can of course be accelerated with your support (testing, debugging,
-coding, patches.)
+Develop B.A.T.M.A.N-Advanced that routes on Layer 2 and creates a Link-Local-Illusion for higher
+OSI-Layers
 
+Read speed tables from WiFi-Cards to calculate the transfer speed of routes
+in B.A.T.M.A.N-Advanced
+
+
+------------
+Requirements
+------------
+
+Linux with kernel-module 'tun' loaded if you want to use/be a gateway
+FreeBSD
+MacOS-X
 
 ------------
 Installation
 ------------
 
-At the moment there is only support for Linux. You need the usual working
-environment to compile software. In the B.A.T.M.A.N directory type
+You need the usual working environment to compile software. In the
+B.A.T.M.A.N directory type
 
 make <press enter>
 
 After the compilation process is finished you'll find a executable called 'batman'. This
-executable is quite big because it contains debugging information for GDB.
+executable is quite big because it is not stripped.
 
-If you want to use the routing deamon on a small embedded system you should
-strip it - that means removing the informations needed by GDB. To do this just
-perform 
+Strip it by performing:
 
 strip batman <press enter>
 
 Note there is no installation script at the moment. If you want to install
-it, copy the deamon to a location in your path, for example /usr/sbin or
-/usr/local/bin.
+it, copy the deamon to a location somewhere in your path, for example
+/usr/sbin or /usr/local/bin.
 
 
 
@@ -78,26 +89,66 @@ Use
 ---
 
 
-Make sure you have no firewall running that is blocking UDP port 1966.
- 
-The functionality of B.A.T.M.A.N at the moment is minimal, so launching it is
-fairly easy. In the directory with the B.A.T.M.A.N deamon type - as root - 
+Make sure you have no firewall running that is blocking UDP port 1966. 
+Type in the B.A.T.M.A.N source-directory:
 
-./batman <interface> <press enter>
+./batman -H
 
-Example:
 
-If the interface you want batman to run on is wlan0, type:
+Usage: batman [options] interface [interface interface]
 
-./batman wlan0 <press enter>
+       -d debug level
+          default: 0, allowed values: 0 - 3
 
-If you want to start with debug level 1, type:
+       -g gateway class
 
-./batman -d wlan0 
+	  Use this feature if you want to offer a internet gateway and tell
+	  clients what kind of gateway you are!
 
-You can add more d's to have even more debugging information:
+          default:         0 -> this is not an internet gateway
+          allowed values:  1 -> modem line
+                           2 -> ISDN line
+                           3 -> double ISDN
+                           4 -> 256 KBit
+                           5 -> UMTS / 0.5 MBit
+                           6 -> 1 MBit
+                           7 -> 2 MBit
+                           8 -> 3 MBit
+                           9 -> 5 MBit
+                          10 -> 6 MBit
+                          11 -> >6 MBit
 
-./batman -ddd wlan0
+       -h shorter help
+       -H this help
+
+
+       -o orginator interval in ms
+          default: 1000, allowed values: >0
+
+       -p preferred gateway
+
+	  This will set up an IP-Tunnel to the destination IP
+
+          default: none, allowed values: IP
+
+       -r routing class (only needed if gateway class = 0)
+
+	  If you are a client, this will select the way you choose an
+	  internet-gateway
+
+          default:         0 -> set no default route
+          allowed values:  1 -> use fast internet connection
+                           2 -> use stable internet connection
+                           3 -> use best statistic internet connection (olsr style)
+
+       -s visualisation server
+
+	  The Server-IP that collects the topology information for
+	  topology-visualisation
+
+          default: none, allowed values: IP
+
+
 
 
 Switch the output of runtime debugging messages to a low level if you want
