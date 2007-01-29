@@ -42,7 +42,7 @@
 #include "allocate.h"
 
 #define BAT_LOGO_PRINT(x,y,z) printf( "\x1B[%i;%iH%c", y + 1, x, z )                      /* write char 'z' into column 'x', row 'y' */
-#define BAT_LOGO_END(x,y) printf("\x1B[8;0H");fflush(NULL);bat_wait( x, y );     /* end of current picture */
+#define BAT_LOGO_END(x,y) printf("\x1B[8;0H");fflush(NULL);bat_wait( x, y );              /* end of current picture */
 
 
 extern struct vis_if vis_if;
@@ -484,10 +484,10 @@ int add_default_route() {
 
 void close_all_sockets() {
 
-	struct list_head *if_pos;
+	struct list_head *if_pos, *if_pos_tmp;
 	struct batman_if *batman_if;
 
-	list_for_each(if_pos, &if_list) {
+	list_for_each_safe(if_pos, if_pos_tmp, &if_list) {
 
 		batman_if = list_entry(if_pos, struct batman_if, list);
 
@@ -500,6 +500,9 @@ void close_all_sockets() {
 
 		close(batman_if->udp_recv_sock);
 		close(batman_if->udp_send_sock);
+
+		list_del( if_pos );
+		debugFree( if_pos, 203 );
 
 	}
 
@@ -858,6 +861,15 @@ void *gw_listen( void *arg ) {
 
 	/* delete tun devices on exit */
 	del_dev_tun( tun_fd );
+
+	list_for_each_safe(client_pos, client_pos_tmp, &batman_if->client_list) {
+
+		gw_client = list_entry(client_pos, struct gw_client, list);
+
+		list_del( client_pos );
+		debugFree( client_pos, 297 );
+
+	}
 
 	return NULL;
 
@@ -1322,6 +1334,8 @@ int main(int argc, char *argv[])
 	res = batman();
 
 	close_all_sockets();
+
+	checkLeak();
 
 	return res;
 

@@ -398,7 +398,7 @@ static void update_routes( struct orig_node *orig_node, unsigned char *hna_recv_
 			output( "Route to %s via %s\n", orig_str, next_str );
 		}
 
-		orig_node->packet_count = neigh_pkts[max_if->if_num];
+		orig_node->packet_count = max_pack;
 
 		if ( orig_node->router != next_hop->addr ) {
 
@@ -1009,7 +1009,7 @@ void schedule_own_packet() {
 
 }
 
-void purge()
+void purge( unsigned int curr_time )
 {
 	struct list_head *orig_pos, *neigh_pos, *pack_pos, *gw_pos, *gw_pos_tmp, *orig_temp, *neigh_temp, *pack_temp;
 	struct orig_node *orig_node;
@@ -1037,7 +1037,7 @@ void purge()
 				pack_node = list_entry(pack_pos, struct pack_node, list);
 
 				/* remove them if outdated */
-				if ((int)((pack_node->time + TIMEOUT) < get_time()))
+				if ((int)((pack_node->time + TIMEOUT) < curr_time))
 				{
 					if (debug_level == 4) {
 						addr_to_string(orig_node->orig, orig_str, ADDR_STR_LEN);
@@ -1072,7 +1072,7 @@ void purge()
 		}
 
 		/* if no more neighbours (next hops) towards given origin, remove origin */
-		if (list_empty(&orig_node->neigh_list) && ((int)(orig_node->last_aware) + TIMEOUT <= ((int)(get_time())))) {
+		if (list_empty(&orig_node->neigh_list) && ((int)(orig_node->last_aware) + TIMEOUT <= ((int)(curr_time)))) {
 
 			if (debug_level == 4) {
 				addr_to_string(orig_node->orig, orig_str, sizeof (orig_str));
@@ -1103,12 +1103,8 @@ void purge()
 			list_del(orig_pos);
 
 			/* remove old announced network(s) */
-			if ( orig_node->hna_buff_len > 0 ) {
-
+			if ( orig_node->hna_buff_len > 0 )
 				add_del_hna( orig_node, 1 );
-				debugFree( orig_node->hna_buff, 108 );
-
-			}
 
 			if ( orig_node->router != 0 ) {
 
@@ -1167,11 +1163,12 @@ void send_vis_packet()
 
 int batman()
 {
-	struct list_head *orig_pos, *if_pos, *neigh_pos, *hna_pos;
-	struct orig_node *orig_node, *orig_neigh_node;
+	struct list_head *if_pos, *neigh_pos, *hna_pos, *hna_pos_tmp, *forw_pos, *forw_pos_tmp;
+	struct orig_node *orig_neigh_node;
 	struct batman_if *batman_if, *if_incoming;
 	struct neigh_node *neigh_node;
 	struct hna_node *hna_node;
+	struct forw_node *forw_node;
 	unsigned int neigh, hna, netmask, debug_timeout, select_timeout;
 	unsigned char in[1501], *hna_recv_buff;
 	static char orig_str[ADDR_STR_LEN], neigh_str[ADDR_STR_LEN];
@@ -1185,7 +1182,7 @@ int batman()
 
 	if ( !( list_empty(&hna_list) ) ) {
 
-		list_for_each(hna_pos, &hna_list) {
+		list_for_each( hna_pos, &hna_list ) {
 
 			hna_node = list_entry(hna_pos, struct hna_node, list);
 
@@ -1200,7 +1197,7 @@ int batman()
 
 	}
 
-	list_for_each(if_pos, &if_list) {
+	list_for_each( if_pos, &if_list ) {
 
 		batman_if = list_entry(if_pos, struct batman_if, list);
 
@@ -1471,7 +1468,7 @@ int batman()
 		if ( ( routing_class != 0 ) && ( curr_gateway == NULL ) )
 			choose_gw();
 
-		purge();
+		purge( get_time() );
 
 		if ( debug_timeout + 1000 < get_time() ) {
 
@@ -1488,16 +1485,28 @@ int batman()
 	if ( debug_level > 0 )
 		printf( "Deleting all BATMAN routes\n" );
 
-	list_for_each(orig_pos, &orig_list) {
+	purge( get_time() + TIMEOUT + orginator_interval );
 
-		orig_node = list_entry(orig_pos, struct orig_node, list);
 
-		/* remove old announced network(s) */
-		if ( orig_node->hna_buff_len > 0 )
-			add_del_hna( orig_node, 1 );
+	list_for_each_safe( hna_pos, hna_pos_tmp, &hna_list ) {
 
-		if ( orig_node->router != 0 )
-			add_del_route( orig_node->orig, 32, orig_node->router, 1, orig_node->batman_if->dev, batman_if->udp_send_sock );
+		hna_node = list_entry(hna_pos, struct hna_node, list);
+
+		debugFree( hna_node, 114 );
+
+	}
+
+	if ( hna_buff != NULL )
+		debugFree( hna_buff, 115 );
+
+
+	list_for_each_safe( forw_pos, forw_pos_tmp, &forw_list ) {
+		forw_node = list_entry( forw_pos, struct forw_node, list );
+
+		list_del( forw_pos );
+
+		debugFree( forw_node->pack_buff, 112 );
+		debugFree( forw_node, 113 );
 
 	}
 
@@ -1511,8 +1520,6 @@ int batman()
 	set_rp_filter( if_rp_filter_all_old, "all" );
 	set_rp_filter( if_rp_filter_default_old, "default" );
 
-
-	checkLeak();
 
 	return 0;
 

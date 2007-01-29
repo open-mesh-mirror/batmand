@@ -24,7 +24,7 @@
 #include <pthread.h>
 #include "list.h"
 
-#define SOURCE_VERSION "0.1.1 beta"
+#define SOURCE_VERSION "0.1.1"
 #define COMPAT_VERSION 2
 #define PORT 1966
 #define UNIDIRECTIONAL 0x80

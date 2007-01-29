@@ -4,7 +4,7 @@
 
 #include "allocate.h"
 
-#define DEBUG_MALLOC
+/* #define DEBUG_MALLOC */
 
 #define MAGIC_NUMBER 0x12345678
 
