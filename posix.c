@@ -241,19 +241,16 @@ int print_animation( void ) {
 
 void *client_to_gw_tun( void *arg ) {
 
-	struct gw_node *gw_node = (struct gw_node *)arg;
-	struct batman_if *curr_gateway_batman_if;
+	struct curr_gw_data *curr_gw_data = (struct curr_gw_data *)arg;
 	struct sockaddr_in gw_addr, my_addr, sender_addr;
 	struct timeval tv;
 	int res, max_sock, status, buff_len, curr_gateway_tcp_sock, curr_gateway_tun_sock, curr_gateway_tun_fd, server_keep_alive_timeout;
-	unsigned int addr_len, curr_gateway_ip;
+	unsigned int addr_len;
 	char curr_gateway_tun_if[IFNAMSIZ], keep_alive_string[] = "ping\0";
 	unsigned char buff[1500];
 	fd_set wait_sockets, tmp_wait_sockets;
 
 
-	curr_gateway_ip = gw_node->orig_node->orig;
-	curr_gateway_batman_if = gw_node->orig_node->batman_if;
 	addr_len = sizeof (struct sockaddr_in);
 
 	memset( &gw_addr, 0, sizeof(struct sockaddr_in) );
@@ -261,11 +258,11 @@ void *client_to_gw_tun( void *arg ) {
 
 	gw_addr.sin_family = AF_INET;
 	gw_addr.sin_port = htons(PORT + 1);
-	gw_addr.sin_addr.s_addr = curr_gateway_ip;
+	gw_addr.sin_addr.s_addr = curr_gw_data->gw_node->orig_node->orig;
 
 	my_addr.sin_family = AF_INET;
 	my_addr.sin_port = htons(PORT + 1);
-	my_addr.sin_addr.s_addr = curr_gateway_batman_if->addr.sin_addr.s_addr;
+	my_addr.sin_addr.s_addr = curr_gw_data->gw_node->orig_node->batman_if->addr.sin_addr.s_addr;
 
 
 	/* connect to server (ask permission) */
@@ -282,8 +279,8 @@ void *client_to_gw_tun( void *arg ) {
 		do_log( "Error - can't connect to gateway: %s\n", strerror(errno) );
 		close( curr_gateway_tcp_sock );
 
-		gw_node->last_failure = get_time();
-		gw_node->unavail_factor++;
+		curr_gw_data->gw_node->last_failure = get_time();
+		curr_gw_data->gw_node->unavail_factor++;
 
 		curr_gateway = NULL;
 		return NULL;
@@ -314,9 +311,9 @@ void *client_to_gw_tun( void *arg ) {
 	}
 
 
-	if ( add_dev_tun( curr_gateway_batman_if, curr_gateway_batman_if->addr.sin_addr.s_addr, curr_gateway_tun_if, sizeof(curr_gateway_tun_if), &curr_gateway_tun_fd ) > 0 ) {
+	if ( add_dev_tun( curr_gw_data->gw_node->orig_node->batman_if, curr_gw_data->gw_node->orig_node->batman_if->addr.sin_addr.s_addr, curr_gateway_tun_if, sizeof(curr_gateway_tun_if), &curr_gateway_tun_fd ) > 0 ) {
 
-		add_del_route( 0, 0, 0, 0, curr_gateway_tun_if, curr_gateway_batman_if->udp_send_sock );
+		add_del_route( 0, 0, 0, 0, curr_gateway_tun_if, curr_gw_data->gw_node->orig_node->batman_if->udp_send_sock );
 
 	} else {
 
@@ -339,7 +336,7 @@ void *client_to_gw_tun( void *arg ) {
 	if ( curr_gateway_tun_fd > max_sock )
 		max_sock = curr_gateway_tun_fd;
 
-	while ( ( !is_aborted() ) && ( curr_gateway != NULL ) ) {
+	while ( ( !is_aborted() ) && ( curr_gateway != NULL ) && ( ! curr_gw_data->gw_node->deleted ) ) {
 
 
 		if ( server_keep_alive_timeout + 30000 < get_time() ) {
@@ -351,8 +348,8 @@ void *client_to_gw_tun( void *arg ) {
 				if ( debug_level == 3 )
 					printf( "server_keepalive failed: no connect to server\n" );
 
-				gw_node->last_failure = get_time();
-				gw_node->unavail_factor++;
+				curr_gw_data->gw_node->last_failure = get_time();
+				curr_gw_data->gw_node->unavail_factor++;
 
 				break;
 
@@ -392,8 +389,8 @@ void *client_to_gw_tun( void *arg ) {
 					if ( debug_level == 3 )
 						printf( "Gateway closed connection - timeout ?\n" );
 
-					gw_node->last_failure = get_time();
-					gw_node->unavail_factor++;
+					curr_gw_data->gw_node->last_failure = get_time();
+					curr_gw_data->gw_node->unavail_factor++;
 
 					break;
 
@@ -442,12 +439,14 @@ void *client_to_gw_tun( void *arg ) {
 	}
 
 	/* cleanup */
-	add_del_route( 0, 0, 0, 1, curr_gateway_tun_if, curr_gateway_batman_if->udp_send_sock );
+	add_del_route( 0, 0, 0, 1, curr_gateway_tun_if, curr_gw_data->gw_node->orig_node->batman_if->udp_send_sock );
 
 	close( curr_gateway_tcp_sock );
 	close( curr_gateway_tun_sock );
 
 	del_dev_tun( curr_gateway_tun_fd );
+
+	debugFree( curr_gw_data, 248 );
 
 	curr_gateway = NULL;
 
@@ -468,9 +467,16 @@ void del_default_route() {
 
 int add_default_route() {
 
-	if ( pthread_create( &curr_gateway_thread_id, NULL, &client_to_gw_tun, curr_gateway ) != 0 ) {
+	struct curr_gw_data *curr_gw_data;
+
+
+	curr_gw_data = debugMalloc( sizeof(struct curr_gw_data), 47 );
+	curr_gw_data->gw_node = curr_gateway;
+
+	if ( pthread_create( &curr_gateway_thread_id, NULL, &client_to_gw_tun, curr_gw_data ) != 0 ) {
 
 		do_log( "Error - couldn't not spawn thread: %s\n", strerror(errno) );
+		debugFree( curr_gw_data, 247 );
 		curr_gateway = NULL;
 
 	}

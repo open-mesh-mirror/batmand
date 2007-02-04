@@ -259,6 +259,9 @@ static void choose_gw()
 		if ( ( gw_node->unavail_factor * gw_node->unavail_factor * 30000 ) + gw_node->last_failure > get_time() )
 			continue;
 
+		if ( gw_node->deleted )
+			continue;
+
 		switch ( routing_class ) {
 
 			case 1:   /* fast connection */
@@ -309,7 +312,7 @@ static void choose_gw()
 		if ( curr_gateway != NULL ) {
 
 			if (debug_level == 3)
-				printf( "Removing default route - better gateway found\n" );
+				printf( "Removing default route\n" );
 
 			del_default_route();
 
@@ -483,14 +486,18 @@ static void update_gw_list( struct orig_node *orig_node, unsigned char new_gwfla
 
 			if ( new_gwflags == 0 ) {
 
+				/* FIXME: find better solution to race condition in client_to_gw_tun()
 				list_del( gw_pos );
-				debugFree( gw_pos, 102 );
+				debugFree( gw_pos, 102 );*/
+
+				gw_node->deleted = 1;
 
 				if (debug_level == 3)
 					printf( "Gateway %s removed from gateway list\n", orig_str );
 
 			} else {
 
+				gw_node->deleted = 0;
 				gw_node->orig_node->gwflags = new_gwflags;
 
 			}
@@ -551,6 +558,9 @@ static void debug() {
 
 			list_for_each(orig_pos, &gw_list) {
 				gw_node = list_entry(orig_pos, struct gw_node, list);
+
+				if ( gw_node->deleted )
+					continue;
 
 				addr_to_string( gw_node->orig_node->orig, str, sizeof (str) );
 				addr_to_string( gw_node->orig_node->router, str2, sizeof (str2) );
@@ -1083,14 +1093,20 @@ void purge( unsigned int curr_time )
 
 				gw_node = list_entry(gw_pos, struct gw_node, list);
 
+				if ( gw_node->deleted )
+					continue;
+
 				if ( gw_node->orig_node == orig_node ) {
 
 					addr_to_string( gw_node->orig_node->orig, orig_str, ADDR_STR_LEN );
 					if (debug_level == 3)
 						printf( "Removing gateway %s from gateway list\n", orig_str );
 
+					/* FIXME: find better solution to race condition in client_to_gw_tun()
 					list_del( gw_pos );
-					debugFree( gw_pos, 107 );
+					debugFree( gw_pos, 107 );*/
+
+					gw_node->deleted = 1;
 
 					gw_purged = 1;
 

@@ -24,7 +24,7 @@
 #include <pthread.h>
 #include "list.h"
 
-#define SOURCE_VERSION "0.1.1"
+#define SOURCE_VERSION "0.1.2 alpha"
 #define COMPAT_VERSION 2
 #define PORT 1966
 #define UNIDIRECTIONAL 0x80
@@ -132,6 +132,7 @@ struct gw_node
 	struct orig_node *orig_node;
 	int unavail_factor;
 	int last_failure;
+	int deleted;
 };
 
 struct batman_if
@@ -163,6 +164,10 @@ struct gw_client
 struct vis_if {
 	int sock;
 	struct sockaddr_in addr;
+};
+
+struct curr_gw_data {
+	struct gw_node *gw_node;
 };
 
 
