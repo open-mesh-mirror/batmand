@@ -446,7 +446,7 @@ void *client_to_gw_tun( void *arg ) {
 
 	del_dev_tun( curr_gateway_tun_fd );
 
-	debugFree( curr_gw_data, 248 );
+	debugFree( arg, 248 );
 
 	curr_gateway = NULL;
 

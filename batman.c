@@ -437,7 +437,7 @@ static void update_routes( struct orig_node *orig_node, unsigned char *hna_recv_
 				orig_node->hna_buff = debugMalloc( hna_buff_len, 3 );
 				orig_node->hna_buff_len = hna_buff_len;
 
-				if ( memcmp( orig_node->hna_buff, hna_recv_buff, hna_buff_len ) != 0 )
+				if ( ( orig_node->hna_buff_len == 0 ) || ( memcmp( orig_node->hna_buff, hna_recv_buff, hna_buff_len ) != 0 ) )
 					memmove( orig_node->hna_buff, hna_recv_buff, hna_buff_len );
 
 				add_del_hna( orig_node, 0 );
@@ -1089,7 +1089,7 @@ void purge( unsigned int curr_time )
 		/* if no more neighbours (next hops) towards given origin, remove origin */
 		if (list_empty(&orig_node->neigh_list) && ((int)(orig_node->last_aware) + TIMEOUT <= ((int)(curr_time)))) {
 
-			if (debug_level == 3) {
+			if (debug_level == 4) {
 				addr_to_string(orig_node->orig, orig_str, sizeof (orig_str));
 				output("Removing orphaned originator %s\n", orig_str);
 			}
@@ -1129,7 +1129,7 @@ void purge( unsigned int curr_time )
 
 			if ( orig_node->router != 0 ) {
 
-				if (debug_level == 3)
+				if (debug_level == 4)
 					output("Deleting route to originator \n");
 
 				add_del_route(orig_node->orig, 32, orig_node->router, 1, orig_node->batman_if->dev, orig_node->batman_if->udp_send_sock);
