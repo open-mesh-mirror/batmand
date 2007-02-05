@@ -199,6 +199,9 @@ void add_del_hna( struct orig_node *orig_node, int del ) {
 
 	int hna_buff_count = 0;
 	unsigned int hna, netmask;
+	static char str1[ADDR_STR_LEN];
+	static char str2[ADDR_STR_LEN];
+	static char str3[ADDR_STR_LEN];
 
 
 	while ( ( hna_buff_count + 1 ) * 5 <= orig_node->hna_buff_len ) {
@@ -206,8 +209,19 @@ void add_del_hna( struct orig_node *orig_node, int del ) {
 		memcpy( &hna, ( unsigned int *)&orig_node->hna_buff[ hna_buff_count * 5 ], 4 );
 		netmask = ( unsigned int )orig_node->hna_buff[ ( hna_buff_count * 5 ) + 4 ];
 
-		if ( ( netmask > 0 ) && ( netmask < 33 ) )
+		if ( ( netmask > 0 ) && ( netmask < 33 ) ) {
+
+			/* FIXME: remove this output after fixing crash in client_to_gw_tun() */
+			if (debug_level == 3) {
+				addr_to_string( orig_node->orig, str1, ADDR_STR_LEN );
+				addr_to_string( hna, str2, ADDR_STR_LEN );
+				addr_to_string( orig_node->router, str3, ADDR_STR_LEN );
+				printf( "[%10u] %s HNA (%s/%i) announced by %s via %s\n", get_time(), ( del ? "Delete" : "Add" ), str2, netmask, str1, str3 );
+
+			}
+
 			add_del_route( hna, netmask, orig_node->router, del, orig_node->batman_if->dev, orig_node->batman_if->udp_send_sock );
+		}
 
 		hna_buff_count++;
 
@@ -224,7 +238,7 @@ void add_del_hna( struct orig_node *orig_node, int del ) {
 
 
 
-static void choose_gw()
+static void choose_gw( int tag )
 {
 	struct list_head *pos;
 	struct gw_node *gw_node, *tmp_curr_gw = NULL;
@@ -234,6 +248,16 @@ static void choose_gw()
 
 	if ( routing_class == 0 )
 		return;
+
+	/* FIXME: remove this output after fixing crash in client_to_gw_tun() */
+	if (debug_level == 3) {
+
+		if ( curr_gateway != NULL )
+			addr_to_string( curr_gateway->orig_node->orig, orig_str, ADDR_STR_LEN );
+
+		printf( "[%10u] choose_gw() - curr_gateway: %s, triggered by %i\n", get_time(), ( curr_gateway == NULL ? "none" : orig_str ), tag );
+
+	}
 
 	if ( list_empty(&gw_list) ) {
 
@@ -502,7 +526,7 @@ static void update_gw_list( struct orig_node *orig_node, unsigned char new_gwfla
 
 			}
 
-			choose_gw();
+			choose_gw( 1000 );
 			return;
 
 		}
@@ -524,7 +548,7 @@ static void update_gw_list( struct orig_node *orig_node, unsigned char new_gwfla
 
 	list_add_tail(&gw_node->list, &gw_list);
 
-	choose_gw();
+	choose_gw( 1001 );
 
 }
 
@@ -1144,7 +1168,7 @@ void purge( unsigned int curr_time )
 	}
 
 	if ( gw_purged )
-		choose_gw();
+		choose_gw( 1002 );
 
 }
 
@@ -1481,9 +1505,6 @@ int batman()
 
 		send_outstanding_packets();
 
-		if ( ( routing_class != 0 ) && ( curr_gateway == NULL ) )
-			choose_gw();
-
 		purge( get_time() );
 
 		if ( debug_timeout + 1000 < get_time() ) {
@@ -1491,6 +1512,9 @@ int batman()
 			debug_timeout = get_time();
 			debug();
 			checkIntegrity();
+
+			if ( ( routing_class != 0 ) && ( curr_gateway == NULL ) )
+				choose_gw( 1003 );
 
 		}
 

@@ -258,11 +258,11 @@ void *client_to_gw_tun( void *arg ) {
 
 	gw_addr.sin_family = AF_INET;
 	gw_addr.sin_port = htons(PORT + 1);
-	gw_addr.sin_addr.s_addr = curr_gw_data->gw_node->orig_node->orig;
+	gw_addr.sin_addr.s_addr = curr_gw_data->orig;
 
 	my_addr.sin_family = AF_INET;
 	my_addr.sin_port = htons(PORT + 1);
-	my_addr.sin_addr.s_addr = curr_gw_data->gw_node->orig_node->batman_if->addr.sin_addr.s_addr;
+	my_addr.sin_addr.s_addr = curr_gw_data->batman_if->addr.sin_addr.s_addr;
 
 
 	/* connect to server (ask permission) */
@@ -311,9 +311,9 @@ void *client_to_gw_tun( void *arg ) {
 	}
 
 
-	if ( add_dev_tun( curr_gw_data->gw_node->orig_node->batman_if, curr_gw_data->gw_node->orig_node->batman_if->addr.sin_addr.s_addr, curr_gateway_tun_if, sizeof(curr_gateway_tun_if), &curr_gateway_tun_fd ) > 0 ) {
+	if ( add_dev_tun( curr_gw_data->batman_if, curr_gw_data->batman_if->addr.sin_addr.s_addr, curr_gateway_tun_if, sizeof(curr_gateway_tun_if), &curr_gateway_tun_fd ) > 0 ) {
 
-		add_del_route( 0, 0, 0, 0, curr_gateway_tun_if, curr_gw_data->gw_node->orig_node->batman_if->udp_send_sock );
+		add_del_route( 0, 0, 0, 0, curr_gateway_tun_if, curr_gw_data->batman_if->udp_send_sock );
 
 	} else {
 
@@ -439,7 +439,7 @@ void *client_to_gw_tun( void *arg ) {
 	}
 
 	/* cleanup */
-	add_del_route( 0, 0, 0, 1, curr_gateway_tun_if, curr_gw_data->gw_node->orig_node->batman_if->udp_send_sock );
+	add_del_route( 0, 0, 0, 1, curr_gateway_tun_if, curr_gw_data->batman_if->udp_send_sock );
 
 	close( curr_gateway_tcp_sock );
 	close( curr_gateway_tun_sock );
@@ -471,7 +471,9 @@ int add_default_route() {
 
 
 	curr_gw_data = debugMalloc( sizeof(struct curr_gw_data), 47 );
+	curr_gw_data->orig = curr_gateway->orig_node->orig;
 	curr_gw_data->gw_node = curr_gateway;
+	curr_gw_data->batman_if = curr_gateway->orig_node->batman_if;
 
 	if ( pthread_create( &curr_gateway_thread_id, NULL, &client_to_gw_tun, curr_gw_data ) != 0 ) {
 

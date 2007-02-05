@@ -167,7 +167,9 @@ struct vis_if {
 };
 
 struct curr_gw_data {
+	unsigned int orig;
 	struct gw_node *gw_node;
+	struct batman_if *batman_if;
 };
 
 
