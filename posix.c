@@ -475,6 +475,7 @@ int add_default_route() {
 	curr_gw_data->gw_node = curr_gateway;
 	curr_gw_data->batman_if = curr_gateway->orig_node->batman_if;
 
+
 	if ( pthread_create( &curr_gateway_thread_id, NULL, &client_to_gw_tun, curr_gw_data ) != 0 ) {
 
 		do_log( "Error - couldn't not spawn thread: %s\n", strerror(errno) );

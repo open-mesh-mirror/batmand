@@ -199,9 +199,6 @@ void add_del_hna( struct orig_node *orig_node, int del ) {
 
 	int hna_buff_count = 0;
 	unsigned int hna, netmask;
-	static char str1[ADDR_STR_LEN];
-	static char str2[ADDR_STR_LEN];
-	static char str3[ADDR_STR_LEN];
 
 
 	while ( ( hna_buff_count + 1 ) * 5 <= orig_node->hna_buff_len ) {
@@ -209,19 +206,8 @@ void add_del_hna( struct orig_node *orig_node, int del ) {
 		memcpy( &hna, ( unsigned int *)&orig_node->hna_buff[ hna_buff_count * 5 ], 4 );
 		netmask = ( unsigned int )orig_node->hna_buff[ ( hna_buff_count * 5 ) + 4 ];
 
-		if ( ( netmask > 0 ) && ( netmask < 33 ) ) {
-
-			/* FIXME: remove this output after fixing crash in client_to_gw_tun() */
-			if (debug_level == 3) {
-				addr_to_string( orig_node->orig, str1, ADDR_STR_LEN );
-				addr_to_string( hna, str2, ADDR_STR_LEN );
-				addr_to_string( orig_node->router, str3, ADDR_STR_LEN );
-				printf( "[%10u] %s HNA (%s/%i) announced by %s via %s\n", get_time(), ( del ? "Delete" : "Add" ), str2, netmask, str1, str3 );
-
-			}
-
+		if ( ( netmask > 0 ) && ( netmask < 33 ) )
 			add_del_route( hna, netmask, orig_node->router, del, orig_node->batman_if->dev, orig_node->batman_if->udp_send_sock );
-		}
 
 		hna_buff_count++;
 
@@ -238,7 +224,7 @@ void add_del_hna( struct orig_node *orig_node, int del ) {
 
 
 
-static void choose_gw( int tag )
+static void choose_gw()
 {
 	struct list_head *pos;
 	struct gw_node *gw_node, *tmp_curr_gw = NULL;
@@ -249,15 +235,6 @@ static void choose_gw( int tag )
 	if ( routing_class == 0 )
 		return;
 
-	/* FIXME: remove this output after fixing crash in client_to_gw_tun() */
-	if (debug_level == 3) {
-
-		if ( curr_gateway != NULL )
-			addr_to_string( curr_gateway->orig_node->orig, orig_str, ADDR_STR_LEN );
-
-		printf( "[%10u] choose_gw() - curr_gateway: %s, triggered by %i\n", get_time(), ( curr_gateway == NULL ? "none" : orig_str ), tag );
-
-	}
 
 	if ( list_empty(&gw_list) ) {
 
@@ -373,7 +350,7 @@ static void update_routes( struct orig_node *orig_node, unsigned char *hna_recv_
 	static char orig_str[ADDR_STR_LEN], next_str[ADDR_STR_LEN];
 
 	if ( debug_level == 4 )
-		output( "update_routes() \n" );
+		output( "update_routes()\n" );
 
 	max_ttl  = 0;
 	max_pack = 0;
@@ -460,13 +437,17 @@ static void update_routes( struct orig_node *orig_node, unsigned char *hna_recv_
 				orig_node->hna_buff = debugMalloc( hna_buff_len, 3 );
 				orig_node->hna_buff_len = hna_buff_len;
 
-				memcpy( orig_node->hna_buff, hna_recv_buff, hna_buff_len );
+				if ( memcmp( orig_node->hna_buff, hna_recv_buff, hna_buff_len ) != 0 )
+					memmove( orig_node->hna_buff, hna_recv_buff, hna_buff_len );
 
 				add_del_hna( orig_node, 0 );
 
 			}
 
-		} else if ( ( hna_buff_len != orig_node->hna_buff_len ) || ( ( hna_buff_len > 0 ) && ( orig_node->hna_buff_len > 0 ) && ( memcmp(orig_node->hna_buff, hna_recv_buff, hna_buff_len ) != 0 ) ) ) {
+		} else if ( ( hna_buff_len != orig_node->hna_buff_len ) || ( ( hna_buff_len > 0 ) && ( orig_node->hna_buff_len > 0 ) && ( memcmp( orig_node->hna_buff, hna_recv_buff, hna_buff_len ) != 0 ) ) ) {
+
+			if ( debug_level == 4 )
+				output( "HNA changed\n" );
 
 			if ( orig_node->hna_buff_len > 0 )
 				add_del_hna( orig_node, 1 );
@@ -526,7 +507,7 @@ static void update_gw_list( struct orig_node *orig_node, unsigned char new_gwfla
 
 			}
 
-			choose_gw( 1000 );
+			choose_gw();
 			return;
 
 		}
@@ -548,7 +529,7 @@ static void update_gw_list( struct orig_node *orig_node, unsigned char new_gwfla
 
 	list_add_tail(&gw_node->list, &gw_list);
 
-	choose_gw( 1001 );
+	choose_gw();
 
 }
 
@@ -760,11 +741,6 @@ void update_originator( struct packet *in, unsigned int neigh, struct batman_if 
 	orig_node->last_seen = get_time();
 	orig_node->flags = in->flags;
 
-	if ( orig_node->gwflags != in->gwflags )
-		update_gw_list( orig_node, in->gwflags );
-
-	orig_node->gwflags = in->gwflags;
-
 	list_for_each(neigh_pos, &orig_node->neigh_list) {
 		neigh_node = list_entry(neigh_pos, struct neigh_node, list);
 
@@ -816,6 +792,11 @@ void update_originator( struct packet *in, unsigned int neigh, struct batman_if 
 	pack_node->time = get_time();
 
 	update_routes( orig_node, hna_recv_buff, hna_buff_len );
+
+	if ( orig_node->gwflags != in->gwflags )
+		update_gw_list( orig_node, in->gwflags );
+
+	orig_node->gwflags = in->gwflags;
 
 }
 
@@ -1108,7 +1089,7 @@ void purge( unsigned int curr_time )
 		/* if no more neighbours (next hops) towards given origin, remove origin */
 		if (list_empty(&orig_node->neigh_list) && ((int)(orig_node->last_aware) + TIMEOUT <= ((int)(curr_time)))) {
 
-			if (debug_level == 4) {
+			if (debug_level == 3) {
 				addr_to_string(orig_node->orig, orig_str, sizeof (orig_str));
 				output("Removing orphaned originator %s\n", orig_str);
 			}
@@ -1148,7 +1129,7 @@ void purge( unsigned int curr_time )
 
 			if ( orig_node->router != 0 ) {
 
-				if (debug_level == 4)
+				if (debug_level == 3)
 					output("Deleting route to originator \n");
 
 				add_del_route(orig_node->orig, 32, orig_node->router, 1, orig_node->batman_if->dev, orig_node->batman_if->udp_send_sock);
@@ -1168,7 +1149,7 @@ void purge( unsigned int curr_time )
 	}
 
 	if ( gw_purged )
-		choose_gw( 1002 );
+		choose_gw();
 
 }
 
@@ -1514,7 +1495,7 @@ int batman()
 			checkIntegrity();
 
 			if ( ( routing_class != 0 ) && ( curr_gateway == NULL ) )
-				choose_gw( 1003 );
+				choose_gw();
 
 		}
 
