@@ -270,6 +270,7 @@ void *client_to_gw_tun( void *arg ) {
 
 		do_log( "Error - can't create tcp socket: %s\n", strerror(errno) );
 		curr_gateway = NULL;
+		debugFree( arg, 248 );
 		return NULL;
 
 	}
@@ -283,6 +284,7 @@ void *client_to_gw_tun( void *arg ) {
 		curr_gw_data->gw_node->unavail_factor++;
 
 		curr_gateway = NULL;
+		debugFree( arg, 248 );
 		return NULL;
 
 	}
@@ -296,6 +298,7 @@ void *client_to_gw_tun( void *arg ) {
 		do_log( "Error - can't create udp socket: %s\n", strerror(errno) );
 		close( curr_gateway_tcp_sock );
 		curr_gateway = NULL;
+		debugFree( arg, 248 );
 		return NULL;
 
 	}
@@ -306,6 +309,7 @@ void *client_to_gw_tun( void *arg ) {
 		close( curr_gateway_tcp_sock );
 		close( curr_gateway_tun_sock );
 		curr_gateway = NULL;
+		debugFree( arg, 248 );
 		return NULL;
 
 	}
@@ -320,6 +324,7 @@ void *client_to_gw_tun( void *arg ) {
 		close( curr_gateway_tcp_sock );
 		close( curr_gateway_tun_sock );
 		curr_gateway = NULL;
+		debugFree( arg, 248 );
 		return NULL;
 
 	}
@@ -446,9 +451,8 @@ void *client_to_gw_tun( void *arg ) {
 
 	del_dev_tun( curr_gateway_tun_fd );
 
-	debugFree( arg, 248 );
-
 	curr_gateway = NULL;
+	debugFree( arg, 248 );
 
 	return NULL;
 

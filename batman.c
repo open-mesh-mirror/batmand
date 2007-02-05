@@ -1184,12 +1184,13 @@ void send_vis_packet()
 
 int batman()
 {
-	struct list_head *if_pos, *neigh_pos, *hna_pos, *hna_pos_tmp, *forw_pos, *forw_pos_tmp;
+	struct list_head *if_pos, *neigh_pos, *hna_pos, *hna_pos_tmp, *forw_pos, *forw_pos_tmp, *gw_pos, *gw_pos_tmp;
 	struct orig_node *orig_neigh_node;
 	struct batman_if *batman_if, *if_incoming;
 	struct neigh_node *neigh_node;
 	struct hna_node *hna_node;
 	struct forw_node *forw_node;
+	struct gw_node *gw_node;
 	unsigned int neigh, hna, netmask, debug_timeout, select_timeout;
 	unsigned char in[1501], *hna_recv_buff;
 	static char orig_str[ADDR_STR_LEN], neigh_str[ADDR_STR_LEN];
@@ -1522,12 +1523,24 @@ int batman()
 
 
 	list_for_each_safe( forw_pos, forw_pos_tmp, &forw_list ) {
+
 		forw_node = list_entry( forw_pos, struct forw_node, list );
 
 		list_del( forw_pos );
 
 		debugFree( forw_node->pack_buff, 112 );
 		debugFree( forw_node, 113 );
+
+	}
+
+	del_default_route();
+
+	list_for_each_safe(gw_pos, gw_pos_tmp, &gw_list) {
+
+		gw_node = list_entry( gw_pos, struct gw_node, list );
+
+		list_del( gw_pos );
+		debugFree( gw_pos, 116 );
 
 	}
 
