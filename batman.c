@@ -437,8 +437,7 @@ static void update_routes( struct orig_node *orig_node, unsigned char *hna_recv_
 				orig_node->hna_buff = debugMalloc( hna_buff_len, 3 );
 				orig_node->hna_buff_len = hna_buff_len;
 
-				if ( ( orig_node->hna_buff_len == 0 ) || ( memcmp( orig_node->hna_buff, hna_recv_buff, hna_buff_len ) != 0 ) )
-					memmove( orig_node->hna_buff, hna_recv_buff, hna_buff_len );
+				memmove( orig_node->hna_buff, hna_recv_buff, hna_buff_len );
 
 				add_del_hna( orig_node, 0 );
 
@@ -1032,6 +1031,7 @@ void purge( unsigned int curr_time )
 	struct pack_node *pack_node;
 	struct gw_node *gw_node;
 	int gw_purged = 0, purged_packets;
+	unsigned char *tmp_hna_buff;
 	static char orig_str[ADDR_STR_LEN], neigh_str[ADDR_STR_LEN];
 
 	if (debug_level == 4)
@@ -1142,7 +1142,20 @@ void purge( unsigned int curr_time )
 		} else if ( purged_packets > 0 ) {
 
 			/* update packet count of orginator */
-			update_routes( orig_node, orig_node->hna_buff, orig_node->hna_buff_len );
+			if ( orig_node->hna_buff_len > 0 ) {
+
+				tmp_hna_buff = debugMalloc( orig_node->hna_buff_len, 43 );
+				memcpy( tmp_hna_buff, orig_node->hna_buff, orig_node->hna_buff_len );
+
+				update_routes( orig_node, tmp_hna_buff, orig_node->hna_buff_len );
+
+				debugFree( tmp_hna_buff, 143 );
+
+			} else {
+
+				update_routes( orig_node, orig_node->hna_buff, orig_node->hna_buff_len );
+
+			}
 
 		}
 
