@@ -132,7 +132,7 @@ struct gw_node
 	struct orig_node *orig_node;
 	int unavail_factor;
 	int last_failure;
-	int deleted;
+	unsigned int deleted;
 };
 
 struct batman_if

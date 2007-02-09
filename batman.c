@@ -475,26 +475,22 @@ static void update_gw_list( struct orig_node *orig_node, unsigned char new_gwfla
 	struct gw_node *gw_node;
 	static char orig_str[ADDR_STR_LEN];
 
+
 	list_for_each_safe(gw_pos, gw_pos_tmp, &gw_list) {
 
 		gw_node = list_entry(gw_pos, struct gw_node, list);
 
 		if ( gw_node->orig_node == orig_node ) {
 
-			if (debug_level == 3) {
-
+			if (debug_level == 3)
 				addr_to_string( gw_node->orig_node->orig, orig_str, ADDR_STR_LEN );
-				printf( "Gateway class of originator %s changed from %i to %i\n", orig_str, gw_node->orig_node->gwflags, new_gwflags );
 
-			}
+			if (debug_level == 3)
+				printf( "Gateway class of originator %s changed from %i to %i\n", orig_str, gw_node->orig_node->gwflags, new_gwflags );
 
 			if ( new_gwflags == 0 ) {
 
-				/* FIXME: find better solution to race condition in client_to_gw_tun()
-				list_del( gw_pos );
-				debugFree( gw_pos, 102 );*/
-
-				gw_node->deleted = 1;
+				gw_node->deleted = get_time();
 
 				if (debug_level == 3)
 					printf( "Gateway %s removed from gateway list\n", orig_str );
@@ -503,6 +499,9 @@ static void update_gw_list( struct orig_node *orig_node, unsigned char new_gwfla
 
 				gw_node->deleted = 0;
 				gw_node->orig_node->gwflags = new_gwflags;
+
+				if ( debug_level == 3 )
+					printf( "Gateway reactivated %s -> class: %i - %s\n", orig_str, new_gwflags, gw2string[new_gwflags] );
 
 			}
 
@@ -513,10 +512,8 @@ static void update_gw_list( struct orig_node *orig_node, unsigned char new_gwfla
 
 	}
 
-	if ( debug_level == 3 ) {
-		addr_to_string( orig_node->orig, orig_str, ADDR_STR_LEN );
+	if ( debug_level == 3 )
 		printf( "Found new gateway %s -> class: %i - %s\n", orig_str, new_gwflags, gw2string[new_gwflags] );
-	}
 
 	gw_node = debugMalloc(sizeof(struct gw_node), 5);
 	memset(gw_node, 0, sizeof(struct gw_node));
@@ -1111,7 +1108,7 @@ void purge( unsigned int curr_time )
 					list_del( gw_pos );
 					debugFree( gw_pos, 107 );*/
 
-					gw_node->deleted = 1;
+					gw_node->deleted = get_time();
 
 					gw_purged = 1;
 
@@ -1161,8 +1158,27 @@ void purge( unsigned int curr_time )
 
 	}
 
+
+	list_for_each_safe(gw_pos, gw_pos_tmp, &gw_list) {
+
+		gw_node = list_entry(gw_pos, struct gw_node, list);
+
+		if ( ( gw_node->deleted ) && ( (int)((gw_node->deleted + 3 * TIMEOUT) < curr_time) ) ) {
+
+			if (debug_level == 3)
+				printf( "Purging gateway from gateway list\n" );
+
+			list_del( gw_pos );
+			debugFree( gw_pos, 107 );
+
+		}
+
+	}
+
+
 	if ( gw_purged )
 		choose_gw();
+
 
 }
 
@@ -1197,13 +1213,12 @@ void send_vis_packet()
 
 int batman()
 {
-	struct list_head *if_pos, *neigh_pos, *hna_pos, *hna_pos_tmp, *forw_pos, *forw_pos_tmp, *gw_pos, *gw_pos_tmp;
+	struct list_head *if_pos, *neigh_pos, *hna_pos, *hna_pos_tmp, *forw_pos, *forw_pos_tmp;
 	struct orig_node *orig_neigh_node;
 	struct batman_if *batman_if, *if_incoming;
 	struct neigh_node *neigh_node;
 	struct hna_node *hna_node;
 	struct forw_node *forw_node;
-	struct gw_node *gw_node;
 	unsigned int neigh, hna, netmask, debug_timeout, select_timeout;
 	unsigned char in[1501], *hna_recv_buff;
 	static char orig_str[ADDR_STR_LEN], neigh_str[ADDR_STR_LEN];
@@ -1520,7 +1535,9 @@ int batman()
 	if ( debug_level > 0 )
 		printf( "Deleting all BATMAN routes\n" );
 
-	purge( get_time() + TIMEOUT + orginator_interval );
+	del_default_route();
+
+	purge( get_time() + ( 5 * TIMEOUT ) + orginator_interval );
 
 
 	list_for_each_safe( hna_pos, hna_pos_tmp, &hna_list ) {
@@ -1543,17 +1560,6 @@ int batman()
 
 		debugFree( forw_node->pack_buff, 112 );
 		debugFree( forw_node, 113 );
-
-	}
-
-	del_default_route();
-
-	list_for_each_safe(gw_pos, gw_pos_tmp, &gw_list) {
-
-		gw_node = list_entry( gw_pos, struct gw_node, list );
-
-		list_del( gw_pos );
-		debugFree( gw_pos, 116 );
 
 	}
 
