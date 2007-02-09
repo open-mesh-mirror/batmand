@@ -500,9 +500,6 @@ static void update_gw_list( struct orig_node *orig_node, unsigned char new_gwfla
 				gw_node->deleted = 0;
 				gw_node->orig_node->gwflags = new_gwflags;
 
-				if ( debug_level == 3 )
-					printf( "Gateway reactivated %s -> class: %i - %s\n", orig_str, new_gwflags, gw2string[new_gwflags] );
-
 			}
 
 			choose_gw();
@@ -572,7 +569,12 @@ static void debug() {
 					printf( "%s via: %s(%i), gw_class %i - %s, reliability: %i\n", str, str2, gw_node->orig_node->packet_count, gw_node->orig_node->gwflags, gw2string[gw_node->orig_node->gwflags], gw_node->unavail_factor );
 				}
 
+				batman_count++;
+
 			}
+
+			if ( batman_count == 0 )
+				printf( "No gateways in range ...\n" );
 
 		}
 
@@ -1105,10 +1107,6 @@ void purge( unsigned int curr_time )
 					addr_to_string( gw_node->orig_node->orig, orig_str, ADDR_STR_LEN );
 					if (debug_level == 3)
 						printf( "Removing gateway %s from gateway list\n", orig_str );
-
-					/* FIXME: find better solution to race condition in client_to_gw_tun()
-					list_del( gw_pos );
-					debugFree( gw_pos, 107 );*/
 
 					gw_node->deleted = get_time();
 
