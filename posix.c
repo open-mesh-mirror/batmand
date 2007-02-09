@@ -604,6 +604,8 @@ int receive_packet( unsigned char *packet_buff, int packet_buff_len, int *hna_bu
 			if ( *hna_buff_len < sizeof(struct packet) )
 				return 0;
 
+			((struct packet *)packet_buff)->seqno = ntohs( ((struct packet *)packet_buff)->seqno ); /* network to host order for our 16bit seqno.*/
+
 			packet_buff[*hna_buff_len] = '\0';
 
 			(*if_incoming) = batman_if;

@@ -937,6 +937,8 @@ void send_outstanding_packets() {
 						if ( debug_level == 4 )
 							output( "Forwarding packet (originator %s, seqno %d, TTL %d) on interface %s\n", orig_str, ((struct packet *)forw_node->pack_buff)->seqno, ((struct packet *)forw_node->pack_buff)->ttl, batman_if->dev );
 
+						((struct packet *)forw_node->pack_buff)->seqno = htons( ((struct packet *)forw_node->pack_buff)->seqno ); /* change sequence number to network order */
+
 						/* non-primary interfaces do not send hna information */
 						if ( ( forw_node->own ) && ( ((struct packet *)forw_node->pack_buff)->orig != ((struct batman_if *)if_list.next)->addr.sin_addr.s_addr ) ) {
 
@@ -1164,9 +1166,6 @@ void purge( unsigned int curr_time )
 		gw_node = list_entry(gw_pos, struct gw_node, list);
 
 		if ( ( gw_node->deleted ) && ( (int)((gw_node->deleted + 3 * TIMEOUT) < curr_time) ) ) {
-
-			if (debug_level == 3)
-				printf( "Purging gateway from gateway list\n" );
 
 			list_del( gw_pos );
 			debugFree( gw_pos, 107 );
