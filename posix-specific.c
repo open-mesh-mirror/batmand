@@ -396,8 +396,6 @@ void apply_init_args( int argc, char *argv[] ) {
 	stop = 0;
 
 
-	printf( "WARNING: You are using the unstable batman branch. If you are interested in *using* batman get the latest stable release !\n" );
-
 	while ( ( optchar = getopt ( argc, argv, "a:bcd:hHo:g:p:r:s:vV" ) ) != -1 ) {
 
 		switch ( optchar ) {
