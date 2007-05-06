@@ -35,7 +35,7 @@
 
 
 
-#define SOURCE_VERSION "0.2 rc1"
+#define SOURCE_VERSION "III 0.2.0 rc1"
 #define COMPAT_VERSION 3
 #define PORT 1966
 #define UNIDIRECTIONAL 0x80
