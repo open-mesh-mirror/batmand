@@ -38,7 +38,7 @@
 #define SOURCE_VERSION "III 0.2.0 rc1"
 
 #ifndef REVISION_VERSION
-#define REVISION_VERSION 0
+#define REVISION_VERSION "0"
 #endif
 
 #define COMPAT_VERSION 3

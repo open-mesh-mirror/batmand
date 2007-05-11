@@ -378,11 +378,10 @@ void debug_orig() {
 	}
 
 	if ( ( debug_clients.clients_num[0] > 0 ) || ( debug_clients.clients_num[3] > 0 ) ) {
-		
+
 		struct list_head *if_pos;
 		struct batman_if *batman_if;
 		static char orig_str[ADDR_STR_LEN];
-		int revision = 0 + REVISION_VERSION;
 
 		list_for_each( if_pos, &if_list ) {
 			batman_if = list_entry( if_pos, struct batman_if, list );
@@ -391,7 +390,7 @@ void debug_orig() {
 		addr_to_string( batman_if->addr.sin_addr.s_addr, orig_str, sizeof(orig_str) );
 
 		debug_output( 1, "BOD \n" );
-		debug_output( 1, "  %-12s %''14s (%s/%i): %''20s... [B.A.T.M.A.N. %s rv%i, MainIF/IP: %s %s ]\n", "Orginator", "Router", "#", SEQ_RANGE, "potential routers", SOURCE_VERSION, revision, batman_if->dev, orig_str  );
+		debug_output( 1, "  %-12s %''14s (%s/%i): %''20s... [B.A.T.M.A.N. %s%s%s, MainIF/IP: %s %s ]\n", "Orginator", "Router", "#", SEQ_RANGE, "potential routers", SOURCE_VERSION, ( strncmp( REVISION_VERSION, "0", 1 ) != 0 ? " rv" : "" ), ( strncmp( REVISION_VERSION, "0", 1 ) != 0 ? REVISION_VERSION : "" ), batman_if->dev, orig_str  );
 
 		if ( debug_clients.clients_num[3] > 0 ) {
 

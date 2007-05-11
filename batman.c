@@ -527,7 +527,7 @@ int isBntog( uint32_t neigh, struct orig_node *orig_tog_node ) {
 
 int isBidirectionalNeigh( struct orig_node *orig_neigh_node, struct batman_if *if_incoming ) {
 
-	if ( ( if_incoming->out.seqno - 2 - orig_neigh_node->bidirect_link[if_incoming->if_num] ) <=  BIDIRECT_TIMEOUT )
+	if ( ( if_incoming->out.seqno - 2 - orig_neigh_node->bidirect_link[if_incoming->if_num] ) <  BIDIRECT_TIMEOUT )
 		return 1;
 
 	return 0;
@@ -628,7 +628,7 @@ int8_t batman() {
 
 		batman_if->out.orig = batman_if->addr.sin_addr.s_addr;
 		batman_if->out.flags = 0x00;
-		batman_if->out.ttl = ( batman_if->if_num == 0 ? TTL : 2 );
+		batman_if->out.ttl = 2;
 		batman_if->out.seqno = 1;
 		batman_if->out.gwflags = gateway_class;
 		batman_if->out.version = COMPAT_VERSION;
@@ -672,7 +672,7 @@ int8_t batman() {
 			addr_to_string( ((struct packet *)&in)->orig, orig_str, sizeof(orig_str) );
 			addr_to_string( neigh, neigh_str, sizeof(neigh_str) );
 			addr_to_string( if_incoming->addr.sin_addr.s_addr, ifaddr_str, sizeof(ifaddr_str) );
-                        
+
 			debug_output( 4, "Received BATMAN packet via NB: %s , IF: %s %s (from OG: %s, seqno %d, TTL %d, V %d, UDF %d, IDF %d) \n",
                                         neigh_str, if_incoming->dev, ifaddr_str, orig_str, ((struct packet *)&in)->seqno, ((struct packet *)&in)->ttl,
 					has_version, has_unidirectional_flag, has_directlink_flag );
@@ -742,7 +742,7 @@ int8_t batman() {
 				orig_neigh_node->last_aware = get_time();
 
 
-				debug_output( 4, "received my own OGM via NB lastTxIfSeqno: %d, currRxSeqno: %d, prevRxSeqno: %d, currRxSeqno-prevRxSeqno %d \n", 
+				debug_output( 4, "received my own OGM via NB lastTxIfSeqno: %d, currRxSeqno: %d, prevRxSeqno: %d, currRxSeqno-prevRxSeqno %d \n",
 								(if_incoming->out.seqno - 2), ((struct packet *)&in)->seqno, orig_neigh_node->bidirect_link[if_incoming->if_num], ((struct packet *)&in)->seqno - orig_neigh_node->bidirect_link[if_incoming->if_num] );
 
 				/* neighbour has to indicate direct link and it has to come via the corresponding interface */
@@ -755,7 +755,7 @@ int8_t batman() {
 
 				} else {
 					debug_output( 4, "NOT indicating bidirectional link - NOT updating bidirect_link seqno  \n");
-					
+
 				}
 
 				debug_output( 4, "Drop packet: originator packet from myself (via neighbour) \n" );
