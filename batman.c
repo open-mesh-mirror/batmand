@@ -628,7 +628,7 @@ int8_t batman() {
 
 		batman_if->out.orig = batman_if->addr.sin_addr.s_addr;
 		batman_if->out.flags = 0x00;
-		batman_if->out.ttl = 2;
+		batman_if->out.ttl = TTL;
 		batman_if->out.seqno = 1;
 		batman_if->out.gwflags = gateway_class;
 		batman_if->out.version = COMPAT_VERSION;
