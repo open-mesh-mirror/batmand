@@ -81,20 +81,20 @@ FILE_NAME=		batmand_$(BATMAN_VERSION)$(BATMAN_RELEASE)-rv$(REVISION)_$@
 IPKG_DEPENDS=		"kmod-tun libpthread"
 
 IPKG_BUILD=		ln -f $(FILE_NAME) $(IPKG_BUILD_PATH)/ipkg-target/usr/sbin/batmand && \
-			$(IPKG_BUILD_PATH)/ipkg-make-control.sh   $(IPKG_BUILD_PATH)/ipkg-target $(FILE_NAME).ipk  batmand  $(IPKG_VERSION) 
+			$(IPKG_BUILD_PATH)/ipkg-make-control.sh   $(IPKG_BUILD_PATH)/ipkg-target $(FILE_NAME).ipk  batmand  $(IPKG_VERSION)
 
 
 LINK_AND_TAR=		tar czvf $(FILE_NAME).tgz $(FILE_NAME) && \
 			mkdir -p dl/misc && \
 			ln -f $(FILE_NAME)* dl/misc/
-			
+
 
 
 all:	batmand
 
 
-batmand:	batman.o $(OS_OBJ) $(LINUX_SRC_C) $(LINUX_SRC_H) Makefile
-	$(CC) -o $@ batman.o $(OS_OBJ) $(LDFLAGS)
+batmand:	 $(LINUX_SRC_C) $(LINUX_SRC_H) Makefile
+	$(CC) $(CFLAGS) -DREVISION_VERSION=\"\ rv$(REVISION)\" -o $@ $(LINUX_SRC_C) $(LDFLAGS)
 
 
 test:
@@ -112,7 +112,7 @@ sources:
 
 	mkdir -p dl/misc
 	ln -f $(FILE_NAME).tgz dl/misc/
-	
+
 	mkdir -p dl/sources
 	ln -f $(FILE_NAME).tgz dl/sources/
 
@@ -121,9 +121,9 @@ i386: i386-gc-elf-32-lsb-static i386-gc-elf-32-lsb-dynamic
 
 i386-gc-elf-32-lsb-static:	$(LINUX_SRC_C) $(LINUX_SRC_H) Makefile
 	$(CC) $(CFLAGS) -DREVISION_VERSION=$(REVISION) -o $(FILE_NAME) $(LINUX_SRC_C) $(LDFLAGS) -static
-	$(STRIP) $(FILE_NAME) 
-	$(IPKG_BUILD) i386 
-	$(LINK_AND_TAR)	
+	$(STRIP) $(FILE_NAME)
+	$(IPKG_BUILD) i386
+	$(LINK_AND_TAR)
 
 	mkdir -p dl/i386
 	ln -f $(FILE_NAME).tgz dl/i386/
@@ -133,16 +133,16 @@ i386-gc-elf-32-lsb-dynamic:	$(LINUX_SRC_C) $(LINUX_SRC_H) Makefile
 	$(CC) $(CFLAGS) -DREVISION_VERSION=$(REVISION) -o $(FILE_NAME) $(LINUX_SRC_C) $(LDFLAGS)
 	$(STRIP) $(FILE_NAME)
 	$(IPKG_BUILD) i386 $(IPKG_DEPENDS)
-	$(LINK_AND_TAR)	
+	$(LINK_AND_TAR)
 
-	
+
 mipsel-kk-bc:	mipsel-kk-elf-32-lsb-static mipsel-kk-elf-32-lsb-dynamic
 
 mipsel-kk-elf-32-lsb-static:	$(LINUX_SRC_C) $(LINUX_SRC_H) Makefile
 	$(CC_MIPS_KK_BC) $(CFLAGS_MIPS) -DREVISION_VERSION=$(REVISION) -o $(FILE_NAME) $(LINUX_SRC_C) $(LDFLAGS_MIPS) -static
 	$(STRIP_MIPS_KK_BC) $(FILE_NAME)
 	$(IPKG_BUILD) mipsel
-	$(LINK_AND_TAR)	
+	$(LINK_AND_TAR)
 
 	mkdir -p dl/meshcube
 	ln -f $(FILE_NAME).ipk dl/meshcube/
@@ -152,7 +152,7 @@ mipsel-kk-elf-32-lsb-dynamic:	$(LINUX_SRC_C) $(LINUX_SRC_H) Makefile
 	$(CC_MIPS_KK_BC) $(CFLAGS_MIPS) -DREVISION_VERSION=$(REVISION) -o $(FILE_NAME) $(LINUX_SRC_C) $(LDFLAGS_MIPS)
 	$(STRIP_MIPS_KK_BC) $(FILE_NAME)
 	$(IPKG_BUILD) mipsel $(IPKG_DEPENDS)
-	$(LINK_AND_TAR)	
+	$(LINK_AND_TAR)
 
 	mkdir -p dl/netgear
 	ln -f $(FILE_NAME).ipk dl/netgear/
@@ -164,14 +164,14 @@ mips-kk-elf-32-msb-static:	$(LINUX_SRC_C) $(LINUX_SRC_H) Makefile
 	$(CC_MIPS_KK_AT) $(CFLAGS_MIPS) -DREVISION_VERSION=$(REVISION) -o $(FILE_NAME) $(LINUX_SRC_C) $(LDFLAGS_MIPS) -static
 	$(STRIP_MIPS_KK_AT) $(FILE_NAME)
 	$(IPKG_BUILD) mips
-	$(LINK_AND_TAR)	
+	$(LINK_AND_TAR)
 
 
 mips-kk-elf-32-msb-dynamic:	$(LINUX_SRC_C) $(LINUX_SRC_H) Makefile
 	$(CC_MIPS_KK_AT) $(CFLAGS_MIPS) -DREVISION_VERSION=$(REVISION) -o $(FILE_NAME) $(LINUX_SRC_C) $(LDFLAGS_MIPS)
 	$(STRIP_MIPS_KK_AT) $(FILE_NAME)
 	$(IPKG_BUILD) mips $(IPKG_DEPENDS)
-	$(LINK_AND_TAR)	
+	$(LINK_AND_TAR)
 
 	mkdir -p dl/fonera-kamikaze
 	ln -f $(FILE_NAME).ipk dl/fonera-kamikaze/
@@ -183,13 +183,13 @@ mipsel-wr-elf-32-lsb-static:	$(LINUX_SRC_C) $(LINUX_SRC_H) Makefile
 	$(CC_MIPS_WR) $(CFLAGS_MIPS) -DREVISION_VERSION=$(REVISION) -o $(FILE_NAME) $(LINUX_SRC_C) $(LDFLAGS_MIPS) -static
 	$(STRIP_MIPS_WR) $(FILE_NAME)
 	$(IPKG_BUILD) mipsel
-	$(LINK_AND_TAR)	
+	$(LINK_AND_TAR)
 
 mipsel-wr-elf-32-lsb-dynamic:	$(LINUX_SRC_C) $(LINUX_SRC_H) Makefile
 	$(CC_MIPS_WR) $(CFLAGS_MIPS) -DREVISION_VERSION=$(REVISION) -o $(FILE_NAME) $(LINUX_SRC_C) $(LDFLAGS_MIPS)
 	$(STRIP_MIPS_WR) $(FILE_NAME)
 	$(IPKG_BUILD) mipsel $(IPKG_DEPENDS)
-	$(LINK_AND_TAR)	
+	$(LINK_AND_TAR)
 
 	mkdir -p dl/wrt
 	ln -f $(FILE_NAME).ipk dl/wrt/
@@ -201,4 +201,4 @@ clean:
 
 
 clean-long:
-		rm -rf batmand_* batmand *.o 
+		rm -rf batmand_* batmand *.o
