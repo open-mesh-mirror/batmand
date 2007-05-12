@@ -67,7 +67,7 @@
 
 
 
-#define NUM_WORDS ( SEQ_RANGE / WORD_BIT_SIZE )
+#define NUM_WORDS ( SEQ_RANGE / WORD_BIT_SIZE ) + ( ( SEQ_RANGE % WORD_BIT_SIZE > 0)? 1 : 0 )
 
 
 
