@@ -61,13 +61,14 @@
 
 #define JITTER 100
 #define TTL 50             /* Time To Live of broadcast messages */
-#define BIDIRECT_TIMEOUT 2
+#define DEFAULT_BIDIRECT_TIMEOUT 2
+#define DEFAULT_ORIGINATOR_INTERVAL 1000
 #define TIMEOUT 60000      /* sliding window size of received orginator messages in ms */
-#define SEQ_RANGE 64       /* sliding packet range of received orginator messages in squence numbers (should be a multiple of our word size) */
+#define DEFAULT_SEQ_RANGE 64  /* sliding packet range of received orginator messages in squence numbers (should be a multiple of our word size) */
+#define MAX_SEQ_RANGE 128
 
 
-
-#define NUM_WORDS ( SEQ_RANGE / WORD_BIT_SIZE ) + ( ( SEQ_RANGE % WORD_BIT_SIZE > 0)? 1 : 0 )
+#define MAX_NUM_WORDS ( MAX_SEQ_RANGE / WORD_BIT_SIZE ) + ( ( MAX_SEQ_RANGE % WORD_BIT_SIZE > 0)? 1 : 0 )
 
 
 
@@ -77,6 +78,10 @@ extern uint8_t gateway_class;
 extern uint8_t routing_class;
 extern uint8_t num_hna;
 extern int16_t orginator_interval;
+extern int16_t bidirect_link_to;
+extern int16_t sequence_range;
+extern int16_t num_words;
+
 extern uint32_t pref_gateway;
 
 extern unsigned char *hna_buff;
@@ -134,7 +139,7 @@ struct neigh_node
 	uint8_t packet_count;
 	uint8_t  last_ttl;         /* ttl of last received packet */
 	uint32_t last_aware;            /* when last packet via this neighbour was received */
-	TYPE_OF_WORD seq_bits[ NUM_WORDS ];
+	TYPE_OF_WORD seq_bits[ MAX_NUM_WORDS ];
 	struct batman_if *if_incoming;
 };
 

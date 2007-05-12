@@ -346,7 +346,7 @@ void debug_orig() {
 
 		} else {
 
-			debug_output( 2, "%''12s     %''15s (%s/%i) \n", "Gateway", "Router", "#", SEQ_RANGE );
+			debug_output( 2, "%''12s     %''15s (%s/%i) \n", "Gateway", "Router", "#", sequence_range );
 
 			list_for_each( orig_pos, &gw_list ) {
 
@@ -390,7 +390,11 @@ void debug_orig() {
 		addr_to_string( batman_if->addr.sin_addr.s_addr, orig_str, sizeof(orig_str) );
 
 		debug_output( 1, "BOD \n" );
-		debug_output( 1, "  %-12s %''14s (%s/%i): %''20s... [B.A.T.M.A.N. %s%s, MainIF/IP: %s %s ]\n", "Orginator", "Router", "#", SEQ_RANGE, "potential routers", SOURCE_VERSION, ( strncmp( REVISION_VERSION, "0", 1 ) != 0 ? REVISION_VERSION : "" ), batman_if->dev, orig_str  );
+		debug_output( 1, "  %-12s %''14s (%s/%i): %''20s... [B.A.T.M.A.N. %s%s, MainIF/IP: %s %s, BDLC: %i, OGMI: %i ] \n",
+			"Orginator", "Router", "#", sequence_range, "potential routers", 
+			SOURCE_VERSION, ( strncmp( REVISION_VERSION, "0", 1 ) != 0 ? REVISION_VERSION : "" ), 
+			batman_if->dev, orig_str, 
+			bidirect_link_to, orginator_interval  );
 
 		if ( debug_clients.clients_num[3] > 0 ) {
 
@@ -404,7 +408,7 @@ void debug_orig() {
 			}
 
 			debug_output( 4, "Originator list \n" );
-			debug_output( 4, "  %-12s %''14s (%s/%i): %''20s\n", "Orginator", "Router", "#", SEQ_RANGE, "potential gateways" );
+			debug_output( 4, "  %-12s %''14s (%s/%i): %''20s\n", "Orginator", "Router", "#", sequence_range, "potential gateways" );
 
 		}
 
