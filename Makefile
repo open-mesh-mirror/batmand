@@ -104,8 +104,8 @@ all:	batmand
 
 
 batmand:	$(LINUX_SRC_C) $(LINUX_SRC_H) Makefile
-	$(CC) $(CFLAGS) -DREVISION_VERSION=$(REVISION_VERSION) -o $@ $(LINUX_SRC_C) $(LDFLAGS) -static
-
+	$(CC) $(CFLAGS)  -o $@ $(LINUX_SRC_C) $(LDFLAGS) -static
+#	$(CC) $(CFLAGS)  -DDEBUG_MALLOC -DMEMORY_USAGE -DPROFILE_DATA -o $@ $(LINUX_SRC_C) $(LDFLAGS)
 
 
 test:
@@ -143,7 +143,7 @@ i386-gc-elf-32-lsb-static:	$(LINUX_SRC_C) $(LINUX_SRC_H) Makefile
 
 i386-gc-elf-32-lsb-dynamic:	$(LINUX_SRC_C) $(LINUX_SRC_H) Makefile
 	$(CC) $(CFLAGS) -DREVISION_VERSION=$(REVISION_VERSION) -o $(FILE_NAME) $(LINUX_SRC_C) $(LDFLAGS)
-	$(IPKG_BUILD) i386 $(IPKG_DEPENDS)
+	$(IPKG_BUILD) i386
 	$(LINK_AND_TAR)
 
 
