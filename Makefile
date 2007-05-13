@@ -74,7 +74,7 @@ CC_N770_OE_PATH =	/usr/src/openEmbedded/stuff/build/nokia770/tmp/cross/bin
 CC_N770_OE =		$(CC_N770_OE_PATH)/arm-linux-gcc
 STRIP_N770_OE =		$(CC_N770_OE_PATH)/arm-linux-strip
 
-REVISION=		$(shell svn info | grep Revision | awk '{print $$2}')
+REVISION=		$(shell svn info | grep Revision | sed -e '1p' -n | awk '{print $$2}')
 REVISION_VERSION=	\"\ rv$(REVISION)\"
 IPKG_BUILD_PATH=	/home/batman/build/ipkg-build
 
