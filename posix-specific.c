@@ -441,7 +441,7 @@ void apply_init_args( int argc, char *argv[] ) {
 	stop = 0;
 
 
-	while ( ( optchar = getopt ( argc, argv, "a:bcd:hHo:l:q:g:p:r:s:vV" ) ) != -1 ) {
+	while ( ( optchar = getopt ( argc, argv, "a:bcd:hHo:g:p:r:s:vV" ) ) != -1 ) {
 
 		switch ( optchar ) {
 
@@ -552,39 +552,6 @@ void apply_init_args( int argc, char *argv[] ) {
 					exit(EXIT_FAILURE);
 
 				}
-
-				found_args += 2;
-				break;
-
-			case 'l':
-
-				errno = 0;
-				bidirect_link_to = strtol (optarg, NULL , 10);
-
-				if ( bidirect_link_to < 1 || bidirect_link_to > 5 ) {
-
-					printf( "Invalid bidirectional_link_to specified: %i.\nThe timeout has to be >=1 and <= 5.\n", bidirect_link_to );
-
-					exit(EXIT_FAILURE);
-				}
-
-				found_args += 2;
-				break;
-
-			case 'q':
-
-				errno = 0;
-				int16_t tmp_sequence_range = strtol (optarg, NULL , 10);
-
-				if ( tmp_sequence_range < 1 || tmp_sequence_range > MAX_SEQ_RANGE ) {
-
-					printf( "Invalid sequence_range specified: %i.\nThe sequence_range must be >= 1 and <= %i.\n", tmp_sequence_range, MAX_SEQ_RANGE );
-
-					exit(EXIT_FAILURE);
-				}
-
-				sequence_range=tmp_sequence_range;
-				num_words = ( sequence_range / WORD_BIT_SIZE ) + ( ( sequence_range % WORD_BIT_SIZE > 0)? 1 : 0 );
 
 				found_args += 2;
 				break;

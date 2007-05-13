@@ -85,16 +85,7 @@ uint8_t gateway_class = 0;
 uint8_t routing_class = 0;
 
 
-int16_t orginator_interval = DEFAULT_ORIGINATOR_INTERVAL;   /* orginator message interval in miliseconds */
-
-/* bidirectional link timeout in number+1 of maximum acceptable missed (not received by this node) 
-of last send own OGMs rebroadcasted from neighbors */
-int16_t bidirect_link_to = DEFAULT_BIDIRECT_TIMEOUT;
-
-int16_t sequence_range = DEFAULT_SEQ_RANGE;
-
-int16_t num_words = ( DEFAULT_SEQ_RANGE / WORD_BIT_SIZE ) + ( ( DEFAULT_SEQ_RANGE % WORD_BIT_SIZE > 0)? 1 : 0 );
-
+int16_t orginator_interval = 1000;   /* orginator message interval in miliseconds */
 
 struct gw_node *curr_gateway = NULL;
 pthread_t curr_gateway_thread_id = 0;
@@ -536,7 +527,7 @@ int isBntog( uint32_t neigh, struct orig_node *orig_tog_node ) {
 
 int isBidirectionalNeigh( struct orig_node *orig_neigh_node, struct batman_if *if_incoming ) {
 
-	if ( ( if_incoming->out.seqno - 2 - orig_neigh_node->bidirect_link[if_incoming->if_num] ) <  bidirect_link_to )
+	if ( ( if_incoming->out.seqno - 2 - orig_neigh_node->bidirect_link[if_incoming->if_num] ) <  BIDIRECT_TIMEOUT )
 		return 1;
 
 	return 0;

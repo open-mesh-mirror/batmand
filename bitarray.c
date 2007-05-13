@@ -27,16 +27,14 @@
 
 
 /* clear the bits */
-
 void bit_init( TYPE_OF_WORD *seq_bits ) {
 
 	int i;
 
-	for (i=0; i< MAX_NUM_WORDS; i++)
+	for (i=0; i< NUM_WORDS; i++)
 		seq_bits[i]= 0;
 
 };
-
 
 /* returns true if corresponding bit in given seq_bits indicates so and curr_seqno is within range of last_seqno */
 uint8_t get_bit_status( TYPE_OF_WORD *seq_bits, uint16_t last_seqno, uint16_t curr_seqno ) {
@@ -44,7 +42,7 @@ uint8_t get_bit_status( TYPE_OF_WORD *seq_bits, uint16_t last_seqno, uint16_t cu
 	int16_t diff, word_offset, word_num;
 
 	diff= last_seqno- curr_seqno;
-	if ( diff < 0 || diff >= sequence_range ) {
+	if ( diff < 0 || diff >= SEQ_RANGE ) {
 		return 0;
 
 	} else {
@@ -62,15 +60,15 @@ uint8_t get_bit_status( TYPE_OF_WORD *seq_bits, uint16_t last_seqno, uint16_t cu
 }
 
 /* print the packet array, for debugging purposes */
-static char bit_string[MAX_SEQ_RANGE+2];
+static char bit_string[130];
 char* bit_print( TYPE_OF_WORD *seq_bits ) {
 	int i,j,k=0,b=0;
 
 // 	printf("the last %d packets, we got %d:\n", SEQ_RANGE, bit_packet_count(seq_bits));
-	for ( i=0; i<num_words; i++ ) {
+	for ( i=0; i<NUM_WORDS; i++ ) {
 		for ( j=0; j<WORD_BIT_SIZE; j++) {
 			bit_string[k++] = ((seq_bits[i]>>j)%2 ? '1':'0'); /* print the j position */
-			if( ++b == sequence_range ) {
+			if( ++b == SEQ_RANGE ) {
 				bit_string[k++]='|';
 			}
 		}
@@ -86,7 +84,7 @@ char* bit_print( TYPE_OF_WORD *seq_bits ) {
 void bit_mark( TYPE_OF_WORD *seq_bits, int32_t n ) {
 	int32_t word_offset,word_num;
 
-	if ( n<0 || n >= sequence_range ) {			/* if too old, just drop it */
+	if ( n<0 || n >= SEQ_RANGE ) {			/* if too old, just drop it */
 // 		printf("got old packet, dropping\n");
 		return;
 	}
@@ -104,13 +102,13 @@ void bit_shift( TYPE_OF_WORD *seq_bits, int32_t n ) {
 	int32_t word_offset, word_num;
 	int32_t i;
 
-	bit_print( seq_bits );
+//	bit_print( seq_bits );
 	if( n<=0 ) return;
 
 	word_offset= n%WORD_BIT_SIZE;	/* shift how much inside each word */
 	word_num   = n/WORD_BIT_SIZE;	/* shift over how much (full) words */
 
-	for ( i=num_words-1; i>word_num; i-- ) {
+	for ( i=NUM_WORDS-1; i>word_num; i-- ) {
 		/* going from old to new, so we can't overwrite the data we copy from. *
  		 * left is high, right is low: FEDC BA98 7654 3210
 		 *	                                  ^^ ^^
@@ -139,20 +137,7 @@ void bit_shift( TYPE_OF_WORD *seq_bits, int32_t n ) {
 	for (; i>=0; i--) {
 		seq_bits[i]= 0;
 	}
-
-	/* pad the trailing end (beyond seqence_range with zeros) */
-	for (i=MAX_NUM_WORDS; i>num_words; i--) {
-		seq_bits[i-1]= 0;
-	}
-
-	TYPE_OF_WORD last_word_reset_mask = 0;
-	last_word_reset_mask = ~0;
-	if ( sequence_range % WORD_BIT_SIZE > 0 ) {
-		last_word_reset_mask = last_word_reset_mask >> ( WORD_BIT_SIZE - (sequence_range % WORD_BIT_SIZE) ); 
-		seq_bits[i-1] = seq_bits[i-1] & last_word_reset_mask;
-	}
-
-	bit_print( seq_bits );
+//	bit_print( seq_bits );
 }
 
 
@@ -161,7 +146,7 @@ char bit_get_packet( TYPE_OF_WORD *seq_bits, int16_t seq_num_diff, int8_t set_ma
 
 	int i;
 
-	if ( ( seq_num_diff < 0 ) && ( seq_num_diff >= -sequence_range ) ) {  /* we already got a sequence number higher than this one, so we just mark it. this should wrap around the integer just fine */
+	if ( ( seq_num_diff < 0 ) && ( seq_num_diff >= -SEQ_RANGE ) ) {  /* we already got a sequence number higher than this one, so we just mark it. this should wrap around the integer just fine */
 
 		if ( set_mark )
 			bit_mark( seq_bits, -seq_num_diff );
@@ -170,15 +155,15 @@ char bit_get_packet( TYPE_OF_WORD *seq_bits, int16_t seq_num_diff, int8_t set_ma
 
 	}
 
-	if ( ( seq_num_diff > sequence_range ) || ( seq_num_diff < -sequence_range ) ) {        /* it seems we missed a lot of packets or the other host restarted */
+	if ( ( seq_num_diff > SEQ_RANGE ) || ( seq_num_diff < -SEQ_RANGE ) ) {        /* it seems we missed a lot of packets or the other host restarted */
 
-		 if ( seq_num_diff > sequence_range )
+		 if ( seq_num_diff > SEQ_RANGE )
 			debug_output( 4, "It seems we missed a lot of packets (%i) !\n",  seq_num_diff-1 );
 
-		if ( -seq_num_diff > sequence_range )
+		if ( -seq_num_diff > SEQ_RANGE )
 			debug_output( 4, "Other host probably restarted !\n" );
 
-		for (i=0; i<MAX_NUM_WORDS; i++)
+		for (i=0; i<NUM_WORDS; i++)
 			seq_bits[i]= 0;
 
 		if ( set_mark )
@@ -203,7 +188,7 @@ int bit_packet_count( TYPE_OF_WORD *seq_bits ) {
 	int i, hamming = 0;
 	TYPE_OF_WORD word;
 
-	for (i=0; i<num_words; i++) {
+	for (i=0; i<NUM_WORDS; i++) {
 
 		word = seq_bits[i];
 
