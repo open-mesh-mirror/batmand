@@ -141,7 +141,8 @@ void update_orig( struct orig_node *orig_node, struct packet *in, uint32_t neigh
 			bit_get_packet( tmp_neigh_node->seq_bits, in->seqno - orig_node->last_seqno, 0 );
 			tmp_neigh_node->packet_count = bit_packet_count( tmp_neigh_node->seq_bits );
 
-			if ( tmp_neigh_node->packet_count > max_packet_count ) {
+			if ( tmp_neigh_node->packet_count > max_packet_count || 
+				( orig_node->router == tmp_neigh_node && tmp_neigh_node->packet_count >= max_packet_count )) {
 
 				max_packet_count = tmp_neigh_node->packet_count;
 				best_neigh_node = tmp_neigh_node;
@@ -390,7 +391,7 @@ void debug_orig() {
 		addr_to_string( batman_if->addr.sin_addr.s_addr, orig_str, sizeof(orig_str) );
 
 		debug_output( 1, "BOD \n" );
-		debug_output( 1, "  %-12s %''14s (%s/%i): %''20s... [B.A.T.M.A.N. %s%s, MainIF/IP: %s %s ]\n", "Orginator", "Router", "#", SEQ_RANGE, "potential routers", SOURCE_VERSION, ( strncmp( REVISION_VERSION, "0", 1 ) != 0 ? REVISION_VERSION : "" ), batman_if->dev, orig_str  );
+		debug_output( 1, "  %-12s %''14s (%s/%3i): %''20s... [B.A.T.M.A.N. %s%s, MainIF/IP: %s %s ]\n", "Orginator", "Router", "#", SEQ_RANGE, "potential routers", SOURCE_VERSION, ( strncmp( REVISION_VERSION, "0", 1 ) != 0 ? REVISION_VERSION : "" ), batman_if->dev, orig_str  );
 
 		if ( debug_clients.clients_num[3] > 0 ) {
 
@@ -404,7 +405,7 @@ void debug_orig() {
 			}
 
 			debug_output( 4, "Originator list \n" );
-			debug_output( 4, "  %-12s %''14s (%s/%i): %''20s\n", "Orginator", "Router", "#", SEQ_RANGE, "potential gateways" );
+			debug_output( 4, "  %-12s %''14s (%s/%3i): %''20s\n", "Orginator", "Router", "#", SEQ_RANGE, "potential gateways" );
 
 		}
 
@@ -420,16 +421,16 @@ void debug_orig() {
 			addr_to_string( orig_node->orig, str, sizeof (str) );
 			addr_to_string( orig_node->router->addr, str2, sizeof (str2) );
 
-			debug_output( 1, "%-15s %''15s (%2i):", str, str2, orig_node->router->packet_count );
-			debug_output( 4, "%''15s %''15s (%2i), last_aware:%u: \n", str, str2, orig_node->router->packet_count, orig_node->last_aware );
+			debug_output( 1, "%-15s %''15s (%3i):", str, str2, orig_node->router->packet_count );
+			debug_output( 4, "%''15s %''15s (%3i), last_aware:%u: \n", str, str2, orig_node->router->packet_count, orig_node->last_aware );
 
 			list_for_each( neigh_pos, &orig_node->neigh_list ) {
 				neigh_node = list_entry( neigh_pos, struct neigh_node, list );
 
 				addr_to_string( neigh_node->addr, str, sizeof (str) );
 
-				debug_output( 1, " %''15s (%2i)", str, neigh_node->packet_count );
-				debug_output( 4, "\t\t%''15s (%2i) \n", str, neigh_node->packet_count );
+				debug_output( 1, " %''15s (%3i)", str, neigh_node->packet_count );
+				debug_output( 4, "\t\t%''15s (%3i) \n", str, neigh_node->packet_count );
 
 			}
 

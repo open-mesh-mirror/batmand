@@ -747,7 +747,8 @@ int8_t batman() {
 
 				/* neighbour has to indicate direct link and it has to come via the corresponding interface */
 				/* if received seqno equals last send seqno save new seqno for bidirectional check */
-				if ( ( ((struct packet *)&in)->flags & DIRECTLINK ) && ( if_incoming->addr.sin_addr.s_addr == ((struct packet *)&in)->orig ) && ( ((struct packet *)&in)->seqno - if_incoming->out.seqno + 2 == 0 ) ) {
+				if ( ( has_directlink_flag ) && ( if_incoming->addr.sin_addr.s_addr == ((struct packet *)&in)->orig ) && 
+					( ( ((struct packet *)&in)->seqno + 2) == if_incoming->out.seqno  ) ) {
 					debug_output( 4, "indicating bidirectional link - updating bidirect_link seqno \n");
 
 					orig_neigh_node->bidirect_link[if_incoming->if_num] = ((struct packet *)&in)->seqno;

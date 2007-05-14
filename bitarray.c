@@ -50,7 +50,7 @@ uint8_t get_bit_status( TYPE_OF_WORD *seq_bits, uint16_t last_seqno, uint16_t cu
 		word_offset= ( last_seqno - curr_seqno ) % WORD_BIT_SIZE;	/* which position in the selected word */
 		word_num   = ( last_seqno - curr_seqno ) / WORD_BIT_SIZE;	/* which word */
 
-		if ( seq_bits[word_num] & 1<<word_offset )   /* get position status */
+		if ( seq_bits[word_num] & (1<<word_offset) )   /* get position status */
 			return 1;
 		else
 			return 0;
