@@ -141,7 +141,7 @@ void update_orig( struct orig_node *orig_node, struct packet *in, uint32_t neigh
 			bit_get_packet( tmp_neigh_node->seq_bits, in->seqno - orig_node->last_seqno, 0 );
 			tmp_neigh_node->packet_count = bit_packet_count( tmp_neigh_node->seq_bits );
 
-			if ( tmp_neigh_node->packet_count > max_packet_count || 
+			if ( tmp_neigh_node->packet_count > max_packet_count ||
 				( orig_node->router == tmp_neigh_node && tmp_neigh_node->packet_count >= max_packet_count )) {
 
 				max_packet_count = tmp_neigh_node->packet_count;
@@ -390,8 +390,8 @@ void debug_orig() {
 		}
 		addr_to_string( batman_if->addr.sin_addr.s_addr, orig_str, sizeof(orig_str) );
 
-		debug_output( 1, "BOD \n" );
-		debug_output( 1, "  %-12s %''14s (%s/%3i): %''20s... [B.A.T.M.A.N. %s%s, MainIF/IP: %s %s ]\n", "Orginator", "Router", "#", SEQ_RANGE, "potential routers", SOURCE_VERSION, ( strncmp( REVISION_VERSION, "0", 1 ) != 0 ? REVISION_VERSION : "" ), batman_if->dev, orig_str  );
+		debug_output( 1, "BOD\n" );
+		debug_output( 1, "  %-12s %''14s (%s/%3i): %''20s... [B.A.T.M.A.N. %s%s, MainIF/IP: %s %s]\n", "Orginator", "Router", "#", SEQ_RANGE, "potential routers", SOURCE_VERSION, ( strncmp( REVISION_VERSION, "0", 1 ) != 0 ? REVISION_VERSION : "" ), batman_if->dev, orig_str  );
 
 		if ( debug_clients.clients_num[3] > 0 ) {
 

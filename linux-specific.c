@@ -67,7 +67,7 @@ void add_del_route( uint32_t dest, uint16_t netmask, uint32_t router, int8_t del
 	route.rt_flags = ( netmask == 32 ? ( RTF_HOST | RTF_UP ) : RTF_UP );
 	route.rt_metric = 1;
 
-	if ( (dest != router) || ( ( dest == 0 ) && ( router == 0 ) ) )
+	if ( ( dest != router ) || ( ( dest == 0 ) && ( router == 0 ) ) )
 	{
 		addr = (struct sockaddr_in *)&route.rt_gateway;
 
@@ -78,22 +78,22 @@ void add_del_route( uint32_t dest, uint16_t netmask, uint32_t router, int8_t del
 
 			route.rt_metric = 0;
 
-			if ( debug_level > 2 )
-				debug_output( debug_level, "%s default route via %s\n", del ? "Deleting" : "Adding", dev );
+			debug_output( 3, "%s default route via %s\n", del ? "Deleting" : "Adding", dev );
+			debug_output( 4, "%s default route via %s\n", del ? "Deleting" : "Adding", dev );
 
 		} else {
 
 			route.rt_flags |= RTF_GATEWAY;
 
-			if ( debug_level > 2 )
-				debug_output( debug_level, "%s route to %s/%i via %s (%s)\n", del ? "Deleting" : "Adding", str1, netmask, str2, dev );
+			debug_output( 3, "%s route to %s/%i via %s (%s)\n", del ? "Deleting" : "Adding", str1, netmask, str2, dev );
+			debug_output( 4, "%s route to %s/%i via %s (%s)\n", del ? "Deleting" : "Adding", str1, netmask, str2, dev );
 
 		}
 
 	} else {
 
-		if ( debug_level > 2 )
-			debug_output( debug_level, "%s route to %s via 0.0.0.0 (%s)\n", del ? "Deleting" : "Adding", str1, dev );
+			debug_output( 3, "%s route to %s via 0.0.0.0 (%s)\n", del ? "Deleting" : "Adding", str1, dev );
+			debug_output( 4, "%s route to %s via 0.0.0.0 (%s)\n", del ? "Deleting" : "Adding", str1, dev );
 
 	}
 
