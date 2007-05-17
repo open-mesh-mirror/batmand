@@ -226,7 +226,7 @@ void *unix_listen( void *arg ) {
 				memset( unix_client, 0, sizeof(struct unix_client) );
 
 				if ( ( unix_client->sock = accept( unix_if.unix_sock, (struct sockaddr *)&sun_addr, &sun_size) ) == -1 ) {
-					debug_output( 0, "Error - can't accept unix client: %s\n", strerror(errno) );
+					debug_output( 0, "Error - can't accept unix client: %s \n", strerror(errno) );
 					continue;
 				}
 
@@ -238,7 +238,7 @@ void *unix_listen( void *arg ) {
 
 				list_add_tail( &unix_client->list, &unix_if.client_list );
 
-				debug_output( 3, "Unix socket: got connection\n" );
+				debug_output( 3, "Unix socket: got connection \n" );
 
 			/* client sent data */
 			} else {
@@ -323,7 +323,7 @@ void *unix_listen( void *arg ) {
 
 							if ( status < 0 ) {
 
-								debug_output( 0, "Error - can't read unix message: %s\n", strerror(errno) );
+								debug_output( 0, "Error - can't read unix message: %s \n", strerror(errno) );
 
 							} else {
 
@@ -354,7 +354,7 @@ void *unix_listen( void *arg ) {
 
 								}
 
-								debug_output( 3, "Unix client closed connection ...\n" );
+								debug_output( 3, "Unix client closed connection ... \n" );
 
 							}
 
@@ -379,7 +379,7 @@ void *unix_listen( void *arg ) {
 
 		} else if ( ( res < 0 ) && ( errno != EINTR ) ) {
 
-			debug_output( 0, "Error - can't select: %s\n", strerror(errno) );
+			debug_output( 0, "Error - can't select: %s \n", strerror(errno) );
 			break;
 
 		}
@@ -755,13 +755,13 @@ void apply_init_args( int argc, char *argv[] ) {
 		strcpy( unix_if.addr.sun_path, UNIX_PATH );
 
 		if ( bind ( unix_if.unix_sock, (struct sockaddr *)&unix_if.addr, sizeof (struct sockaddr_un) ) < 0 ) {
-			debug_output( 0, "Error - can't bind unix socket: %s\n", strerror(errno) );
+			debug_output( 0, "Error - can't bind unix socket: %s \n", strerror(errno) );
 			restore_defaults();
 			exit(EXIT_FAILURE);
 		}
 
 		if ( listen( unix_if.unix_sock, 10 ) < 0 ) {
-			debug_output( 0, "Error - can't listen unix socket: %s\n", strerror(errno) );
+			debug_output( 0, "Error - can't listen unix socket: %s \n", strerror(errno) );
 			restore_defaults();
 			exit(EXIT_FAILURE);
 		}
@@ -901,14 +901,14 @@ void init_interface ( struct batman_if *batman_if ) {
 
 
 	if ( strlen( batman_if->dev ) > IFNAMSIZ - 1 ) {
-		debug_output( 0, "Error - interface name too long: %s\n", batman_if->dev );
+		debug_output( 0, "Error - interface name too long: %s \n", batman_if->dev );
 		restore_defaults();
 		exit(EXIT_FAILURE);
 	}
 
 	batman_if->udp_send_sock = socket( PF_INET, SOCK_DGRAM, 0 );
 	if (batman_if->udp_send_sock < 0) {
-		debug_output( 0, "Error - can't create send socket: %s", strerror(errno) );
+		debug_output( 0, "Error - can't create send socket: %s \n", strerror(errno) );
 		restore_defaults();
 		exit(EXIT_FAILURE);
 	}
@@ -916,7 +916,7 @@ void init_interface ( struct batman_if *batman_if ) {
 	batman_if->udp_recv_sock = socket( PF_INET, SOCK_DGRAM, 0 );
 	if ( batman_if->udp_recv_sock < 0 ) {
 
-		debug_output( 0, "Error - can't create receive socket: %s", strerror(errno) );
+		debug_output( 0, "Error - can't create receive socket: %s \n", strerror(errno) );
 		restore_defaults();
 		exit(EXIT_FAILURE);
 
@@ -927,7 +927,7 @@ void init_interface ( struct batman_if *batman_if ) {
 
 	if ( ioctl( batman_if->udp_recv_sock, SIOCGIFADDR, &int_req ) < 0 ) {
 
-		debug_output( 0, "Error - can't get IP address of interface %s\n", batman_if->dev );
+		debug_output( 0, "Error - can't get IP address of interface %s \n", batman_if->dev );
 		restore_defaults();
 		exit(EXIT_FAILURE);
 
@@ -939,7 +939,7 @@ void init_interface ( struct batman_if *batman_if ) {
 
 	if ( ioctl( batman_if->udp_recv_sock, SIOCGIFBRDADDR, &int_req ) < 0 ) {
 
-		debug_output( 0, "Error - can't get broadcast IP address of interface %s\n", batman_if->dev );
+		debug_output( 0, "Error - can't get broadcast IP address of interface %s \n", batman_if->dev );
 		restore_defaults();
 		exit(EXIT_FAILURE);
 
@@ -951,7 +951,7 @@ void init_interface ( struct batman_if *batman_if ) {
 
 	if ( batman_if->broad.sin_addr.s_addr == 0 ) {
 
-		debug_output( 0, "Error - invalid broadcast address detected (0.0.0.0): %s\n", batman_if->dev );
+		debug_output( 0, "Error - invalid broadcast address detected (0.0.0.0): %s \n", batman_if->dev );
 		restore_defaults();
 		exit(EXIT_FAILURE);
 
@@ -959,7 +959,7 @@ void init_interface ( struct batman_if *batman_if ) {
 
 	if ( setsockopt( batman_if->udp_send_sock, SOL_SOCKET, SO_BROADCAST, &on, sizeof (int) ) < 0 ) {
 
-		debug_output( 0, "Error - can't enable broadcasts: %s\n", strerror(errno) );
+		debug_output( 0, "Error - can't enable broadcasts: %s \n", strerror(errno) );
 		restore_defaults();
 		exit(EXIT_FAILURE);
 
@@ -974,7 +974,7 @@ void init_interface ( struct batman_if *batman_if ) {
 
 	if ( bind( batman_if->udp_send_sock, (struct sockaddr *)&batman_if->addr, sizeof (struct sockaddr_in) ) < 0 ) {
 
-		debug_output( 0, "Error - can't bind send socket: %s\n", strerror(errno) );
+		debug_output( 0, "Error - can't bind send socket: %s \n", strerror(errno) );
 		restore_defaults();
 		exit(EXIT_FAILURE);
 
@@ -989,7 +989,7 @@ void init_interface ( struct batman_if *batman_if ) {
 
 	if ( bind( batman_if->udp_recv_sock, (struct sockaddr *)&batman_if->broad, sizeof (struct sockaddr_in) ) < 0 ) {
 
-		debug_output( 0, "Error - can't bind receive socket: %s\n", strerror(errno) );
+		debug_output( 0, "Error - can't bind receive socket: %s \n", strerror(errno) );
 		restore_defaults();
 		exit(EXIT_FAILURE);
 
@@ -1008,38 +1008,38 @@ void init_interface_gw ( struct batman_if *batman_if )
 	batman_if->tcp_gw_sock = socket(PF_INET, SOCK_STREAM, 0);
 
 	if ( batman_if->tcp_gw_sock < 0 ) {
-		debug_output( 0, "Error - can't create socket: %s", strerror(errno) );
+		debug_output( 0, "Error - can't create socket: %s \n", strerror(errno) );
 		restore_defaults();
 		exit(EXIT_FAILURE);
 	}
 
 	if ( setsockopt( batman_if->tcp_gw_sock, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(int) ) < 0 ) {
-		debug_output( 0, "Error - can't enable reuse of address: %s\n", strerror(errno) );
+		debug_output( 0, "Error - can't enable reuse of address: %s \n", strerror(errno) );
 		restore_defaults();
 		exit(EXIT_FAILURE);
 	}
 
 	if ( bind( batman_if->tcp_gw_sock, (struct sockaddr*)&batman_if->addr, sizeof(struct sockaddr_in) ) < 0 ) {
-		debug_output( 0, "Error - can't bind socket: %s\n", strerror(errno) );
+		debug_output( 0, "Error - can't bind socket: %s \n", strerror(errno) );
 		restore_defaults();
 		exit(EXIT_FAILURE);
 	}
 
 	if ( listen( batman_if->tcp_gw_sock, 10 ) < 0 ) {
-		debug_output( 0, "Error - can't listen socket: %s\n", strerror(errno) );
+		debug_output( 0, "Error - can't listen socket: %s \n", strerror(errno) );
 		restore_defaults();
 		exit(EXIT_FAILURE);
 	}
 
 	batman_if->tunnel_sock = socket(PF_INET, SOCK_DGRAM, 0);
 	if ( batman_if->tunnel_sock < 0 ) {
-		debug_output( 0, "Error - can't create tunnel socket: %s", strerror(errno) );
+		debug_output( 0, "Error - can't create tunnel socket: %s \n", strerror(errno) );
 		restore_defaults();
 		exit(EXIT_FAILURE);
 	}
 
 	if ( bind( batman_if->tunnel_sock, (struct sockaddr *)&batman_if->addr, sizeof (struct sockaddr_in) ) < 0 ) {
-		debug_output( 0, "Error - can't bind tunnel socket: %s\n", strerror(errno) );
+		debug_output( 0, "Error - can't bind tunnel socket: %s \n", strerror(errno) );
 		restore_defaults();
 		exit(EXIT_FAILURE);
 	}
@@ -1081,7 +1081,7 @@ void *client_to_gw_tun( void *arg ) {
 	/* connect to server (ask permission) */
 	if ( ( curr_gateway_tcp_sock = socket(PF_INET, SOCK_STREAM, 0) ) < 0 ) {
 
-		debug_output( 0, "Error - can't create tcp socket: %s\n", strerror(errno) );
+		debug_output( 0, "Error - can't create tcp socket: %s \n", strerror(errno) );
 		curr_gateway = NULL;
 		debugFree( arg, 1206 );
 		return NULL;
@@ -1092,7 +1092,7 @@ void *client_to_gw_tun( void *arg ) {
 
 		if ( connect ( curr_gateway_tcp_sock, (struct sockaddr *)&gw_addr, sizeof(struct sockaddr) ) < 0 ) {
 
-			debug_output( 0, "Error - can't connect to gateway: %s\n", strerror(errno) );
+			debug_output( 0, "Error - can't connect to gateway: %s \n", strerror(errno) );
 			close( curr_gateway_tcp_sock );
 
 			curr_gw_data->gw_node->last_failure = get_time();
@@ -1128,7 +1128,7 @@ void *client_to_gw_tun( void *arg ) {
 	/* connect to server (establish udp tunnel) */
 	if ( ( curr_gateway_tun_sock = socket(PF_INET, SOCK_DGRAM, 0) ) < 0 ) {
 
-		debug_output( 0, "Error - can't create udp socket: %s\n", strerror(errno) );
+		debug_output( 0, "Error - can't create udp socket: %s \n", strerror(errno) );
 		close( curr_gateway_tcp_sock );
 		curr_gateway = NULL;
 		debugFree( arg, 1209 );
@@ -1138,7 +1138,7 @@ void *client_to_gw_tun( void *arg ) {
 
 	if ( bind( curr_gateway_tun_sock, (struct sockaddr *)&my_addr, sizeof (struct sockaddr_in) ) < 0) {
 
-		debug_output( 0, "Error - can't bind tunnel socket: %s\n", strerror(errno) );
+		debug_output( 0, "Error - can't bind tunnel socket: %s \n", strerror(errno) );
 		close( curr_gateway_tcp_sock );
 		close( curr_gateway_tun_sock );
 		curr_gateway = NULL;
@@ -1185,7 +1185,7 @@ void *client_to_gw_tun( void *arg ) {
 
 				if ( write( curr_gateway_tcp_sock, keep_alive_string, sizeof( keep_alive_string ) ) < 0 ) {
 
-					debug_output( 3, "server_keepalive failed: %s\n", strerror(errno) );
+					debug_output( 3, "server_keepalive failed: %s \n", strerror(errno) );
 
 					curr_gw_data->gw_node->last_failure = get_time();
 					curr_gw_data->gw_node->unavail_factor++;
@@ -1227,17 +1227,17 @@ void *client_to_gw_tun( void *arg ) {
 
 				if ( status > 0 ) {
 
-					debug_output( 3, "server message ?\n" );
+					debug_output( 3, "server message ? \n" );
 
 				} else if ( status < 0 ) {
 
-					debug_output( 3, "Cannot read message from gateway: %s\n", strerror(errno) );
+					debug_output( 3, "Cannot read message from gateway: %s \n", strerror(errno) );
 
 					break;
 
 				} else if (status == 0) {
 
-					debug_output( 3, "Gateway closed connection - timeout ?\n" );
+					debug_output( 3, "Gateway closed connection - timeout ? \n" );
 
 					curr_gw_data->gw_node->last_failure = get_time();
 					curr_gw_data->gw_node->unavail_factor++;
@@ -1251,13 +1251,13 @@ void *client_to_gw_tun( void *arg ) {
 
 				if ( ( buff_len = recvfrom( curr_gateway_tun_sock, buff, sizeof( buff ), 0, (struct sockaddr *)&sender_addr, &addr_len ) ) < 0 ) {
 
-					debug_output( 0, "Error - can't receive packet: %s\n", strerror(errno) );
+					debug_output( 0, "Error - can't receive packet: %s \n", strerror(errno) );
 
 				} else {
 
 					if ( write( curr_gateway_tun_fd, buff, buff_len ) < 0 ) {
 
-						debug_output( 0, "Error - can't write packet: %s\n", strerror(errno) );
+						debug_output( 0, "Error - can't write packet: %s \n", strerror(errno) );
 
 					}
 
@@ -1267,12 +1267,12 @@ void *client_to_gw_tun( void *arg ) {
 
 				if ( ( buff_len = read( curr_gateway_tun_fd, buff, sizeof( buff ) ) ) < 0 ) {
 
-					debug_output( 0, "Error - couldn't read data: %s\n", strerror(errno) );
+					debug_output( 0, "Error - couldn't read data: %s \n", strerror(errno) );
 
 				} else {
 
 					if ( sendto(curr_gateway_tun_sock, buff, buff_len, 0, (struct sockaddr *)&gw_addr, sizeof (struct sockaddr_in) ) < 0 ) {
-						debug_output( 0, "Error - can't send to gateway: %s\n", strerror(errno) );
+						debug_output( 0, "Error - can't send to gateway: %s \n", strerror(errno) );
 					}
 
 				}
@@ -1281,7 +1281,7 @@ void *client_to_gw_tun( void *arg ) {
 
 		} else if ( ( res < 0 ) && (errno != EINTR) ) {
 
-			debug_output( 0, "Error - can't select: %s\n", strerror(errno) );
+			debug_output( 0, "Error - can't select: %s \n", strerror(errno) );
 			break;
 
 		}
@@ -1328,7 +1328,7 @@ int8_t add_default_route() {
 
 	if ( pthread_create( &curr_gateway_thread_id, NULL, &client_to_gw_tun, curr_gw_data ) != 0 ) {
 
-		debug_output( 0, "Error - couldn't spawn thread: %s\n", strerror(errno) );
+		debug_output( 0, "Error - couldn't spawn thread: %s \n", strerror(errno) );
 		debugFree( curr_gw_data, 1213 );
 		curr_gateway = NULL;
 
@@ -1411,7 +1411,7 @@ int8_t receive_packet( unsigned char *packet_buff, int32_t packet_buff_len, int1
 
 		if ( errno != EINTR ) {
 
-			debug_output( 0, "Error - can't select: %s\n", strerror(errno) );
+			debug_output( 0, "Error - can't select: %s \n", strerror(errno) );
 			return -1;
 
 		}
@@ -1429,7 +1429,7 @@ int8_t receive_packet( unsigned char *packet_buff, int32_t packet_buff_len, int1
 
 			if ( ( *hna_buff_len = recvfrom( batman_if->udp_recv_sock, packet_buff, packet_buff_len - 1, 0, (struct sockaddr *)&addr, &addr_len ) ) < 0 ) {
 
-				debug_output( 0, "Error - can't receive packet: %s\n", strerror(errno) );
+				debug_output( 0, "Error - can't receive packet: %s \n", strerror(errno) );
 				return -1;
 
 			}
@@ -1464,7 +1464,7 @@ int8_t send_packet( unsigned char *packet_buff, int32_t packet_buff_len, struct 
 
 		} else {
 
-			debug_output( 0, "Error - can't send packet: %s.\n", strerror(errno) );
+			debug_output( 0, "Error - can't send packet: %s. \n", strerror(errno) );
 
 		}
 
@@ -1500,7 +1500,7 @@ void *gw_listen( void *arg ) {
 
 	if ( inet_pton(AF_INET, tun_ip, &tmp_ip_holder) < 1 ) {
 
-		debug_output( 0, "Error - invalid tunnel IP specified: %s\n", tun_ip );
+		debug_output( 0, "Error - invalid tunnel IP specified: %s \n", tun_ip );
 		exit(EXIT_FAILURE);
 
 	}
@@ -1540,7 +1540,7 @@ void *gw_listen( void *arg ) {
 				memset( gw_client, 0, sizeof(struct gw_client) );
 
 				if ( ( gw_client->sock = accept(batman_if->tcp_gw_sock, (struct sockaddr *)&gw_client->addr, &sin_size) ) == -1 ) {
-					debug_output( 0, "Error - can't accept client packet: %s\n", strerror(errno) );
+					debug_output( 0, "Error - can't accept client packet: %s \n", strerror(errno) );
 					continue;
 				}
 
@@ -1555,20 +1555,20 @@ void *gw_listen( void *arg ) {
 				list_add_tail(&gw_client->list, &batman_if->client_list);
 
 				addr_to_string(gw_client->addr.sin_addr.s_addr, str2, sizeof (str2));
-				debug_output( 3, "gateway: %s (%s) got connection from %s (internet via %s)\n", gw_addr, batman_if->dev, str2, tun_dev );
+				debug_output( 3, "gateway: %s (%s) got connection from %s (internet via %s) \n", gw_addr, batman_if->dev, str2, tun_dev );
 
 			/* tunnel activity */
 			} else if ( FD_ISSET( batman_if->tunnel_sock, &tmp_wait_sockets ) ) {
 
 				if ( ( buff_len = recvfrom( batman_if->tunnel_sock, buff, sizeof( buff ), 0, (struct sockaddr *)&addr, &addr_len ) ) < 0 ) {
 
-					debug_output( 0, "Error - can't receive packet: %s\n", strerror(errno) );
+					debug_output( 0, "Error - can't receive packet: %s \n", strerror(errno) );
 
 				} else {
 
 					if ( write( tun_fd, buff, buff_len ) < 0 ) {
 
-						debug_output( 0, "Error - can't write packet: %s\n", strerror(errno) );
+						debug_output( 0, "Error - can't write packet: %s \n", strerror(errno) );
 
 					}
 
@@ -1579,7 +1579,7 @@ void *gw_listen( void *arg ) {
 
 				/* not needed - kernel knows client adress and routes traffic directly */
 
-				debug_output( 0, "Warning - data coming through tun device: %s\n", tun_dev );
+				debug_output( 0, "Warning - data coming through tun device: %s \n", tun_dev );
 
 				/*if ( ( buff_len = read( tun_fd, buff, sizeof( buff ) ) ) < 0 ) {
 
@@ -1615,17 +1615,17 @@ void *gw_listen( void *arg ) {
 							if ( gw_client->sock > max_sock )
 								max_sock = gw_client->sock;
 
-							debug_output( 3, "gateway: client %s sent keep alive on interface %s\n", str2, batman_if->dev );
+							debug_output( 3, "gateway: client %s sent keep alive on interface %s \n", str2, batman_if->dev );
 
 						} else {
 
 							if ( status < 0 ) {
 
-								debug_output( 0, "Error - can't read message: %s\n", strerror(errno) );
+								debug_output( 0, "Error - can't read message: %s \n", strerror(errno) );
 
 							} else {
 
-								debug_output( 3, "Client %s closed connection ...\n", str2 );
+								debug_output( 3, "Client %s closed connection ... \n", str2 );
 
 							}
 
@@ -1650,7 +1650,7 @@ void *gw_listen( void *arg ) {
 
 		} else if ( ( res < 0 ) && (errno != EINTR) ) {
 
-			debug_output( 0, "Error - can't select: %s\n", strerror(errno) );
+			debug_output( 0, "Error - can't select: %s \n", strerror(errno) );
 			break;
 
 		}
@@ -1673,7 +1673,7 @@ void *gw_listen( void *arg ) {
 					close( gw_client->sock );
 
 					addr_to_string(gw_client->addr.sin_addr.s_addr, str2, sizeof (str2));
-					debug_output( 3, "gateway: client %s timeout on interface %s\n", str2, batman_if->dev );
+					debug_output( 3, "gateway: client %s timeout on interface %s \n", str2, batman_if->dev );
 
 					list_del( client_pos );
 					debugFree( client_pos, 1216 );
@@ -1753,7 +1753,7 @@ void segmentation_fault( int32_t sig ) {
 
 	signal( SIGSEGV, SIG_DFL );
 
-	debug_output( 0, "Error - SIGSEGV received !\n" );
+	debug_output( 0, "Error - SIGSEGV received ! \n" );
 
 	restore_and_exit();
 

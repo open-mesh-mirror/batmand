@@ -230,7 +230,7 @@ void choose_gw() {
 
 		if ( curr_gateway != NULL ) {
 
-			debug_output( 3, "Removing default route - no gateway in range\n" );
+			debug_output( 3, "Removing default route - no gateway in range \n" );
 
 			del_default_route();
 
@@ -290,7 +290,7 @@ void choose_gw() {
 			tmp_curr_gw = gw_node;
 
 			addr_to_string( tmp_curr_gw->orig_node->orig, orig_str, ADDR_STR_LEN );
-			debug_output( 3, "Preferred gateway found: %s (%i,%i,%i)\n", orig_str, gw_node->orig_node->gwflags, gw_node->orig_node->router->packet_count, ( gw_node->orig_node->router->packet_count * gw_node->orig_node->gwflags ) );
+			debug_output( 3, "Preferred gateway found: %s (%i,%i,%i) \n", orig_str, gw_node->orig_node->gwflags, gw_node->orig_node->router->packet_count, ( gw_node->orig_node->router->packet_count * gw_node->orig_node->gwflags ) );
 
 			break;
 
@@ -305,7 +305,7 @@ void choose_gw() {
 
 			if ( curr_gateway != NULL ) {
 
-				debug_output( 3, "Removing default route - better gateway found\n" );
+				debug_output( 3, "Removing default route - better gateway found \n" );
 
 				del_default_route();
 
@@ -317,7 +317,7 @@ void choose_gw() {
 			if ( ( curr_gateway != NULL ) && ( !is_aborted() ) ) {
 
 				addr_to_string( curr_gateway->orig_node->orig, orig_str, ADDR_STR_LEN );
-				debug_output( 3, "Adding default route to %s (%i,%i,%i)\n", orig_str, max_gw_class, max_packets, max_gw_factor );
+				debug_output( 3, "Adding default route to %s (%i,%i,%i) \n", orig_str, max_gw_class, max_packets, max_gw_factor );
 
 				add_default_route();
 
@@ -354,16 +354,16 @@ void update_routes( struct orig_node *orig_node, struct neigh_node *neigh_node, 
 		if ( ( orig_node != NULL ) && ( neigh_node != NULL ) ) {
 			addr_to_string( orig_node->orig, orig_str, ADDR_STR_LEN );
 			addr_to_string( neigh_node->addr, next_str, ADDR_STR_LEN );
-			debug_output( 4, "Route to %s via %s\n", orig_str, next_str );
+			debug_output( 4, "Route to %s via %s \n", orig_str, next_str );
 		}
 
 		/* route altered or deleted */
 		if ( ( ( orig_node->router != NULL ) && ( neigh_node != NULL ) ) || ( neigh_node == NULL ) ) {
 
 			if ( neigh_node == NULL ) {
-				debug_output( 4, "Deleting previous route\n" );
+				debug_output( 4, "Deleting previous route \n" );
 			} else {
-				debug_output( 4, "Route changed\n" );
+				debug_output( 4, "Route changed \n" );
 			}
 
 			/* remove old announced network(s) */
@@ -378,9 +378,9 @@ void update_routes( struct orig_node *orig_node, struct neigh_node *neigh_node, 
 		if ( ( ( orig_node->router != NULL ) && ( neigh_node != NULL ) ) || ( orig_node->router == NULL ) ) {
 
 			if ( orig_node->router == NULL ) {
-				debug_output( 4, "Adding new route\n" );
+				debug_output( 4, "Adding new route \n" );
 			} else {
-				debug_output( 4, "Route changed\n" );
+				debug_output( 4, "Route changed \n" );
 			}
 
 			add_del_route( orig_node->orig, 32, neigh_node->addr, 0, neigh_node->if_incoming->dev, neigh_node->if_incoming->udp_send_sock );
@@ -447,13 +447,13 @@ void update_gw_list( struct orig_node *orig_node, uint8_t new_gwflags ) {
 		if ( gw_node->orig_node == orig_node ) {
 
 			addr_to_string( gw_node->orig_node->orig, orig_str, ADDR_STR_LEN );
-			debug_output( 3, "Gateway class of originator %s changed from %i to %i\n", orig_str, gw_node->orig_node->gwflags, new_gwflags );
+			debug_output( 3, "Gateway class of originator %s changed from %i to %i \n", orig_str, gw_node->orig_node->gwflags, new_gwflags );
 
 			if ( new_gwflags == 0 ) {
 
 				gw_node->deleted = get_time();
 
-				debug_output( 3, "Gateway %s removed from gateway list\n", orig_str );
+				debug_output( 3, "Gateway %s removed from gateway list \n", orig_str );
 
 			} else {
 
@@ -471,7 +471,7 @@ void update_gw_list( struct orig_node *orig_node, uint8_t new_gwflags ) {
 	}
 
 	addr_to_string( orig_node->orig, orig_str, ADDR_STR_LEN );
-	debug_output( 3, "Found new gateway %s -> class: %i - %s\n", orig_str, new_gwflags, gw2string[new_gwflags] );
+	debug_output( 3, "Found new gateway %s -> class: %i - %s \n", orig_str, new_gwflags, gw2string[new_gwflags] );
 
 	gw_node = debugMalloc( sizeof(struct gw_node), 103 );
 	memset( gw_node, 0, sizeof(struct gw_node) );
@@ -673,7 +673,7 @@ int8_t batman() {
 			addr_to_string( neigh, neigh_str, sizeof(neigh_str) );
 			addr_to_string( if_incoming->addr.sin_addr.s_addr, ifaddr_str, sizeof(ifaddr_str) );
 
-			debug_output( 4, "Received BATMAN packet via NB: %s , IF: %s %s (from OG: %s, seqno %d, TTL %d, V %d, UDF %d, IDF %d) \n",
+			debug_output( 4, "Received BATMAN packet via NB: %s, IF: %s %s (from OG: %s, seqno %d, TTL %d, V %d, UDF %d, IDF %d) \n",
                                         neigh_str, if_incoming->dev, ifaddr_str, orig_str, ((struct packet *)&in)->seqno, ((struct packet *)&in)->ttl,
 					has_version, has_unidirectional_flag, has_directlink_flag );
 
@@ -712,7 +712,7 @@ int8_t batman() {
 					addr_to_string( hna, orig_str, sizeof (orig_str) );
 
 					if ( ( netmask > 0 ) && ( netmask < 33 ) )
-						debug_output( 4, "hna: %s/%i\n", orig_str, netmask );
+						debug_output( 4, "hna: %s/%i \n", orig_str, netmask );
 					else
 						debug_output( 4, "hna: %s/%i -> ignoring (invalid netmask) \n", orig_str, netmask );
 
@@ -747,7 +747,7 @@ int8_t batman() {
 
 				/* neighbour has to indicate direct link and it has to come via the corresponding interface */
 				/* if received seqno equals last send seqno save new seqno for bidirectional check */
-				if ( ( has_directlink_flag ) && ( if_incoming->addr.sin_addr.s_addr == ((struct packet *)&in)->orig ) && 
+				if ( ( has_directlink_flag ) && ( if_incoming->addr.sin_addr.s_addr == ((struct packet *)&in)->orig ) &&
 					( ( ((struct packet *)&in)->seqno + 2) == if_incoming->out.seqno  ) ) {
 					debug_output( 4, "indicating bidirectional link - updating bidirect_link seqno \n");
 
@@ -852,7 +852,7 @@ int8_t batman() {
 
 					} else {
 
-						 debug_output( 4, "Drop packet: received via bidirectional link: %s, BNTOG: %s !\n",
+						 debug_output( 4, "Drop packet: received via bidirectional link: %s, BNTOG: %s ! \n",
 								is_bidirectional?"YES":" NO", is_bntog?"YES":" NO" );
 
 					}

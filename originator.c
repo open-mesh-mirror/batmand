@@ -155,7 +155,7 @@ void update_orig( struct orig_node *orig_node, struct packet *in, uint32_t neigh
 
 	if ( neigh_node == NULL ) {
 
-		debug_output( 4, "Creating new last-hop neighbour of originator\n" );
+		debug_output( 4, "Creating new last-hop neighbour of originator \n" );
 
 		neigh_node = debugMalloc( sizeof (struct neigh_node), 403 );
 		memset( neigh_node, 0, sizeof(struct neigh_node) );
@@ -168,7 +168,7 @@ void update_orig( struct orig_node *orig_node, struct packet *in, uint32_t neigh
 
 	} else {
 
-		debug_output( 4, "Updating existing last-hop neighbour of originator\n" );
+		debug_output( 4, "Updating existing last-hop neighbour of originator \n" );
 
 	}
 
@@ -219,7 +219,7 @@ void purge_orig( uint32_t curr_time ) {
 	struct neigh_node *neigh_node, *best_neigh_node;
 	struct gw_node *gw_node;
 	uint8_t gw_purged = 0, neigh_purged;
-	static char orig_str[ADDR_STR_LEN];
+	static char orig_str[ADDR_STR_LEN], neigh_str[ADDR_STR_LEN];
 
 
 	/* for all origins... */
@@ -230,7 +230,7 @@ void purge_orig( uint32_t curr_time ) {
 		if ( (int)( ( orig_node->last_aware + ( 2 * TIMEOUT ) ) < curr_time ) ) {
 
 			addr_to_string( orig_node->orig, orig_str, ADDR_STR_LEN );
-			debug_output( 4, "Orginator timeout: originator %s, last_aware %u) \n", orig_str, orig_node->last_aware );
+			debug_output( 4, "Orginator timeout: originator %s, last_aware %u \n", orig_str, orig_node->last_aware );
 
 			hash_remove_bucket( orig_hash, hashit );
 
@@ -281,6 +281,13 @@ void purge_orig( uint32_t curr_time ) {
 				neigh_node = list_entry( neigh_pos, struct neigh_node, list );
 
 				if ( (int)( ( neigh_node->last_aware + ( 2 * TIMEOUT ) ) < curr_time ) ) {
+
+					addr_to_string( orig_node->orig, orig_str, ADDR_STR_LEN );
+					addr_to_string( neigh_node->addr, neigh_str, ADDR_STR_LEN );
+					debug_output( 4, "Neighbour timeout: originator %s, neighbour: %s, last_aware %u \n", orig_str, neigh_str, neigh_node->last_aware );
+
+					if ( orig_node->router == neigh_node )
+						orig_node->router = NULL;
 
 					neigh_purged = 1;
 					list_del( neigh_pos );
@@ -391,7 +398,7 @@ void debug_orig() {
 		addr_to_string( batman_if->addr.sin_addr.s_addr, orig_str, sizeof(orig_str) );
 
 		debug_output( 1, "BOD\n" );
-		debug_output( 1, "  %-12s %''14s (%s/%3i): %''20s... [B.A.T.M.A.N. %s%s, MainIF/IP: %s %s]\n", "Orginator", "Router", "#", SEQ_RANGE, "potential routers", SOURCE_VERSION, ( strncmp( REVISION_VERSION, "0", 1 ) != 0 ? REVISION_VERSION : "" ), batman_if->dev, orig_str  );
+		debug_output( 1, "  %-12s %''14s (%s/%3i): %''20s... [B.A.T.M.A.N. %s%s, MainIF/IP: %s %s] \n", "Orginator", "Router", "#", SEQ_RANGE, "potential routers", SOURCE_VERSION, ( strncmp( REVISION_VERSION, "0", 1 ) != 0 ? REVISION_VERSION : "" ), batman_if->dev, orig_str  );
 
 		if ( debug_clients.clients_num[3] > 0 ) {
 
@@ -405,7 +412,7 @@ void debug_orig() {
 			}
 
 			debug_output( 4, "Originator list \n" );
-			debug_output( 4, "  %-12s %''14s (%s/%3i): %''20s\n", "Orginator", "Router", "#", SEQ_RANGE, "potential gateways" );
+			debug_output( 4, "  %-12s %''14s (%s/%3i): %''20s \n", "Orginator", "Router", "#", SEQ_RANGE, "potential gateways" );
 
 		}
 
