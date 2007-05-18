@@ -218,7 +218,7 @@ void purge_orig( uint32_t curr_time ) {
 	struct orig_node *orig_node;
 	struct neigh_node *neigh_node, *best_neigh_node;
 	struct gw_node *gw_node;
-	uint8_t gw_purged = 0, neigh_purged;
+	uint8_t gw_purged = 0, neigh_purged, router_purged;
 	static char orig_str[ADDR_STR_LEN], neigh_str[ADDR_STR_LEN];
 
 
@@ -273,7 +273,7 @@ void purge_orig( uint32_t curr_time ) {
 		} else {
 
 			best_neigh_node = NULL;
-			neigh_purged = 0;
+			neigh_purged = router_purged = 0;
 
 			/* for all neighbours towards this orginator ... */
 			list_for_each_safe( neigh_pos, neigh_temp, &orig_node->neigh_list ) {
@@ -287,7 +287,7 @@ void purge_orig( uint32_t curr_time ) {
 					debug_output( 4, "Neighbour timeout: originator %s, neighbour: %s, last_aware %u \n", orig_str, neigh_str, neigh_node->last_aware );
 
 					if ( orig_node->router == neigh_node )
-						orig_node->router = NULL;
+						router_purged = 1;
 
 					neigh_purged = 1;
 					list_del( neigh_pos );
@@ -303,7 +303,7 @@ void purge_orig( uint32_t curr_time ) {
 
 			}
 
-			if ( ( neigh_purged ) && ( ( best_neigh_node == NULL ) || ( orig_node->router == NULL ) || ( best_neigh_node->packet_count > orig_node->router->packet_count ) ) )
+			if ( ( neigh_purged ) && ( ( router_purged ) || ( best_neigh_node == NULL ) || ( orig_node->router == NULL ) || ( best_neigh_node->packet_count > orig_node->router->packet_count ) ) )
 				update_routes( orig_node, best_neigh_node, orig_node->hna_buff, orig_node->hna_buff_len );
 
 		}
