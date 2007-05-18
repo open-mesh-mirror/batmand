@@ -218,7 +218,7 @@ void purge_orig( uint32_t curr_time ) {
 	struct orig_node *orig_node;
 	struct neigh_node *neigh_node, *best_neigh_node;
 	struct gw_node *gw_node;
-	uint8_t gw_purged = 0, neigh_purged, router_purged;
+	uint8_t gw_purged = 0, neigh_purged;
 	static char orig_str[ADDR_STR_LEN], neigh_str[ADDR_STR_LEN];
 
 
@@ -273,7 +273,7 @@ void purge_orig( uint32_t curr_time ) {
 		} else {
 
 			best_neigh_node = NULL;
-			neigh_purged = router_purged = 0;
+			neigh_purged = 0;
 
 			/* for all neighbours towards this orginator ... */
 			list_for_each_safe( neigh_pos, neigh_temp, &orig_node->neigh_list ) {
@@ -286,8 +286,20 @@ void purge_orig( uint32_t curr_time ) {
 					addr_to_string( neigh_node->addr, neigh_str, ADDR_STR_LEN );
 					debug_output( 4, "Neighbour timeout: originator %s, neighbour: %s, last_aware %u \n", orig_str, neigh_str, neigh_node->last_aware );
 
-					if ( orig_node->router == neigh_node )
-						router_purged = 1;
+					if ( orig_node->router == neigh_node ) {
+
+						/* we have to delete the route towards this node before it gets purged */
+						debug_output( 4, "Deleting previous route \n" );
+
+						/* remove old announced network(s) */
+						if ( orig_node->hna_buff_len > 0 )
+							add_del_hna( orig_node, 1 );
+
+						add_del_route( orig_node->orig, 32, orig_node->router->addr, 1, orig_node->batman_if->dev, orig_node->batman_if->udp_send_sock );
+
+						orig_node->router = NULL;
+
+					}
 
 					neigh_purged = 1;
 					list_del( neigh_pos );
@@ -303,7 +315,7 @@ void purge_orig( uint32_t curr_time ) {
 
 			}
 
-			if ( ( neigh_purged ) && ( ( router_purged ) || ( best_neigh_node == NULL ) || ( orig_node->router == NULL ) || ( best_neigh_node->packet_count > orig_node->router->packet_count ) ) )
+			if ( ( neigh_purged ) && ( ( best_neigh_node == NULL ) || ( orig_node->router == NULL ) || ( best_neigh_node->packet_count > orig_node->router->packet_count ) ) )
 				update_routes( orig_node, best_neigh_node, orig_node->hna_buff, orig_node->hna_buff_len );
 
 		}
