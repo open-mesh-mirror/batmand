@@ -32,6 +32,7 @@ void set_rp_filter(int32_t state, char* dev);
 int32_t get_rp_filter(char *dev);
 
 void add_del_route( uint32_t dest, uint16_t netmask, uint32_t router, int8_t del, char *dev, int32_t sock );
+void add_del_hna( struct orig_node *orig_node, int8_t del );
 int8_t is_aborted();
 void handler( int32_t sig );
 void segmentation_fault( int32_t sig );
