@@ -74,7 +74,7 @@ CC_N770_OE_PATH =	/usr/src/openEmbedded/stuff/build/nokia770/tmp/cross/bin
 CC_N770_OE =		$(CC_N770_OE_PATH)/arm-linux-gcc
 STRIP_N770_OE =		$(CC_N770_OE_PATH)/arm-linux-strip
 
-REVISION=		$(shell svn info | grep Revision | sed -e '1p' -n | awk '{print $$2}')
+REVISION=		$(shell svn info | grep "Rev:" | sed -e '1p' -n | awk '{print $$4}')
 REVISION_VERSION=	\"\ rv$(REVISION)\"
 IPKG_BUILD_PATH=	/home/batman/build/ipkg-build
 
@@ -145,6 +145,8 @@ i386-gc-elf-32-lsb-dynamic:	$(LINUX_SRC_C) $(LINUX_SRC_H) Makefile
 	$(CC) $(CFLAGS) -DREVISION_VERSION=$(REVISION_VERSION) -o $(FILE_NAME) $(LINUX_SRC_C) $(LDFLAGS)
 	$(IPKG_BUILD) i386
 	$(LINK_AND_TAR)
+
+	ln -f $(FILE_NAME) batmand
 
 
 mipsel-kk-bc:	mipsel-kk-elf-32-lsb-static mipsel-kk-elf-32-lsb-dynamic
