@@ -170,7 +170,7 @@ void debug_output( int8_t debug_prio, char *format, ... ) {
 						vsprintf( tmp_string, format, args );
 // TODO: this causes lots of errors if enabled:
 //						if( vdprintf( debug_level_info->fd, format, args ) < 0) {
-//						if( 
+//						if(
 							dprintf( debug_level_info->fd, "%s", tmp_string );
 //														< 0) {
 //							printf("error: could not write to fd !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! \n");
@@ -1722,10 +1722,12 @@ void *gw_listen( void *arg ) {
 
 
 
-void restore_and_exit() {
+void restore_and_exit( uint8_t is_sigsegv ) {
 
 	struct list_head *if_pos;
 	struct batman_if *batman_if;
+	struct orig_node *orig_node;
+	struct hash_it_t *hashit = NULL;
 
 
 	if ( !unix_client ) {
@@ -1750,13 +1752,28 @@ void restore_and_exit() {
 		if ( ( routing_class != 0 ) && ( curr_gateway != NULL ) )
 			del_default_route();
 
-		purge_orig( get_time() + ( 5 * TIMEOUT ) + orginator_interval );
+		if ( !is_sigsegv ) {
+
+			purge_orig( get_time() + ( 5 * TIMEOUT ) + orginator_interval );
+
+		} else {
+
+			while ( NULL != ( hashit = hash_iterate( orig_hash, hashit ) ) ) {
+
+				orig_node = hashit->bucket->data;
+
+				update_routes( orig_node, NULL, NULL, 0 );
+
+			}
+
+		}
 
 		restore_defaults();
 
 	}
 
-	exit(EXIT_FAILURE);
+	if ( !is_sigsegv )
+		exit(EXIT_FAILURE);
 
 }
 
@@ -1768,7 +1785,9 @@ void segmentation_fault( int32_t sig ) {
 
 	debug_output( 0, "Error - SIGSEGV received ! \n" );
 
-	restore_and_exit();
+	restore_and_exit(1);
+
+	raise( SIGSEGV );
 
 }
 

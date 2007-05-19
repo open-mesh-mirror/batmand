@@ -102,7 +102,7 @@ struct orig_node *get_orig_node( uint32_t addr ) {
 		if ( swaphash == NULL ) {
 
 			debug_output( 0, "Couldn't resize hash table \n" );
-			restore_and_exit();
+			restore_and_exit(0);
 
 		}
 
@@ -274,7 +274,7 @@ void purge_orig( uint32_t curr_time ) {
 
 			best_neigh_node = NULL;
 			neigh_purged = 0;
-			
+
                          /* for all neighbours towards this orginator ... */
 			list_for_each_safe( neigh_pos, neigh_temp, &orig_node->neigh_list ) {
 
@@ -456,8 +456,8 @@ void debug_orig() {
 
 			}
 
-			debug_output( 1, "%s \n", dbg_ogm_str );			
-			debug_output( 4, "%s \n", dbg_ogm_str );			
+			debug_output( 1, "%s \n", dbg_ogm_str );
+			debug_output( 4, "%s \n", dbg_ogm_str );
 //			debug_output( 1, " \n" );
 
 		}

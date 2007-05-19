@@ -36,7 +36,7 @@ void add_del_hna( struct orig_node *orig_node, int8_t del );
 int8_t is_aborted();
 void handler( int32_t sig );
 void segmentation_fault( int32_t sig );
-void restore_and_exit();
+void restore_and_exit( uint8_t is_sigsegv );
 
 
 int8_t receive_packet( unsigned char *packet_buff, int32_t packet_buff_len, int16_t *hna_buff_len, uint32_t *neigh, uint32_t timeout, struct batman_if **if_incoming );
