@@ -60,7 +60,8 @@ int8_t is_aborted() {
 
 void handler( int32_t sig ) {
 
-	stop = 1;
+	if ( sig != SIGPIPE )
+		stop = 1;
 
 }
 
@@ -671,6 +672,7 @@ void apply_init_args( int argc, char *argv[] ) {
 
 		signal( SIGINT, handler );
 		signal( SIGTERM, handler );
+		signal( SIGPIPE, handler );
 		signal( SIGSEGV, segmentation_fault );
 
 		for ( res = 0; res < 4; res++ ) {
@@ -1783,7 +1785,7 @@ void segmentation_fault( int32_t sig ) {
 
 	signal( SIGSEGV, SIG_DFL );
 
-	debug_output( 0, "Error - SIGSEGV received ! \n" );
+	debug_output( 0, "Error - SIGSEGV received, trying to clean up ... \n" );
 
 	restore_and_exit(1);
 

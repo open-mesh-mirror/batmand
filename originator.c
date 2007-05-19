@@ -357,6 +357,7 @@ void debug_orig() {
 	int dbg_ogm_out = 0;
 	static char dbg_ogm_str[500]; // TBD: must be checked for overflow when using with sprintf
 
+
 	if ( debug_clients.clients_num[1] > 0 ) {
 
 		debug_output( 2, "BOD\n" );
