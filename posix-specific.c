@@ -334,42 +334,37 @@ void *unix_listen( void *arg ) {
 
 						} else {
 
-							if ( status < 0 ) {
-
+							if ( status < 0 )
 								debug_output( 0, "Error - can't read unix message: %s \n", strerror(errno) );
 
-							} else {
+							if ( unix_client->debug_level != 0 ) {
 
-								if ( unix_client->debug_level != 0 ) {
+								if ( pthread_mutex_lock( (pthread_mutex_t *)debug_clients.mutex[(int)unix_client->debug_level - '1'] ) != 0 )
+									debug_output( 0, "Error - could not lock mutex (unix_listen => 3): %s \n", strerror( errno ) );
 
-									if ( pthread_mutex_lock( (pthread_mutex_t *)debug_clients.mutex[(int)unix_client->debug_level - '1'] ) != 0 )
-										debug_output( 0, "Error - could not lock mutex (unix_listen => 3): %s \n", strerror( errno ) );
+								list_for_each_safe( debug_pos, debug_pos_tmp, (struct list_head *)debug_clients.fd_list[(int)unix_client->debug_level - '1'] ) {
 
-									list_for_each_safe( debug_pos, debug_pos_tmp, (struct list_head *)debug_clients.fd_list[(int)unix_client->debug_level - '1'] ) {
+									debug_level_info = list_entry(debug_pos, struct debug_level_info, list);
 
-										debug_level_info = list_entry(debug_pos, struct debug_level_info, list);
+									if ( debug_level_info->fd == unix_client->sock ) {
 
-										if ( debug_level_info->fd == unix_client->sock ) {
+										list_del( debug_pos );
+										debug_clients.clients_num[(int)unix_client->debug_level - '1']--;
 
-											list_del( debug_pos );
-											debug_clients.clients_num[(int)unix_client->debug_level - '1']--;
+										debugFree( debug_pos, 1202 );
 
-											debugFree( debug_pos, 1202 );
-
-											break;
-
-										}
+										break;
 
 									}
 
-									if ( pthread_mutex_unlock( (pthread_mutex_t *)debug_clients.mutex[(int)unix_client->debug_level - '1'] ) != 0 )
-										debug_output( 0, "Error - could not unlock mutex (unix_listen => 3): %s \n", strerror( errno ) );
-
 								}
 
-								debug_output( 3, "Unix client closed connection ... \n" );
+								if ( pthread_mutex_unlock( (pthread_mutex_t *)debug_clients.mutex[(int)unix_client->debug_level - '1'] ) != 0 )
+									debug_output( 0, "Error - could not unlock mutex (unix_listen => 3): %s \n", strerror( errno ) );
 
 							}
+
+							debug_output( 3, "Unix client closed connection ... \n" );
 
 							FD_CLR(unix_client->sock, &wait_sockets);
 							close( unix_client->sock );
