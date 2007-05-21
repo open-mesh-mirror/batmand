@@ -25,7 +25,6 @@
 #include "batman.h"
 
 
-
 /* needed for hash, compares 2 struct orig_node, but only their ip-addresses. assumes that
  * the ip address is the first field in the struct */
 int compare_orig( void *data1, void *data2 ) {
@@ -117,7 +116,7 @@ struct orig_node *get_orig_node( uint32_t addr ) {
 
 
 
-void update_orig( struct orig_node *orig_node, struct packet *in, uint32_t neigh, struct batman_if *if_incoming, unsigned char *hna_recv_buff, int16_t hna_buff_len ) {
+void update_orig( struct orig_node *orig_node, struct packet *in, uint32_t neigh, struct batman_if *if_incoming, unsigned char *hna_recv_buff, int16_t hna_buff_len, uint32_t rcvd_time ) {
 
 	prof_start( PROF_update_originator );
 	struct list_head *neigh_pos;
@@ -174,6 +173,7 @@ void update_orig( struct orig_node *orig_node, struct packet *in, uint32_t neigh
 
 
 	is_new_seqno = bit_get_packet( neigh_node->seq_bits, in->seqno - orig_node->last_seqno, 1 );
+
 	neigh_node->packet_count = bit_packet_count( neigh_node->seq_bits );
 
 	if ( neigh_node->packet_count > max_packet_count ) {
@@ -183,9 +183,9 @@ void update_orig( struct orig_node *orig_node, struct packet *in, uint32_t neigh
 
 	}
 
+	orig_node->last_valid = rcvd_time;
 
-	orig_node->last_valid = get_time();
-	neigh_node->last_valid = get_time();
+	neigh_node->last_valid = rcvd_time;
 
 	if ( is_new_seqno ) {
 
@@ -405,6 +405,7 @@ void debug_orig() {
 		struct list_head *if_pos;
 		struct batman_if *batman_if;
 		static char orig_str[ADDR_STR_LEN];
+		uint32_t uptime_sec;
 
 		list_for_each( if_pos, &if_list ) {
 			batman_if = list_entry( if_pos, struct batman_if, list );
@@ -412,8 +413,10 @@ void debug_orig() {
 		}
 		addr_to_string( batman_if->addr.sin_addr.s_addr, orig_str, sizeof(orig_str) );
 
+		uptime_sec = get_time_sec();
+		
 		debug_output( 1, "BOD\n" );
-		debug_output( 1, "  %-12s %14s (%s/%3i): %20s... [B.A.T.M.A.N. %s%s, MainIF/IP: %s %s] \n", "Orginator", "Router", "#", SEQ_RANGE, "potential routers", SOURCE_VERSION, ( strncmp( REVISION_VERSION, "0", 1 ) != 0 ? REVISION_VERSION : "" ), batman_if->dev, orig_str  );
+		debug_output( 1, "  %-12s %14s (%s/%3i): %20s... [B.A.T.M.A.N. %s%s, MainIF/IP: %s %s, UT: %id%2ih%2im] \n", "Originator", "Router", "#", SEQ_RANGE, "Potential routers", SOURCE_VERSION, ( strncmp( REVISION_VERSION, "0", 1 ) != 0 ? REVISION_VERSION : "" ), batman_if->dev, orig_str, uptime_sec/86400, ((uptime_sec%86400)/3600), ((uptime_sec)%3600)/60  );
 
 		if ( debug_clients.clients_num[3] > 0 ) {
 
@@ -427,7 +430,7 @@ void debug_orig() {
 			}
 
 			debug_output( 4, "Originator list \n" );
-			debug_output( 4, "  %-12s %14s (%s/%3i): %20s \n", "Orginator", "Router", "#", SEQ_RANGE, "potential gateways" );
+			debug_output( 4, "  %-12s %14s (%s/%3i): %20s \n", "Originator", "Router", "#", SEQ_RANGE, "Potential routers" );
 
 		}
 

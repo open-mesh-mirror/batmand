@@ -580,7 +580,7 @@ int8_t batman() {
 	struct neigh_node *neigh_node;
 	struct hna_node *hna_node;
 	struct forw_node *forw_node;
-	uint32_t neigh, hna, netmask, debug_timeout, select_timeout, curr_time;
+	uint32_t neigh, hna, netmask, debug_timeout, select_timeout, curr_time, rcvd_time;
 	unsigned char in[1501], *hna_recv_buff;
 	static char orig_str[ADDR_STR_LEN], neigh_str[ADDR_STR_LEN], ifaddr_str[ADDR_STR_LEN];
 	int16_t hna_buff_count, hna_buff_len;
@@ -658,10 +658,13 @@ int8_t batman() {
 
 		res = receive_packet( ( unsigned char *)&in, sizeof(in), &hna_buff_len, &neigh, select_timeout, &if_incoming );
 
+		rcvd_time = get_time();
+
 		if ( res < 0 )
 			return -1;
 
 		if ( res > 0 ) {
+
 
 			is_my_addr = is_my_orig = is_broadcast = is_duplicate = is_bidirectional = is_bntog = forward_duplicate_packet = 0;
 
@@ -774,10 +777,9 @@ int8_t batman() {
 
 				/* update ranking */
 				if ( ( is_bidirectional ) && ( !is_duplicate ) )
-					update_orig( orig_node, (struct packet *)&in, neigh, if_incoming, hna_recv_buff, hna_buff_len );
+					update_orig( orig_node, (struct packet *)&in, neigh, if_incoming, hna_recv_buff, hna_buff_len, rcvd_time );
 
 				is_bntog = isBntog(neigh, orig_node );
-
 
 				/* is single hop (direct) neighbour */
 				if ( ((struct packet *)&in)->orig == neigh ) {
@@ -811,7 +813,7 @@ int8_t batman() {
 
 							debug_output( 4, "Forward packet: rebroadcast orginator packet \n" );
 
-						} else if ( ( orig_node->router != NULL ) && ( orig_node->router->addr == neigh ) ) {
+						} else { /* is_bnotg anyway */
 
 							list_for_each( neigh_pos, &orig_node->neigh_list ) {
 
@@ -819,8 +821,15 @@ int8_t batman() {
 
 								if ( ( neigh_node->addr == neigh ) && ( neigh_node->if_incoming == if_incoming ) ) {
 
-									if ( neigh_node->last_ttl == ((struct packet *)&in)->ttl )
+									if ( neigh_node->last_ttl == ((struct packet *)&in)->ttl ) {
+
 										forward_duplicate_packet = 1;
+
+				/* also update only last_valid time if arrived (and rebroadcasted because best neighbor) */				
+										orig_node->last_valid = rcvd_time;
+										neigh_node->last_valid = rcvd_time;
+
+									}
 
 									break;
 
@@ -841,11 +850,7 @@ int8_t batman() {
 
 							}
 
-						} else {
-
-							debug_output( 4, "Drop packet: duplicate packet (not received via best neighbour) \n" );
-
-						}
+						} 
 
 					} else {
 
@@ -864,11 +869,11 @@ int8_t batman() {
 		send_outstanding_packets();
 
 
-		if ( debug_timeout + 1000 < get_time() ) {
+		if ( debug_timeout + 1000 < rcvd_time ) {
 
-			debug_timeout = get_time();
+			debug_timeout = rcvd_time;
 
-			purge_orig( get_time() );
+			purge_orig( rcvd_time );
 
 			debug_orig();
 
