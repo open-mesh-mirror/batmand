@@ -739,8 +739,6 @@ int8_t batman() {
 
 				orig_neigh_node = get_orig_node( neigh );
 
-				orig_neigh_node->last_aware = get_time();
-
 
 				debug_output( 4, "received my own OGM via NB lastTxIfSeqno: %d, currRxSeqno: %d, prevRxSeqno: %d, currRxSeqno-prevRxSeqno %d \n",
 								(if_incoming->out.seqno - 2), ((struct packet *)&in)->seqno, orig_neigh_node->bidirect_link[if_incoming->if_num], ((struct packet *)&in)->seqno - orig_neigh_node->bidirect_link[if_incoming->if_num] );
@@ -768,7 +766,6 @@ int8_t batman() {
 			} else {
 
 				orig_node = get_orig_node( ((struct packet *)&in)->orig );
-				orig_node->last_aware = get_time();
 
 				orig_neigh_node = get_orig_node( neigh );
 
@@ -894,7 +891,7 @@ int8_t batman() {
 	if ( debug_level > 0 )
 		printf( "Deleting all BATMAN routes\n" );
 
-	purge_orig( get_time() + ( 5 * TIMEOUT ) + orginator_interval );
+	purge_orig( get_time() + ( 5 * PURGE_TIMEOUT ) + orginator_interval );
 
 	hash_destroy( orig_hash );
 

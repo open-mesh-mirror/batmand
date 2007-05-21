@@ -184,7 +184,8 @@ void update_orig( struct orig_node *orig_node, struct packet *in, uint32_t neigh
 	}
 
 
-	neigh_node->last_aware = get_time();
+	orig_node->last_valid = get_time();
+	neigh_node->last_valid = get_time();
 
 	if ( is_new_seqno ) {
 
@@ -227,10 +228,10 @@ void purge_orig( uint32_t curr_time ) {
 
 		orig_node = hashit->bucket->data;
 
-		if ( (int)( ( orig_node->last_aware + ( 2 * TIMEOUT ) ) < curr_time ) ) {
+		if ( (int)( ( orig_node->last_valid + PURGE_TIMEOUT ) < curr_time ) ) {
 
 			addr_to_string( orig_node->orig, orig_str, ADDR_STR_LEN );
-			debug_output( 4, "Orginator timeout: originator %s, last_aware %u \n", orig_str, orig_node->last_aware );
+			debug_output( 4, "Orginator timeout: originator %s, last_valid %u \n", orig_str, orig_node->last_valid );
 
 			hash_remove_bucket( orig_hash, hashit );
 
@@ -275,16 +276,16 @@ void purge_orig( uint32_t curr_time ) {
 			best_neigh_node = NULL;
 			neigh_purged = 0;
 
-                         /* for all neighbours towards this orginator ... */
+                         /* for all neighbours towards this originator ... */
 			list_for_each_safe( neigh_pos, neigh_temp, &orig_node->neigh_list ) {
 
 				neigh_node = list_entry( neigh_pos, struct neigh_node, list );
 
-				if ( (int)( ( neigh_node->last_aware + ( 2 * TIMEOUT ) ) < curr_time ) ) {
+				if ( (int)( ( neigh_node->last_valid + PURGE_TIMEOUT ) < curr_time ) ) {
 
 					addr_to_string( orig_node->orig, orig_str, ADDR_STR_LEN );
 					addr_to_string( neigh_node->addr, neigh_str, ADDR_STR_LEN );
-					debug_output( 4, "Neighbour timeout: originator %s, neighbour: %s, last_aware %u \n", orig_str, neigh_str, neigh_node->last_aware );
+					debug_output( 4, "Neighbour timeout: originator %s, neighbour: %s, last_valid %u \n", orig_str, neigh_str, neigh_node->last_valid );
 
 					if ( orig_node->router == neigh_node ) {
 
@@ -326,7 +327,7 @@ void purge_orig( uint32_t curr_time ) {
 
 		gw_node = list_entry(gw_pos, struct gw_node, list);
 
-		if ( ( gw_node->deleted ) && ( (int)((gw_node->deleted + 3 * TIMEOUT) < curr_time) ) ) {
+		if ( ( gw_node->deleted ) && ( (int)((gw_node->deleted + 2 * PURGE_TIMEOUT) < curr_time) ) ) {
 
 			list_del( gw_pos );
 			debugFree( gw_pos, 1405 );
@@ -444,7 +445,7 @@ void debug_orig() {
 
 			dbg_ogm_out = sprintf( dbg_ogm_str, "%-15s %15s (%3i):", str, str2, orig_node->router->packet_count );
 //			debug_output( 1, "%-15s %''15s (%3i):", str, str2, orig_node->router->packet_count );
-//			debug_output( 4, "%15s %15s (%3i), last_aware:%u: \n", str, str2, orig_node->router->packet_count, orig_node->last_aware );
+//			debug_output( 4, "%15s %15s (%3i), last_valid:%u: \n", str, str2, orig_node->router->packet_count, orig_node->last_valid );
 
 			list_for_each( neigh_pos, &orig_node->neigh_list ) {
 				neigh_node = list_entry( neigh_pos, struct neigh_node, list );

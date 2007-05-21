@@ -60,8 +60,7 @@ int8_t is_aborted() {
 
 void handler( int32_t sig ) {
 
-	if ( sig != SIGPIPE )
-		stop = 1;
+	stop = 1;
 
 }
 
@@ -672,7 +671,7 @@ void apply_init_args( int argc, char *argv[] ) {
 
 		signal( SIGINT, handler );
 		signal( SIGTERM, handler );
-		signal( SIGPIPE, handler );
+		signal( SIGPIPE, SIG_IGN );
 		signal( SIGSEGV, segmentation_fault );
 
 		for ( res = 0; res < 4; res++ ) {
@@ -1756,7 +1755,7 @@ void restore_and_exit( uint8_t is_sigsegv ) {
 
 		if ( !is_sigsegv ) {
 
-			purge_orig( get_time() + ( 5 * TIMEOUT ) + orginator_interval );
+			purge_orig( get_time() + ( 5 * PURGE_TIMEOUT ) + orginator_interval );
 
 		} else {
 
