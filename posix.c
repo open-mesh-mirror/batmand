@@ -50,6 +50,9 @@ extern struct vis_if vis_if;
 
 static struct timeval start_time;
 
+static uint32_t last_time_sec = 0;
+static uint32_t corrected_start_time_sec = 0;
+
 
 static void get_time_internal( struct timeval *tv ) {
 
@@ -79,13 +82,35 @@ uint32_t get_time( void ) {
 	return tv.tv_sec * 1000 + tv.tv_usec / 1000;
 }
 
-uint32_t get_time_sec( void ) {
-
+uint32_t get_uptime_sec( void ) {
 	struct timeval tv;
 
-	get_time_internal(&tv);
+// Inititialization of corrected_start_time_sec and last_uptime_sec:
 
-	return tv.tv_sec;
+	gettimeofday( &tv, NULL );
+
+	if ( corrected_start_time_sec == 0 ) 
+		corrected_start_time_sec = tv.tv_sec; 
+
+	if ( last_time_sec == 0 ) 
+		last_time_sec = tv.tv_sec; 
+
+
+//Checking for large time drifts (greater 10 secs since last call) and correcting to previous uptime:
+
+	if( last_time_sec + MAX_TIME_DRIFT_SEC < tv.tv_sec ) {
+
+		corrected_start_time_sec = corrected_start_time_sec + ( tv.tv_sec - last_time_sec );
+
+	} else if ( last_time_sec > tv.tv_sec + MAX_TIME_DRIFT_SEC ) {
+
+		corrected_start_time_sec = corrected_start_time_sec - ( last_time_sec - tv.tv_sec );
+
+	}
+
+	last_time_sec = tv.tv_sec; 
+
+	return ( tv.tv_sec - corrected_start_time_sec );
 }
 
 

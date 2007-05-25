@@ -357,7 +357,7 @@ void debug_orig() {
 	static char str[ADDR_STR_LEN], str2[ADDR_STR_LEN];
 	int dbg_ogm_out = 0;
 	static char dbg_ogm_str[500]; // TBD: must be checked for overflow when using with sprintf
-
+	static uint32_t uptime_sec;
 
 	if ( debug_clients.clients_num[1] > 0 ) {
 
@@ -405,7 +405,6 @@ void debug_orig() {
 		struct list_head *if_pos;
 		struct batman_if *batman_if;
 		static char orig_str[ADDR_STR_LEN];
-		uint32_t uptime_sec;
 
 		list_for_each( if_pos, &if_list ) {
 			batman_if = list_entry( if_pos, struct batman_if, list );
@@ -413,7 +412,7 @@ void debug_orig() {
 		}
 		addr_to_string( batman_if->addr.sin_addr.s_addr, orig_str, sizeof(orig_str) );
 
-		uptime_sec = get_time_sec();
+		uptime_sec = get_uptime_sec();
 		
 		debug_output( 1, "BOD\n" );
 		debug_output( 1, "  %-12s %14s (%s/%3i): %20s... [B.A.T.M.A.N. %s%s, MainIF/IP: %s %s, UT: %id%2ih%2im] \n", "Originator", "Router", "#", SEQ_RANGE, "Potential routers", SOURCE_VERSION, ( strncmp( REVISION_VERSION, "0", 1 ) != 0 ? REVISION_VERSION : "" ), batman_if->dev, orig_str, uptime_sec/86400, ((uptime_sec%86400)/3600), ((uptime_sec)%3600)/60  );

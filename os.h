@@ -23,7 +23,13 @@
 #include "batman-specific.h"
 
 uint32_t get_time( void );
-uint32_t get_time_sec( void );
+
+/* 
+Returns uptime of programm in seconds, and detects time drifts greater than MAX_UPTIME_DRIFT_SEC.
+Must be called at least once in MAX_UPTIME_DRIFT_SEC 
+*/
+#define MAX_TIME_DRIFT_SEC 5
+uint32_t get_uptime_sec( void );
 
 int32_t rand_num( int32_t limit );
 void addr_to_string( uint32_t addr, char *str, int32_t len );

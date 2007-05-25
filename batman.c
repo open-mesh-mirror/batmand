@@ -590,6 +590,8 @@ int8_t batman() {
 
 
 	debug_timeout = get_time();
+	get_uptime_sec();
+
 
 	if ( NULL == ( orig_hash = hash_new( 128, compare_orig, choose_orig ) ) )
 		return(-1);
@@ -867,6 +869,9 @@ int8_t batman() {
 
 
 		send_outstanding_packets();
+
+
+		get_uptime_sec();
 
 
 		if ( debug_timeout + 1000 < rcvd_time ) {
