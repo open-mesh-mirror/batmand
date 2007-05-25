@@ -50,9 +50,6 @@ endif
 LINUX_SRC_C= batman.c originator.c schedule.c posix-specific.c posix.c allocate.c bitarray.c hash.c profile.c $(OS_C)
 LINUX_SRC_H= batman.h originator.h schedule.h batman-specific.h list.h os.h allocate.h bitarray.h hash.h profile.h 
 
-CC_I_PATH=		/usr/bin
-CC_I=			$(CC_I_PATH)/gcc
-STRIP_CC_I=		$(CC_I_PATH)/strip
 
 CC_MIPS_KK_BC_PATH =	/usr/src/openWrt/build/kamikaze-brcm63xx-2.6/kamikaze/staging_dir_mipsel/bin
 CC_MIPS_KK_BC =		$(CC_MIPS_KK_BC_PATH)/mipsel-linux-uclibc-gcc
@@ -87,7 +84,7 @@ BATMAN_STRING=		begin:$(BATMAN_GENERATION):$(BATMAN_VERSION):$(BATMAN_RELEASE):$
 IPKG_VERSION=		$(BATMAN_VERSION)$(BATMAN_RELEASE)-rv$(REVISION)
 
 FILE_NAME=		batmand_$(BATMAN_VERSION)$(BATMAN_RELEASE)-rv$(REVISION)_$@
-CURRENT=		batmand_$(BATMAN_VERSION)$(BATMAN_RELEASE)-current_$@
+FILE_CURRENT=		batmand_$(BATMAN_VERSION)$(BATMAN_RELEASE)-current_$@
 
 IPKG_DEPENDS=		"kmod-tun libpthread"
 
@@ -95,10 +92,14 @@ IPKG_BUILD=		ln -f $(FILE_NAME) $(IPKG_BUILD_PATH)/ipkg-target/usr/sbin/batmand 
 			$(IPKG_BUILD_PATH)/ipkg-make-control.sh   $(IPKG_BUILD_PATH)/ipkg-target $(FILE_NAME).ipk  batmand  $(IPKG_VERSION)
 
 
-LINK_AND_TAR=		tar czvf $(FILE_NAME).tgz $(FILE_NAME) && \
-			mkdir -p dl/misc && \
-			ln -f $(FILE_NAME)* dl/misc/
 
+LINK_AND_TAR=		tar czvf $(FILE_NAME).tgz $(FILE_NAME) && \
+			ln -f $(FILE_NAME).tgz $(FILE_CURRENT).tgz && \
+			ln -f $(FILE_NAME).ipk $(FILE_CURRENT).ipk && \
+			ln -f $(FILE_NAME) $(FILE_CURRENT) && \
+			mkdir -p dl/misc && \
+			ln -f $(FILE_NAME)* dl/misc/ && \
+			ln -f $(FILE_CURRENT)* dl/misc/
 
 all:	batmand
 
@@ -134,19 +135,26 @@ i386: i386-gc-elf-32-lsb-static i386-gc-elf-32-lsb-dynamic
 
 i386-gc-elf-32-lsb-static:	$(LINUX_SRC_C) $(LINUX_SRC_H) Makefile
 	$(CC) $(CFLAGS) -DREVISION_VERSION=$(REVISION_VERSION) -o $(FILE_NAME) $(LINUX_SRC_C) $(LDFLAGS) -static
+	$(STRIP) $(FILE_NAME)
 	$(IPKG_BUILD) i386
 	$(LINK_AND_TAR)
 
 	mkdir -p dl/i386
 	ln -f $(FILE_NAME).tgz dl/i386/
+	ln -f $(FILE_CURRENT).tgz dl/i386/
 
 
 i386-gc-elf-32-lsb-dynamic:	$(LINUX_SRC_C) $(LINUX_SRC_H) Makefile
 	$(CC) $(CFLAGS) -DREVISION_VERSION=$(REVISION_VERSION) -o $(FILE_NAME) $(LINUX_SRC_C) $(LDFLAGS)
+	$(STRIP) $(FILE_NAME)
 	$(IPKG_BUILD) i386
 	$(LINK_AND_TAR)
 
+	mkdir -p dl/i386
 	ln -f $(FILE_NAME) batmand
+	ln -f $(FILE_NAME).tgz dl/i386/
+	ln -f $(FILE_CURRENT).tgz dl/i386/
+
 
 
 mipsel-kk-bc:	mipsel-kk-elf-32-lsb-static mipsel-kk-elf-32-lsb-dynamic
@@ -159,6 +167,7 @@ mipsel-kk-elf-32-lsb-static:	$(LINUX_SRC_C) $(LINUX_SRC_H) Makefile
 
 	mkdir -p dl/meshcube
 	ln -f $(FILE_NAME).ipk dl/meshcube/
+	ln -f $(FILE_CURRENT).ipk dl/meshcube/
 
 
 mipsel-kk-elf-32-lsb-dynamic:	$(LINUX_SRC_C) $(LINUX_SRC_H) Makefile
@@ -169,6 +178,7 @@ mipsel-kk-elf-32-lsb-dynamic:	$(LINUX_SRC_C) $(LINUX_SRC_H) Makefile
 
 	mkdir -p dl/netgear-kamikaze
 	ln -f $(FILE_NAME).ipk dl/netgear-kamikaze/
+	ln -f $(FILE_CURRENT).ipk dl/netgear-kamikaze/
 
 
 mips-kk-at:	mips-kk-elf-32-msb-static mips-kk-elf-32-msb-dynamic
@@ -181,6 +191,7 @@ mips-kk-elf-32-msb-static:	$(LINUX_SRC_C) $(LINUX_SRC_H) Makefile
 
 	mkdir -p dl/fonera
 	ln -f $(FILE_NAME).tgz dl/fonera/
+	ln -f $(FILE_CURRENT).tgz dl/fonera/
 
 
 mips-kk-elf-32-msb-dynamic:	$(LINUX_SRC_C) $(LINUX_SRC_H) Makefile
@@ -191,6 +202,7 @@ mips-kk-elf-32-msb-dynamic:	$(LINUX_SRC_C) $(LINUX_SRC_H) Makefile
 
 	mkdir -p dl/fonera-kamikaze
 	ln -f $(FILE_NAME).ipk dl/fonera-kamikaze/
+	ln -f $(FILE_CURRENT).ipk dl/fonera-kamikaze/
 
 
 mipsel-wr:	mipsel-wr-elf-32-lsb-static mipsel-wr-elf-32-lsb-dynamic
@@ -209,8 +221,10 @@ mipsel-wr-elf-32-lsb-dynamic:	$(LINUX_SRC_C) $(LINUX_SRC_H) Makefile
 
 	mkdir -p dl/wrt-freifunk
 	ln -f $(FILE_NAME).ipk dl/wrt-freifunk/
+	ln -f $(FILE_CURRENT).ipk dl/wrt-freifunk/
 	mkdir -p dl/buffalo-freifunk
 	ln -f $(FILE_NAME).ipk dl/buffalo-freifunk/
+	ln -f $(FILE_CURRENT).ipk dl/buffalo-freifunk/
 
 arm-oe:		armv5te-oe-elf-32-lsb-static armv5te-oe-elf-32-lsb-dynamic 
 
@@ -223,6 +237,8 @@ armv5te-oe-elf-32-lsb-static:	$(LINUX_SRC_C) $(LINUX_SRC_H) Makefile
 	mkdir -p dl/armv5te
 	ln -f $(FILE_NAME).ipk dl/armv5te/
 	ln -f $(FILE_NAME).tgz dl/armv5te/
+	ln -f $(FILE_CURRENT).ipk dl/armv5te/
+	ln -f $(FILE_CURRENT).tgz dl/armv5te/
 
 armv5te-oe-elf-32-lsb-dynamic:	$(LINUX_SRC_C) $(LINUX_SRC_H) Makefile
 	$(CC_ARM_OE) $(CFLAGS_MIPS) -DREVISION_VERSION=$(REVISION_VERSION) -o $(FILE_NAME) $(LINUX_SRC_C) $(LDFLAGS_MIPS)
@@ -232,6 +248,7 @@ armv5te-oe-elf-32-lsb-dynamic:	$(LINUX_SRC_C) $(LINUX_SRC_H) Makefile
 
 	mkdir -p dl/zaurus-akita
 	ln -f $(FILE_NAME).ipk dl/zaurus-akita/
+	ln -f $(FILE_CURRENT).ipk dl/zaurus-akita/
 
 nokia770-oe:	nokia770-oe-elf-32-lsb-static nokia770-oe-elf-32-lsb-dynamic
 
