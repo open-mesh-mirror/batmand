@@ -18,13 +18,13 @@
 
 
 
-CFLAGS_MIPS =	-Wall -O2 -g3
+CFLAGS_MIPS =	-Wall -O0 -g3
 LDFLAGS_MIPS =	-lpthread
 
 CC =			gcc
 STRIP=			strip
 #CC =			mipsel-linux-uclibc-gcc
-CFLAGS =		-Wall -O2 -g3
+CFLAGS =		-Wall -O0 -g3
 LDFLAGS =		-lpthread
 #LDFLAGS =		-static -lpthread
 
