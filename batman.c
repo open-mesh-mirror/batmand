@@ -815,7 +815,7 @@ int8_t batman() {
 
 							debug_output( 4, "Forward packet: rebroadcast orginator packet \n" );
 
-						} else { /* is_bnotg anyway */
+						} else { /* is_bntog anyway */
 
 							list_for_each( neigh_pos, &orig_node->neigh_list ) {
 
@@ -827,7 +827,7 @@ int8_t batman() {
 
 										forward_duplicate_packet = 1;
 
-				/* also update only last_valid time if arrived (and rebroadcasted because best neighbor) */				
+										/* also update only last_valid time if arrived (and rebroadcasted because best neighbor) */
 										orig_node->last_valid = rcvd_time;
 										neigh_node->last_valid = rcvd_time;
 
@@ -852,7 +852,7 @@ int8_t batman() {
 
 							}
 
-						} 
+						}
 
 					} else {
 
