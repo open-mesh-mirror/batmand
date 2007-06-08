@@ -18,11 +18,11 @@
 
 
 CC =			gcc
-CFLAGS =		-Wall -O0 -g3
+CFLAGS =		-Wall -O1 -g3 -DDEBUG_MALLOC -DMEMORY_USAGE -DPROFILE_DATA
 STRIP=			strip
-LDFLAGS =		-lpthread
+LDFLAGS =		-lpthread -static
 
-CFLAGS_MIPS =	-Wall -O0 -g3
+CFLAGS_MIPS =	-Wall -O1 -g3
 LDFLAGS_MIPS =	-lpthread
 
 UNAME=		$(shell uname)
@@ -56,16 +56,10 @@ REVISION_VERSION=	\"\ rv$(REVISION)\"
 BUILD_PATH=		/home/batman/build
 IPKG_BUILD_PATH=	$(BUILD_PATH)/ipkg-build
 
-BAT_GENERATION=		$(shell grep "^\#define SOURCE_VERSION " $(SOURCE_VERSION_HEADER) | sed -e '1p' -n | awk -F '"' '{print $$2}' | awk '{print $$1}')
-BAT_VERSION=		$(shell grep "^\#define SOURCE_VERSION " $(SOURCE_VERSION_HEADER) | sed -e '1p' -n | awk -F '"' '{print $$2}' | awk '{print $$2}')
-BAT_RELEASE=		$(shell grep "^\#define SOURCE_VERSION " $(SOURCE_VERSION_HEADER) | sed -e '1p' -n | awk -F '"' '{print $$2}' | awk '{print $$3}')
-BAT_TRAILER=		$(shell grep "^\#define SOURCE_VERSION " $(SOURCE_VERSION_HEADER) | sed -e '1p' -n | awk -F '"' '{print $$2}' | awk '{print $$4}')
-BAT_STRING=		begin:$(BATMAN_GENERATION):$(BATMAN_VERSION):$(BATMAN_RELEASE):$(BATMAN_TRAILER):end
-
-IPKG_VERSION=		$(BAT_VERSION)$(BAT_RELEASE)-rv$(REVISION)
-
-FILE_NAME=		$(BINARY_NAME)_$(BAT_VERSION)$(BAT_RELEASE)-rv$(REVISION)_$@
-FILE_CURRENT=		$(BINARY_NAME)_$(BAT_VERSION)$(BAT_RELEASE)-current_$@
+BAT_VERSION=		$(shell grep "^\#define SOURCE_VERSION " $(SOURCE_VERSION_HEADER) | sed -e '1p' -n | awk -F '"' '{print $$2}' | awk '{print $$1}')
+IPKG_VERSION=		$(BAT_VERSION)-rv$(REVISION)
+FILE_NAME=		$(BINARY_NAME)_$(BAT_VERSION)-rv$(REVISION)_$@
+FILE_CURRENT=		$(BINARY_NAME)_$(BAT_VERSION)-current_$@
 
 IPKG_DEPENDS=		"kmod-tun libpthread"
 
@@ -106,14 +100,13 @@ LINK_AND_TAR=		tar czvf $(FILE_NAME).tgz $(FILE_NAME) && \
 all:		$(BINARY_NAME)
 
 $(BINARY_NAME):	$(LINUX_SRC_C) $(LINUX_SRC_H) Makefile
-	$(CC) $(CFLAGS)  -DDEBUG_MALLOC -DMEMORY_USAGE -o $@ $(LINUX_SRC_C) $(LDFLAGS)
-#	$(CC) $(CFLAGS)  -DDEBUG_MALLOC -DMEMORY_USAGE -DPROFILE_DATA -o $@ $(LINUX_SRC_C) $(LDFLAGS)
+	$(CC) $(CFLAGS)  -o $@ $(LINUX_SRC_C) $(LDFLAGS)
 
 
 
-long:	sources i386 mipsel-kk-bc mips-kk-at mipsel-wr arm-oe nokia770-oe
+long:	sources i386 mipsel-kk-bc mips-kk-at mipsel-wr arm-oe nokia770-oe clean-long
 
-axel:	sources i386 mipsel-kk-bc mips-kk-at mipsel-wr arm-oe
+axel:	sources i386 mipsel-kk-bc mips-kk-at mipsel-wr arm-oe clean-long
 
 sources:
 	mkdir -p $(FILE_NAME)
@@ -265,11 +258,9 @@ nokia770-oe-elf-32-lsb-dynamic:	$(LINUX_SRC_C) $(LINUX_SRC_H) Makefile
 	$(IPKG_BUILD) arm-nokia770 kernel-module-tun
 	$(LINK_AND_TAR)	
 
-
-
 clean:
 		rm -f batmand *.o
 
 
 clean-long:
-		rm -rf batmand_* batmand *.o
+		rm -rf batmand_*

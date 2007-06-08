@@ -120,7 +120,7 @@ void update_orig( struct orig_node *orig_node, struct packet *in, uint32_t neigh
 
 	prof_start( PROF_update_originator );
 	struct list_head *neigh_pos;
-	struct neigh_node *neigh_node = NULL, *tmp_neigh_node, *best_neigh_node;
+	struct neigh_node *neigh_node = NULL, *tmp_neigh_node = NULL, *best_neigh_node = NULL;
 	uint8_t max_packet_count = 0, is_new_seqno = 0;
 
 
@@ -403,7 +403,7 @@ void debug_orig() {
 	if ( ( debug_clients.clients_num[0] > 0 ) || ( debug_clients.clients_num[3] > 0 ) ) {
 
 		struct list_head *if_pos;
-		struct batman_if *batman_if;
+		struct batman_if *batman_if = NULL;
 		static char orig_str[ADDR_STR_LEN];
 
 		list_for_each( if_pos, &if_list ) {
