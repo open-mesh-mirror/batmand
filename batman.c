@@ -114,6 +114,9 @@ struct vis_if vis_if;
 struct unix_if unix_if;
 struct debug_clients debug_clients;
 
+unsigned char *vis_packet = NULL;
+uint16_t vis_packet_size = 0;
+
 
 
 void usage( void ) {
@@ -535,38 +538,68 @@ int isBidirectionalNeigh( struct orig_node *orig_neigh_node, struct batman_if *i
 }
 
 
-void send_vis_packet() {
+
+void generate_vis_packet() {
 
 	struct hash_it_t *hashit = NULL;
 	struct orig_node *orig_node;
-	unsigned char *packet=NULL;
 
-	int step = 5, size=0,cnt=0;
+
+	if ( vis_packet != NULL ) {
+
+		debugFree( vis_packet, 1102 );
+		vis_packet = NULL;
+		vis_packet_size = 0;
+
+	}
+
+	/* sender ip and gateway class */
+	vis_packet_size = 5;
+	vis_packet = debugMalloc( vis_packet_size, 104 );
+
+	memcpy( vis_packet, (unsigned char *)&(((struct batman_if *)if_list.next)->addr.sin_addr.s_addr), 4 );
+	vis_packet[4] = gateway_class;
+
 
 	while ( NULL != ( hashit = hash_iterate( orig_hash, hashit ) ) ) {
 
 		orig_node = hashit->bucket->data;
 
-		if ( ( orig_node->router != NULL ) && ( orig_node->orig == orig_node->router->addr ) )
-		{
-			if(cnt >= size)
-			{
-				size += step;
-				packet = debugRealloc(packet, size * sizeof(unsigned char), 113);
-			}
-			memmove(&packet[cnt], (unsigned char*)&orig_node->orig,4);
-			 *(packet + cnt + 4) = (unsigned char) orig_node->router->packet_count;
-			cnt += step;
+		/* we interested in 1 hop neighbours only */
+		if ( ( orig_node->router != NULL ) && ( orig_node->orig == orig_node->router->addr ) ) {
+
+			/* neighbour ip and packet count */
+			vis_packet_size += 5;
+
+			vis_packet = debugRealloc( vis_packet, vis_packet_size, 105 );
+
+			memcpy( vis_packet + vis_packet_size - 5, (unsigned char *)&orig_node->orig, 4 );
+
+			vis_packet[vis_packet_size - 1] = orig_node->router->packet_count;
+
 		}
+
 	}
-	if(packet != NULL)
-	{
-		size++;
-		packet = debugRealloc(packet, size * sizeof(unsigned char), 114);
-		*(packet + size - 1) = gateway_class;
-		send_packet(packet, size * sizeof(unsigned char), &vis_if.addr, vis_if.sock);
-		debugFree( packet, 1102 );
+
+	if ( vis_packet_size == 5 ) {
+
+		debugFree( vis_packet, 1107 );
+		vis_packet = NULL;
+		vis_packet_size = 0;
+
 	}
+
+}
+
+
+
+void send_vis_packet() {
+
+	generate_vis_packet();
+
+	if ( vis_packet != NULL )
+		send_packet( vis_packet, vis_packet_size, &vis_if.addr, vis_if.sock );
+
 }
 
 
@@ -790,7 +823,7 @@ int8_t batman() {
 				} else {
 
 					is_duplicate = isDuplicate( orig_node, ((struct packet *)&in)->seqno );
-	
+
 					is_bidirectional = isBidirectionalNeigh( orig_neigh_node, if_incoming );
 
 					/* update ranking */
@@ -861,24 +894,24 @@ int8_t batman() {
 									schedule_forward_packet( (struct packet *)&in, 0, 0, hna_recv_buff, hna_buff_len, if_incoming );
 
 									debug_output( 4, "Forward packet: duplicate packet received via best neighbour with best ttl \n" );
-	
+
 								} else {
-	
+
 									debug_output( 4, "Drop packet: duplicate packet received via best neighbour but not best ttl \n" );
-	
+
 								}
-	
+
 							}
-	
+
 						} else {
-	
+
 							debug_output( 4, "Drop packet: received via bidirectional link: %s, BNTOG: %s ! \n",
 									is_bidirectional?"YES":" NO", is_bntog?"YES":" NO" );
-	
+
 						}
-	
+
 					}
-	
+
 				}
 
 			}
@@ -945,6 +978,9 @@ int8_t batman() {
 		debugFree( forw_node, 1106 );
 
 	}
+
+	if ( vis_packet != NULL )
+		debugFree( vis_packet, 1108 );
 
 	set_forwarding( forward_old );
 
