@@ -749,7 +749,7 @@ void apply_init_args( int argc, char *argv[] ) {
 			vis_if.addr.sin_family = AF_INET;
 			vis_if.addr.sin_port = htons(1968);
 			vis_if.addr.sin_addr.s_addr = vis_server;
-			vis_if.sock = socket( PF_INET, SOCK_DGRAM, 0);
+			vis_if.sock = socket( PF_INET, SOCK_DGRAM, 0 );
 			/*vis_if.sock = ((struct batman_if *)if_list.next)->udp_send_sock;*/
 		} else {
 			memset(&vis_if, 0, sizeof(vis_if));
@@ -1403,10 +1403,11 @@ int8_t receive_packet( unsigned char *packet_buff, int32_t packet_buff_len, int1
 	struct batman_if *batman_if;
 	uint32_t addr_len;
 	int8_t res;
-	fd_set tmp_wait_set = receive_wait_set;
+	fd_set tmp_wait_set;
 
 
 	addr_len = sizeof(struct sockaddr_in);
+	memcpy( &tmp_wait_set, &receive_wait_set, sizeof(fd_set) );
 
 	while (1) {
 
