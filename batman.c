@@ -554,11 +554,12 @@ void generate_vis_packet() {
 	}
 
 	/* sender ip and gateway class */
-	vis_packet_size = 5;
+	vis_packet_size = 6;
 	vis_packet = debugMalloc( vis_packet_size, 104 );
 
 	memcpy( vis_packet, (unsigned char *)&(((struct batman_if *)if_list.next)->addr.sin_addr.s_addr), 4 );
 	vis_packet[4] = gateway_class;
+	vis_packet[5] = SEQ_RANGE;
 
 
 	while ( NULL != ( hashit = hash_iterate( orig_hash, hashit ) ) ) {
@@ -581,7 +582,7 @@ void generate_vis_packet() {
 
 	}
 
-	if ( vis_packet_size == 5 ) {
+	if ( vis_packet_size == 6 ) {
 
 		debugFree( vis_packet, 1107 );
 		vis_packet = NULL;
@@ -612,7 +613,7 @@ int8_t batman() {
 	struct neigh_node *neigh_node;
 	struct hna_node *hna_node;
 	struct forw_node *forw_node;
-	uint32_t neigh, hna, netmask, debug_timeout, select_timeout, curr_time, rcvd_time;
+	uint32_t neigh, hna, netmask, debug_timeout, vis_timeout, select_timeout, curr_time, rcvd_time;
 	unsigned char in[1501], *hna_recv_buff;
 	static char orig_str[ADDR_STR_LEN], neigh_str[ADDR_STR_LEN], ifaddr_str[ADDR_STR_LEN];
 	int16_t hna_buff_count, hna_buff_len;
@@ -621,7 +622,7 @@ int8_t batman() {
 	int8_t res;
 
 
-	debug_timeout = get_time();
+	debug_timeout = vis_timeout = get_time();
 	get_uptime_sec();
 
 
@@ -941,8 +942,12 @@ int8_t batman() {
 			if ( ( routing_class != 0 ) && ( curr_gateway == NULL ) )
 				choose_gw();
 
-			if ( vis_if.sock )
+			if ( ( vis_if.sock ) && ( vis_timeout + 10000 < rcvd_time ) ){
+
+				vis_timeout = rcvd_time;
 				send_vis_packet();
+
+			}
 
 		}
 
