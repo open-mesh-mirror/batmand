@@ -173,7 +173,8 @@ struct batman_if
 	int32_t tcp_gw_sock;
 	int32_t tunnel_sock;
 	int16_t if_num;
-	int16_t if_rp_filter_old;
+	uint8_t if_rp_filter_old;
+	uint8_t if_send_redirects_old;
 	pthread_t listen_thread_id;
 	struct sockaddr_in addr;
 	struct sockaddr_in broad;

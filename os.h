@@ -24,9 +24,9 @@
 
 uint32_t get_time( void );
 
-/* 
+/*
 Returns uptime of programm in seconds, and detects time drifts greater than MAX_UPTIME_DRIFT_SEC.
-Must be called at least once in MAX_UPTIME_DRIFT_SEC 
+Must be called at least once in MAX_UPTIME_DRIFT_SEC
 */
 #define MAX_TIME_DRIFT_SEC 5
 uint32_t get_uptime_sec( void );
@@ -38,6 +38,8 @@ void set_forwarding(int32_t state);
 int32_t get_forwarding(void);
 void set_rp_filter(int32_t state, char* dev);
 int32_t get_rp_filter(char *dev);
+void set_send_redirects( int32_t state, char* dev );
+int32_t get_send_redirects( char *dev );
 
 void add_del_route( uint32_t dest, uint16_t netmask, uint32_t router, int8_t del, char *dev, int32_t sock );
 void add_del_hna( struct orig_node *orig_node, int8_t del );
