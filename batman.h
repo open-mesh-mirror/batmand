@@ -35,7 +35,7 @@
 
 
 
-#define SOURCE_VERSION "0.2"
+#define SOURCE_VERSION "0.2"  //put exactly one distinct word inside the string like "0.3-pre-alpha" or "0.3-rc1" or "0.3"
 
 #ifndef REVISION_VERSION
 #define REVISION_VERSION "0"
