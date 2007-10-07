@@ -36,7 +36,7 @@ struct vis_packet {
 	uint32_t sender_ip;
 	uint8_t version;
 	uint8_t gw_class;
-	uint8_t seq_range;
+	uint8_t tq_max;
 } __attribute__((packed));
 
 struct vis_data {
