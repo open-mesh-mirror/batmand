@@ -56,7 +56,7 @@ PACKAGE_NAME=	batmand
 BINARY_NAME=	batmand
 SOURCE_VERSION_HEADER= batman.h
 
-REVISION_VERSION=\"\ 0.3\"
+REVISION_VERSION=\"\"
 
 BAT_VERSION=	$(shell grep "^\#define SOURCE_VERSION " $(SOURCE_VERSION_HEADER) | sed -e '1p' -n | awk -F '"' '{print $$2}' | awk '{print $$1}')
 FILE_NAME=	$(PACKAGE_NAME)_$(BAT_VERSION)-rv$(REVISION)_$@
