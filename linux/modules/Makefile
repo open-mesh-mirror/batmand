@@ -1,7 +1,8 @@
 UNAME:=$(shell uname -r)
 LINUX26=2.6
 LINUX_VERSION:=$(findstring $(LINUX26),$(UNAME))
-REVISION := "0.3"	
+REVISION :=	$(shell if [ -d .svn ]; then svn info | grep "Rev:" | sed -e '1p' -n | awk '{print $$4}'; else if [ -d ~/.svk ]; then echo $$(svk info | grep "Mirrored From" | awk '{print $$5}'); fi; fi)
+
 include $(PWD)/Makefile.kbuild
 
 ifneq ($(LINUX_VERSION),$(LINUX26))
