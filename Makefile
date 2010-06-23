@@ -71,11 +71,8 @@ REVISION= $(shell      if [ -d .git ]; then \
                         fi)
 REVISION_VERSION =\"\ $(REVISION)\"
 
-NUM_CPUS = $(shell NUM_CPUS=`cat /proc/cpuinfo | grep -v 'model name' | grep processor | tail -1 | awk -F' ' '{print $$3}'`;echo `expr $$NUM_CPUS + 1`)
 
-
-all:
-	$(MAKE) -j $(NUM_CPUS) $(BINARY_NAME)
+all: $(BINARY_NAME)
 
 $(BINARY_NAME): $(SRC_O) $(SRC_H) Makefile
 	$(Q_LD)$(CC) -o $@ $(SRC_O) $(LDFLAGS)
