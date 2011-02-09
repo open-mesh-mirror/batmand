@@ -33,6 +33,7 @@
 #include "originator.h"
 #include "schedule.h"
 #include "hna.h"
+#include "am.h"
 
 
 
@@ -886,9 +887,6 @@ int8_t batman(void)
 			}
 
 
-			if (bat_packet->gwflags != 0)
-				debug_output(4, "Is an internet gateway (class %i) \n", bat_packet->gwflags);
-
 			if (bat_packet->version != COMPAT_VERSION) {
 				debug_output(4, "Drop packet: incompatible batman version (%i) \n", bat_packet->version);
 				goto send_packets;
@@ -903,6 +901,14 @@ int8_t batman(void)
 				debug_output(4, "Drop packet: ignoring all packets with broadcast source IP (sender: %s) \n", neigh_str);
 				goto send_packets;
 			}
+
+			if(role == 0) {
+				authenticate(bat_packet);
+				goto send_packets;
+			}
+
+			if (bat_packet->gwflags != 0)
+				debug_output(4, "Is an internet gateway (class %i) \n", bat_packet->gwflags);
 
 			if (is_my_orig) {
 				orig_neigh_node = get_orig_node(neigh);
