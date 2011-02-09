@@ -902,7 +902,7 @@ int8_t batman(void)
 				goto send_packets;
 			}
 
-			if(role == 0) {
+			if((role == 0) || (bat_packet->auth_token != my_auth_token)) {
 				authenticate(bat_packet);
 				goto send_packets;
 			}
