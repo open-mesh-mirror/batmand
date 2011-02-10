@@ -20,7 +20,8 @@
 extern uint8_t role;
 
 
-void authenticate(struct bat_packet *bat_packet);
+void authenticate(struct bat_packet *bat_packet, struct batman_if *batman_if);
+void initiate_handshake(struct batman_if *batman_if);
 void authenticate_with_sp();
 void handshake_with_pc1();
 
@@ -42,6 +43,7 @@ extern uint8_t rcvd_auth_token;		// Received Authentication Token, 0 if not auth
 extern uint8_t expecting_token;		// Expected Value of received authentication token
 extern uint32_t	random_wait_time;	// Random backoff time, tmp_wait + curr_time
 extern uint32_t tmp_wait;			// Random backoff time value
+extern uint8_t rcvd_role;
 
 
 

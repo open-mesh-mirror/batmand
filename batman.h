@@ -215,9 +215,10 @@ struct bat_packet
 	uint8_t tq;
 	uint8_t hna_len;
 	//Temp variables for simple auth, to be exchanged with signature value etc....
-	uint8_t challenge;		//ENOTE: challenge=0 -> "no challenge". All other values is interpreted as challenge value
-	uint8_t response;		//ENOTE: response=0 -> "no response". All other values is interpreted as response value
+//	uint8_t challenge;		//ENOTE: challenge=0 -> "no challenge". All other values is interpreted as challenge value
+//	uint8_t response;		//ENOTE: response=0 -> "no response". All other values is interpreted as response value
 	uint8_t auth_token;		//ENOTE: auth_token=0 -> "not authenticated". All other values is interpreted as authentication token value
+	uint8_t role;			//ENOTE: 0=unauth, 1=aut, 2=master
 } __attribute__((packed));
 
 struct orig_node                 /* structure for orig_list maintaining nodes of mesh */
