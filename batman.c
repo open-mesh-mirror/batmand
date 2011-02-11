@@ -902,15 +902,18 @@ int8_t batman(void)
 				goto send_packets;
 			}
 
+
 			/*
 			 * If the deamon is not authenticated, or it receives an authentication token which it does not recognize,
 			 * the authentication procedure in the Authentication Module is called. No packets received when authenticating
 			 * will be processed.
 			 */
-			if((role == 0) || (bat_packet->auth_token != my_auth_token)) {
+
+			if((my_role == 0) || (bat_packet->auth_token != my_auth_token)) {
 				authenticate(bat_packet, batman_if);
 				goto send_packets;
 			}
+
 
 			if (bat_packet->gwflags != 0)
 				debug_output(4, "Is an internet gateway (class %i) \n", bat_packet->gwflags);
