@@ -329,7 +329,7 @@ void wait_for_handshake() {
 }
 
 void initiate_handshake(struct batman_if *batman_if) {
-
+//tester igjen da...
 
 	send_udp_packet(pakken, pakkelengden, &batman_if->addr, batman_if->udp_send_sock, NULL);
 
