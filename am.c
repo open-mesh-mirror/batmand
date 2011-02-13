@@ -321,7 +321,7 @@ void authenticate(struct bat_packet *bat_packet, struct batman_if *batman_if) {
 //					}
 //				}
 
-}
+
 
 
 void wait_for_handshake() {
@@ -329,9 +329,10 @@ void wait_for_handshake() {
 }
 
 void initiate_handshake(struct batman_if *batman_if) {
-	//vant kampen om master/sp, starter handshake med den andre noden.
+
+
 	send_udp_packet(pakken, pakkelengden, &batman_if->addr, batman_if->udp_send_sock, NULL);
-	//TODO: Lag en handshakepakke, som skal sendes i meldingen over.
+
 }
 
 void authenticate_with_sp() {
