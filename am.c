@@ -14,7 +14,7 @@
 
 #include "am.h"
 
-uint8_t role = 0;
+uint8_t my_role = 0;
 
 
 //Temp variables
@@ -329,8 +329,10 @@ void wait_for_handshake() {
 }
 
 void initiate_handshake(struct batman_if *batman_if) {
-//tester igjen da...
+//tester igjen
 
+	struct challenge_packet *challenge_packet;
+	challenge_packet->role =
 	send_udp_packet(pakken, pakkelengden, &batman_if->addr, batman_if->udp_send_sock, NULL);
 
 }
