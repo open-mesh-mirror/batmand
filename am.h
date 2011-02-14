@@ -54,6 +54,10 @@ extern uint32_t tmp_wait;			// Random backoff time value
 extern uint8_t rcvd_role;
 
 
+//tmp variable for before I make a pthread for the am module
+extern uint32_t ogm_count;
+
+
 //test
 
 

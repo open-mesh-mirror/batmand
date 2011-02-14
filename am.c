@@ -36,6 +36,8 @@ uint8_t tmp_response = 0;
 uint32_t tmp_wait = 0;
 uint8_t rcvd_role = 0;
 
+uint32_t ogm_count = 0;
+
 
 
 
@@ -52,7 +54,7 @@ void authenticate(struct bat_packet *bat_packet, struct batman_if *batman_if) {
 	if(my_role == 0) {
 
 		if (rcvd_auth_token > 0) {
-			debug_output(4, "rcvd_auth_token > 0");
+			debug_output(4, "rcvd_auth_token > 0\n");
 
 			if(rcvd_role == 2) {
 				authenticate_with_sp();
@@ -67,11 +69,11 @@ void authenticate(struct bat_packet *bat_packet, struct batman_if *batman_if) {
 			debug_output(4, "rcvd_auth_token == 0");
 
 			if(bat_packet->prev_sender < (uint32_t)batman_if->addr.sin_addr.s_addr) {
-				debug_output(4, "I have the greatest IP number");
+				debug_output(4, "I have the greatest IP number\n");
 				initiate_handshake(batman_if);
 
 			} else{
-				debug_output(4, "I have the smallest IP number");
+				debug_output(4, "I have the smallest IP number\n");
 				wait_for_handshake(batman_if);
 			}
 		}
@@ -342,7 +344,7 @@ void wait_for_handshake(struct batman_if *batman_if) {
 	for(i=0; i<50; i++) {
 		if(rcvd_packet_size = recvfrom(batman_if->udp_recv_sock, &recvBuf, MAXBUFLEN - 1, 0, &batman_if->addr, sizeof(&batman_if->addr)) == sizeof(struct challenge_packet)) {
 			struct challenge_packet *rcvd_challenge_packet = recvBuf;
-			debug_output(4, "FOUND THE CHALLENGE!");
+			debug_output(4, "FOUND THE CHALLENGE!\n");
 			break;
 		}
 	}

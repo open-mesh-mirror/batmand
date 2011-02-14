@@ -909,10 +909,14 @@ int8_t batman(void)
 			 * will be processed.
 			 */
 
-			if((my_role == 0) || (bat_packet->auth_token != my_auth_token)) {
+			if(((my_role == 0) || (bat_packet->auth_token != my_auth_token)) && (ogm_count > 0)) {
 				authenticate(bat_packet, batman_if);
 				goto send_packets;
 			}
+			ogm_count++;
+			/*
+			 * ogm_count is necessary so that not only only one node enter authentication, should be removed when I make a pthread for am later...
+			 */
 
 
 			if (bat_packet->gwflags != 0)
