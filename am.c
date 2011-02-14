@@ -14,6 +14,8 @@
 
 #include "am.h"
 
+#define MAXBUFLEN 5000
+
 uint8_t my_role = 0;
 
 
@@ -48,6 +50,8 @@ void authenticate(struct bat_packet *bat_packet, struct batman_if *batman_if) {
 	rcvd_role = bat_packet->role;
 //	debug_output(4, "\n====================================\nrcvd_challenge = %d\nrcvd_response = %d\nrcvd_auth_token = %d\n====================================\n", rcvd_challenge, rcvd_response, rcvd_auth_token);
 
+	char recvBuf[MAXBUFLEN] = {0};
+
 	if(role == 0) { //Unauthenticated node
 
 		if (rcvd_auth_token > 0) {
@@ -59,7 +63,7 @@ void authenticate(struct bat_packet *bat_packet, struct batman_if *batman_if) {
 				if(bat_packet->prev_sender < (uint32_t)batman_if->addr.sin_addr.s_addr) {
 					initiate_handshake(batman_if);
 				} else{
-					wait_for_handshake();
+					wait_for_handshake(batman_if);
 				}
 			} else {
 				return;
@@ -324,8 +328,12 @@ void authenticate(struct bat_packet *bat_packet, struct batman_if *batman_if) {
 }
 
 
-void wait_for_handshake() {
-	//tapte kampen, venter på handshake fra den andre uautentiserte noden
+void wait_for_handshake(struct batman_if *batman_if) {
+	int rcvd_packet_size;
+	//TODO: Create a loop to look through all the received packets, as the buffer will be full of regular OGMs as well as the challenge packet.
+	if(rcvd_packet_size = recvfrom(batman_if->udp_recv_sock, &recvBuf, MAXBUFLEN - 1, 0, &batman_if->addr, sizeof(&batman_if->addr)) == sizeof(struct challenge_packet)) {
+		struct challenge_packet *rcvd_challenge_packet = recvBuf;
+	}
 }
 
 void initiate_handshake(struct batman_if *batman_if) {

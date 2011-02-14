@@ -17,8 +17,7 @@
 
 #include "batman.h"
 
-struct challenge_packet
-{
+struct challenge_packet {
 	uint8_t role;
 	uint8_t challenge_value;
 } __attribute__((packed));
@@ -26,6 +25,7 @@ struct challenge_packet
 extern uint8_t my_role;
 
 void authenticate(struct bat_packet *bat_packet, struct batman_if *batman_if);
+void wait_for_handshake(struct batman_if *batman_if);
 void initiate_handshake(struct batman_if *batman_if);
 void authenticate_with_sp();
 void handshake_with_pc1();
