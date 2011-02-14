@@ -27,7 +27,6 @@ struct challenge_packet {
 extern uint8_t my_role;
 char recvBuf[MAXBUFLEN];
 
-
 void authenticate(struct bat_packet *bat_packet, struct batman_if *batman_if);
 void wait_for_handshake(struct batman_if *batman_if);
 void initiate_handshake(struct batman_if *batman_if);
