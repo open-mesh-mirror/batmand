@@ -41,30 +41,38 @@ uint8_t rcvd_role = 0;
 
 
 void authenticate(struct bat_packet *bat_packet, struct batman_if *batman_if) {
+
 	debug_output(4, "\n====================================\nauthenticate()\n====================================\n");
-//	rcvd_challenge = bat_packet->challenge;
-//	rcvd_response = bat_packet->response;
+
 	rcvd_auth_token = bat_packet->auth_token;
 	rcvd_role = bat_packet->role;
-//	debug_output(4, "\n====================================\nrcvd_challenge = %d\nrcvd_response = %d\nrcvd_auth_token = %d\n====================================\n", rcvd_challenge, rcvd_response, rcvd_auth_token);
 
 	char recvBuf[MAXBUFLEN] = {0};
 
-	if(my_role == 0) { //Unauthenticated node
+	if(my_role == 0) {
 
 		if (rcvd_auth_token > 0) {
+			debug_output(4, "rcvd_auth_token > 0");
+
 			if(rcvd_role == 2) {
 				authenticate_with_sp();
+
 			} else if(rcvd_role == 1) {
 				handshake_with_pc1();
-			} else if(rcvd_role == 0) {
-				if(bat_packet->prev_sender < (uint32_t)batman_if->addr.sin_addr.s_addr) {
-					initiate_handshake(batman_if);
-				} else{
-					wait_for_handshake(batman_if);
-				}
+
 			} else {
 				return;
+			}
+		} else {
+			debug_output(4, "rcvd_auth_token == 0");
+
+			if(bat_packet->prev_sender < (uint32_t)batman_if->addr.sin_addr.s_addr) {
+				debug_output(4, "I have the greatest IP number");
+				initiate_handshake(batman_if);
+
+			} else{
+				debug_output(4, "I have the smallest IP number");
+				wait_for_handshake(batman_if);
 			}
 		}
 	}
