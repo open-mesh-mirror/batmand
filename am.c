@@ -365,11 +365,7 @@ void initiate_handshake(struct batman_if *batman_if) {
 	challenge_packet->challenge_value = my_challenge;
 
 	int i;
-<<<<<<< HEAD
 	while(1) {
-=======
-	while(true) {
->>>>>>> 62288496695adb3bcd69dea4bb32a2cbef8a670e
 		send_udp_packet(challenge_packet, sizeof(challenge_packet), &batman_if->addr, batman_if->udp_send_sock, NULL);
 	}
 
