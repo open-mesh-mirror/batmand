@@ -344,9 +344,11 @@ void wait_for_handshake(struct batman_if *batman_if) {
 	for(i=0; i<50; i++) {
 		if(rcvd_packet_size = recvfrom(batman_if->udp_recv_sock, &recvBuf, MAXBUFLEN - 1, 0, &batman_if->addr, sizeof(&batman_if->addr)) == sizeof(struct challenge_packet)) {
 			struct challenge_packet *rcvd_challenge_packet = recvBuf;
+			memset(recvBuf, 0, sizeof(recvBuf));
 			debug_output(4, "FOUND THE CHALLENGE!\n");
 			break;
 		}
+		memset(recvBuf, 0, sizeof(recvBuf));
 	}
 
 	return;
@@ -363,7 +365,7 @@ void initiate_handshake(struct batman_if *batman_if) {
 	challenge_packet->challenge_value = my_challenge;
 
 	int i;
-	for(i=0; i<50; i++) {
+	while(true) {
 		send_udp_packet(challenge_packet, sizeof(challenge_packet), &batman_if->addr, batman_if->udp_send_sock, NULL);
 	}
 
