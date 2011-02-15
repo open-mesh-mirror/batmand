@@ -66,7 +66,7 @@ void authenticate(struct bat_packet *bat_packet, struct batman_if *batman_if) {
 				return;
 			}
 		} else {
-			debug_output(4, "rcvd_auth_token == 0");
+			debug_output(4, "rcvd_auth_token == 0\n");
 
 			if(bat_packet->prev_sender < (uint32_t)batman_if->addr.sin_addr.s_addr) {
 				debug_output(4, "I have the greatest IP number\n");
@@ -362,7 +362,10 @@ void initiate_handshake(struct batman_if *batman_if) {
 	challenge_packet->role = my_role;
 	challenge_packet->challenge_value = my_challenge;
 
-	send_udp_packet(challenge_packet, sizeof(challenge_packet), &batman_if->addr, batman_if->udp_send_sock, NULL);
+	int i;
+	for(i=0; i<50; i++) {
+		send_udp_packet(challenge_packet, sizeof(challenge_packet), &batman_if->addr, batman_if->udp_send_sock, NULL);
+	}
 
 	return;
 }
