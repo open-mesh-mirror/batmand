@@ -16,6 +16,7 @@
 #define AM_H
 
 #include "batman.h"
+#include <sys/socket.h>
 
 #define MAXBUFLEN 5000
 
@@ -26,8 +27,15 @@ struct challenge_packet {
 
 extern uint8_t my_role;
 char recvBuf[MAXBUFLEN];
+struct addrinfo hints, *res;
+int32_t am_send_socket;
+int32_t am_recv_socket;
 
 void authenticate(struct bat_packet *bat_packet, struct batman_if *batman_if);
+void setup_am_socks();
+void setup_am_recv_sock();
+void setup_am_send_sock();
+void destroy_am_socks();
 void wait_for_handshake(struct batman_if *batman_if);
 void initiate_handshake(struct batman_if *batman_if);
 void authenticate_with_sp();

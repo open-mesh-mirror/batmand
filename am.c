@@ -15,6 +15,9 @@
 #include "am.h"
 
 uint8_t my_role = 0;
+struct addrinfo hints, *res;
+int32_t am_send_socket = 0;
+int32_t am_recv_socket = 0;
 
 
 //Temp variables
@@ -51,6 +54,8 @@ void authenticate(struct bat_packet *bat_packet, struct batman_if *batman_if) {
 
 	char recvBuf[MAXBUFLEN] = {0};
 
+	setup_am_socks(batman_if->dev);
+
 	if(my_role == 0) {
 
 		if (rcvd_auth_token > 0) {
@@ -78,263 +83,66 @@ void authenticate(struct bat_packet *bat_packet, struct batman_if *batman_if) {
 			}
 		}
 	}
-//
-//
-//					if (rcvd_auth_token > 0) {
-//
-//						if(rcvd_challenge == 0) {
-//
-//							if(rcvd_response > 0) { //Receive RESPONSE
-//
-//								tmp_response = (2*generated_request) % UINT8_MAX;
-//								tmp_response = (tmp_response == 0 ? 1 : tmp_response);
-//								debug_output(4, "========================================================\n");
-//								debug_output(4, "[RECV] %d | %d | %d (RESPONSE)\n", rcvd_challenge, rcvd_response, rcvd_auth_token);
-//
-//								if(rcvd_response == tmp_response) { //RESPONSE is correct
-//
-//									my_challenge = 0;
-//									my_response = 0;
-//									my_auth_token = rcvd_auth_token;
-//									generated_challenge = 0;
-//									generated_request = 0;
-//									generated_auth = 0;
-//									tmp_response = 0;
-//									role = 1;
-//									debug_output(4, "[SEND] %d | %d | %d (AUTH)\n", my_challenge, my_response, my_auth_token);
-//									debug_output(4, "YOU ARE AUTHENTICATED!\n");
-//	//								schedule_own_packet(batman_if);
-//
-//								} else { //RESPONSE is wrong
-//
-//									my_challenge = 0;
-//									my_response = 0;
-//									my_auth_token = 0;
-//									tmp_response = 0;
-//									debug_output(4, "RESPONSE IS WRONG\n");
-//									tmp_wait = rand() % 10000;
-//									random_wait_time = curr_time + tmp_wait;
-//
-//								}
-//								debug_output(4, "========================================================\n");
-//
-//							} else { //Receive AUTH
-//
-//								my_challenge = 0;
-//								my_response = 0;
-//
-//								debug_output(4, "========================================================\n");
-//								debug_output(4, "[RECV] %d | %d | %d (AUTH)\n", rcvd_challenge, rcvd_response, rcvd_auth_token);
-//
-//								if(rcvd_auth_token == generated_auth) { //Receive AUTH (Last Message in Handshake)
-//
-//									role = 2;
-//									my_auth_token = generated_auth;
-//									generated_challenge = 0;
-//									generated_request = 0;
-//									generated_auth = 0;
-//									debug_output(4, "YOU ARE MASTER NODE!\n");
-//
-//								}
-//								debug_output(4, "========================================================\n");
-//
-//							}
-//
-//						} else {
-//
-//							if(rcvd_response == 0) { //Receive CHALLENGE FROM MASTER
-//
-//								if(generated_request == 0) {
-//									generated_request = 1 + (rand() % UINT8_MAX);
-//								}
-//								my_challenge = generated_request;
-//								my_response = (2*rcvd_challenge) % UINT8_MAX;
-//								my_response = (my_response == 0 ? 1 : my_response);
-//								my_auth_token = 0;
-//								debug_output(4, "========================================================\n");
-//								debug_output(4, "[SEND] %d | %d | %d (REQUEST)\n", my_challenge, my_response, my_auth_token);
-//								debug_output(4, "========================================================\n");
-//
-//							}
-//
-//
-//
-//						}
-//
-//
-//					} else {
-//						if(rcvd_challenge == 0) {
-//
-//							if(rcvd_response == 0) { //Receive PLAIN
-//
-//
-//								if(curr_time > random_wait_time) {
-//
-//									debug_output(4, "========================================================\n");
-//									debug_output(4, "[RECV] %d | %d | %d (PLAIN)\n", rcvd_challenge, rcvd_response, rcvd_auth_token);
-//
-//									usleep(rand() % 100000);
-//
-//									if(generated_challenge==0) {
-//										generated_challenge = 1 + (rand() % UINT8_MAX);
-//									}
-//
-//									my_challenge = generated_challenge;
-//									my_response = 0;
-//									my_auth_token = 0;
-//
-//									debug_output(4, "[SEND] %d | %d | %d (CHALLENGE)\n", my_challenge, my_response, my_auth_token);
-//									debug_output(4, "========================================================\n");
-//	//								schedule_own_packet(batman_if);
-//
-//								}
-//
-//							}
-//
-//						} else {
-//
-//							if(rcvd_response == 0) { //Receive CHALLENGE
-//
-//								debug_output(4, "========================================================\n");
-//								debug_output(4, "[RECV] %d | %d | %d (CHALLENGE)\n", rcvd_challenge, rcvd_response, rcvd_auth_token);
-//
-//								if(my_challenge > 0) { //Received CHALLENGE when I have sent CHALLENGE (COLLISION)
-//
-//									my_challenge = 0;
-//									my_response = 0;
-//									my_auth_token = 0;
-//
-//									debug_output(4, "COLLISION!\n");
-//
-//									tmp_wait = rand() % 10000;
-//									random_wait_time = curr_time + tmp_wait;
-//
-//								} else { //Received CHALLENGE
-//
-//									if((generated_challenge == 0) || (curr_time > random_wait_time-(tmp_wait/2))) {
-//										//if gen = 0 -> ingen tidligere sendte challenges så bare å kjøre på
-//										//if halve ventetiden er over, kan man begynne å godta challenges
-//
-//										if(generated_request == 0) {
-//											generated_request = 1 + (rand() % UINT8_MAX);
-//										}
-//
-//										my_challenge = generated_request;
-//										my_response = (2*rcvd_challenge) % UINT8_MAX;
-//										my_response = (my_response == 0 ? 1 : my_response);
-//										my_auth_token = 0;
-//										debug_output(4, "[SEND] %d | %d | %d (REQUEST)\n", my_challenge, my_response, my_auth_token);
-//	//									schedule_own_packet(batman_if);
-//
-//									} else {
-//										debug_output(4, "WAITING\n");
-//									}
-//
-//								}
-//								debug_output(4, "========================================================\n");
-//
-//							} else { //Receive REQUEST
-//								tmp_response = (2*generated_challenge) % UINT8_MAX;
-//								tmp_response = (tmp_response == 0 ? 1 : tmp_response);
-//								debug_output(4, "========================================================\n");
-//								debug_output(4, "[RECV] %d | %d | %d (REQUEST)\n", rcvd_challenge, rcvd_response, rcvd_auth_token);
-//
-//								if(rcvd_response == tmp_response) { //REQUEST is correct
-//
-//									my_challenge = 0;
-//									my_response = (2*rcvd_challenge) % UINT8_MAX;
-//									my_response = (my_response == 0 ? 1 : my_response);
-//
-//									if(generated_auth == 0) {
-//										generated_auth = 1 + (rand() % UINT8_MAX);
-//									}
-//
-//									my_auth_token = generated_auth;
-//									debug_output(4, "[SEND] %d | %d | %d (RESPONSE)\n", my_challenge, my_response, my_auth_token);
-//	//								schedule_own_packet(batman_if);
-//
-//								} else { //REQUEST is wrong
-//
-//									my_challenge = 0;
-//									my_response = 0;
-//									my_auth_token = 0;
-//									tmp_response = 0;
-//									debug_output(4, "REQUEST IS WRONG\n");
-//									tmp_wait = rand() % 10000;
-//									random_wait_time = curr_time + tmp_wait;
-//
-//								}
-//								debug_output(4, "========================================================\n");
-//							}
-//
-//						}
-//					}
-//
-//					goto send_packets;
-//
-//				} else if(role == 1) {
-//					//Authenticated node
-//					if(rcvd_auth_token != my_auth_token) {
-//						goto send_packets;
-//					}
-//
-//
-//				} else {
-//					//Master node
-//					if(rcvd_auth_token == 0) {
-//
-//						if(rcvd_challenge == 0) {
-//
-//							if(rcvd_response == 0) { //Receive PLAIN
-//
-//								debug_output(4, "========================================================\n");
-//								debug_output(4, "[RECV] %d | %d | %d (PLAIN)\n", rcvd_challenge, rcvd_response, rcvd_auth_token);
-//
-//								if(generated_challenge==0) {
-//									generated_challenge = 1 + (rand() % UINT8_MAX);
-//								}
-//
-//								my_challenge = generated_challenge;
-//								my_response = 0;
-//
-//								debug_output(4, "[SEND] %d | %d | %d (CHALLENGE)\n", my_challenge, my_response, my_auth_token);
-//								debug_output(4, "========================================================\n");
-//
-//							}
-//
-//						} else {
-//
-//							if(rcvd_response > 0) { //Received REQUEST
-//
-//								tmp_response = (2*generated_challenge) % UINT8_MAX;
-//								tmp_response = (tmp_response == 0 ? 1 : tmp_response);
-//								debug_output(4, "========================================================\n");
-//								debug_output(4, "[RECV] %d | %d | %d (REQUEST)\n", rcvd_challenge, rcvd_response, rcvd_auth_token);
-//
-//								if(rcvd_response == tmp_response) { //REQUEST is correct
-//
-//									my_challenge = 0;
-//									my_response = (2*rcvd_challenge) % UINT8_MAX;
-//									my_response = (my_response == 0 ? 1 : my_response);
-//
-//									debug_output(4, "[SEND] %d | %d | %d (RESPONSE)\n", my_challenge, my_response, my_auth_token);
-//
-//								}
-//								debug_output(4, "========================================================\n");
-//
-//							}
-//
-//						}
-//
-//						goto send_packets;
-//
-//					} else if(rcvd_auth_token != my_auth_token) {//Receieve OGM from node in another MANET, auth token > 0, but not the same as the masters auth token
-//						goto send_packets;
-//					}
-//				}
-
 }
 
+void setup_am_socks(char *dev) {
+
+	memset(&hints, 0, sizeof hints);
+	hints.ai_family = AF_UNSPEC;  // use IPv4 or IPv6, whichever
+	hints.ai_socktype = SOCK_DGRAM;
+	hints.ai_flags = AI_PASSIVE;
+
+	getaddrinfo(NULL, "64305", &hints, &res);
+
+	setup_am_recv_sock();
+	setup_am_send_sock();
+}
+
+void setup_am_recv_sock() {
+	debug_output(4, "Attempting to create AM receive socket\n");
+	if ( (am_recv_socket = socket(res->ai_family, res->ai_socktype, res->ai_protocol)) < 0 ) {
+		debug_output(4, "Error - can't create AM receive socket: %s\n", strerror(errno) );
+		destroy_am_socks();
+	}
+
+	if ( bind_to_iface( am_recv_socket, dev ) < 0 ) {
+		debug_output(3, "Cannot bind socket to device %s : %s \n", dev, strerror(errno));
+		destroy_am_socks();
+	}
+
+	bind(am_recv_socket, res->ai_addr, res->ai_addrlen);
+
+	debug_output(4, "Successfully created AM receive socket\n");
+}
+
+void setup_am_send_sock() {
+	debug_output(4, "Attempting to create AM send socket\n");
+	if ( (am_send_socket = socket(res->ai_family, res->ai_socktype, res->ai_protocol)) < 0 ) {
+		debug_output(4, "Error - can't create AM send socket: %s\n", strerror(errno) );
+		destroy_am_socks();
+	}
+
+	if ( bind_to_iface( am_send_socket, dev ) < 0 ) {
+		debug_output(3, "Cannot bind socket to device %s : %s \n", dev, strerror(errno));
+		destroy_am_socks();
+	}
+
+	debug_output(4, "Successfully created AM send socket\n");
+}
+
+void destroy_am_socks() {
+	debug_output(4, "Destroying AM sockets\n");
+	if (am_recv_socket != 0)
+		close(am_recv_socket);
+
+	if (am_send_socket != 0)
+		close(am_send_socket);
+
+	am_recv_socket = 0;
+	am_send_socket = 0;
+
+	freeaddrinfo(res);
+}
 
 void wait_for_handshake(struct batman_if *batman_if) {
 	debug_output(4, "\n====================================\nwait_for_handshake()\n====================================\n");
