@@ -94,6 +94,7 @@ void setup_am_socks(char *dev) {
 
 	getaddrinfo(NULL, "64305", &hints, &res);
 
+<<<<<<< HEAD
 	setup_am_recv_sock(dev);
 	setup_am_send_sock(dev);
 }
@@ -116,6 +117,30 @@ void setup_am_recv_sock(char *dev) {
 }
 
 void setup_am_send_sock(char *dev) {
+=======
+	setup_am_recv_sock();
+	setup_am_send_sock();
+}
+
+void setup_am_recv_sock() {
+	debug_output(4, "Attempting to create AM receive socket\n");
+	if ( (am_recv_socket = socket(res->ai_family, res->ai_socktype, res->ai_protocol)) < 0 ) {
+		debug_output(4, "Error - can't create AM receive socket: %s\n", strerror(errno) );
+		destroy_am_socks();
+	}
+
+	if ( bind_to_iface( am_recv_socket, dev ) < 0 ) {
+		debug_output(3, "Cannot bind socket to device %s : %s \n", dev, strerror(errno));
+		destroy_am_socks();
+	}
+
+	bind(am_recv_socket, res->ai_addr, res->ai_addrlen);
+
+	debug_output(4, "Successfully created AM receive socket\n");
+}
+
+void setup_am_send_sock() {
+>>>>>>> branch 'refs/heads/sandbox' of ssh://git@github.com/espengra/secure-ad-hoc-network.git
 	debug_output(4, "Attempting to create AM send socket\n");
 	if ( (am_send_socket = socket(res->ai_family, res->ai_socktype, res->ai_protocol)) < 0 ) {
 		debug_output(4, "Error - can't create AM send socket: %s\n", strerror(errno) );

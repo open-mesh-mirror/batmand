@@ -17,10 +17,13 @@
 
 #include "batman.h"
 #include <sys/socket.h>
+<<<<<<< HEAD
 #include <netinet/in.h>
 #include <sys/types.h>
 #include <netdb.h>
 #include <errno.h>
+=======
+>>>>>>> branch 'refs/heads/sandbox' of ssh://git@github.com/espengra/secure-ad-hoc-network.git
 
 #define MAXBUFLEN 5000
 
