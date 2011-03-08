@@ -121,6 +121,7 @@ uint8_t aggregation_enabled = 1;
 int nat_tool_avail = -1;
 int8_t disable_client_nat = 0;
 
+pthread_t am_thread;	//Thread for running the Authentication Module
 
 
 void usage(void)
@@ -909,14 +910,11 @@ int8_t batman(void)
 			 * will be processed.
 			 */
 
-			if(((my_role == 0) || (bat_packet->auth_token != my_auth_token)) && (ogm_count > 0)) {
-				authenticate(bat_packet, batman_if);
+			if( bat_packet->auth_token != my_auth_token ) {
+//				authenticate(bat_packet, batman_if);
+				pthread_create(am_thread, NULL, authenticate, batman_if);
 				goto send_packets;
 			}
-			ogm_count++;
-			/*
-			 * ogm_count is necessary so that not only only one node enter authentication, should be removed when I make a pthread for am later...
-			 */
 
 
 			if (bat_packet->gwflags != 0)

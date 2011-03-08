@@ -30,11 +30,21 @@ struct challenge_packet {
 	uint8_t challenge_value;
 } __attribute__((packed));
 
-extern uint8_t my_role;
 char recvBuf[MAXBUFLEN];
 struct addrinfo hints, *res;
 int32_t am_send_socket;
 int32_t am_recv_socket;
+
+extern enum role_type{
+	NOT_AUTHENTICATED = 0,
+	AUTHENTICATED = 1,
+	MASTER = 2
+};
+
+extern enum pthread_status{
+	IN_USE,
+	READY
+};
 
 void authenticate(struct bat_packet *bat_packet, struct batman_if *batman_if);
 void setup_am_socks();
@@ -66,12 +76,6 @@ extern uint32_t	random_wait_time;	// Random backoff time, tmp_wait + curr_time
 extern uint32_t tmp_wait;			// Random backoff time value
 extern uint8_t rcvd_role;
 
-
-//tmp variable for before I make a pthread for the am module
-extern uint32_t ogm_count;
-
-
-//test
 
 
 #endif
