@@ -46,7 +46,7 @@ uint8_t rcvd_role = 0;
 
 void authenticate(struct bat_packet *bat_packet, struct batman_if *batman_if) {
 
-	debug_output(4, "\n====================================\nauthenticate()\n====================================\n");
+	printf("\n====================================\nauthenticate()\n====================================\n");
 
 	if( am_status == READY ) {
 		am_status = IN_USE;
@@ -101,39 +101,39 @@ void setup_am_socks(char *dev) {
 }
 
 void setup_am_recv_sock(char *dev) {
-	debug_output(4, "Attempting to create AM receive socket\n");
+	printf("Attempting to create AM receive socket\n");
 	if ( (am_recv_socket = socket(res->ai_family, res->ai_socktype, res->ai_protocol)) < 0 ) {
-		debug_output(4, "Error - can't create AM receive socket: %s\n", strerror(errno) );
+		printf("Error - can't create AM receive socket: %s\n", strerror(errno) );
 		destroy_am_socks();
 	}
 
 	if ( bind_to_iface( am_recv_socket, dev ) < 0 ) {
-		debug_output(3, "Cannot bind socket to device %s : %s \n", dev, strerror(errno));
+		printf("Cannot bind socket to device %s : %s \n", dev, strerror(errno));
 		destroy_am_socks();
 	}
 
 	bind(am_recv_socket, res->ai_addr, res->ai_addrlen);
 
-	debug_output(4, "Successfully created AM receive socket\n");
+	printf("Successfully created AM receive socket\n");
 }
 
 void setup_am_send_sock(char *dev) {
-	debug_output(4, "Attempting to create AM send socket\n");
+	printf("Attempting to create AM send socket\n");
 	if ( (am_send_socket = socket(res->ai_family, res->ai_socktype, res->ai_protocol)) < 0 ) {
-		debug_output(4, "Error - can't create AM send socket: %s\n", strerror(errno) );
+		printf("Error - can't create AM send socket: %s\n", strerror(errno) );
 		destroy_am_socks();
 	}
 
 	if ( bind_to_iface( am_send_socket, dev ) < 0 ) {
-		debug_output(3, "Cannot bind socket to device %s : %s \n", dev, strerror(errno));
+		printf("Cannot bind socket to device %s : %s \n", dev, strerror(errno));
 		destroy_am_socks();
 	}
 
-	debug_output(4, "Successfully created AM send socket\n");
+	printf("Successfully created AM send socket\n");
 }
 
 void destroy_am_socks() {
-	debug_output(4, "Destroying AM sockets\n");
+	printf("Destroying AM sockets\n");
 	if (am_recv_socket != 0)
 		close(am_recv_socket);
 
@@ -147,20 +147,20 @@ void destroy_am_socks() {
 }
 
 void wait_for_handshake(struct batman_if *batman_if) {
-	debug_output(4, "\n====================================\nwait_for_handshake()\n====================================\n");
+	printf("\n====================================\nwait_for_handshake()\n====================================\n");
 	int rcvd_packet_size;
 
 	if(rcvd_packet_size = recvfrom(am_recv_socket, &recvBuf, MAXBUFLEN - 1, 0, &batman_if->addr, sizeof(&batman_if->addr)) == sizeof(struct challenge_packet)) {
 		struct challenge_packet *rcvd_challenge_packet = recvBuf;
 		memset(recvBuf, 0, sizeof(recvBuf));
-		debug_output(4, "FOUND THE CHALLENGE!\n");
+		printf("FOUND THE CHALLENGE!\n");
 	}
 	memset(recvBuf, 0, sizeof(recvBuf));
 
 }
 
 void initiate_handshake(struct batman_if *batman_if) {
-	debug_output(4, "\n====================================\ninitiate_handshake()\n====================================\n");
+	printf("\n====================================\ninitiate_handshake()\n====================================\n");
 
 	my_challenge = 1 + (rand() % UINT8_MAX);
 
@@ -173,10 +173,10 @@ void initiate_handshake(struct batman_if *batman_if) {
 
 	if ( sendto( am_send_socket, challenge_packet, sizeof(challenge_packet), 0, &batman_if->addr, sizeof(struct sockaddr_in) ) < 0 ) {
 		if ( errno == 1 ) {
-			debug_output(4, "Error - can't send UDP packet: %s.\n", strerror(errno));
-			debug_output(4, "Does your Firewall allow outgoing packets on port 64305?\n");
+			printf("Error - can't send UDP packet: %s.\n", strerror(errno));
+			printf("Does your Firewall allow outgoing packets on port 64305?\n");
 		} else {
-			debug_output(4, "Error - can't send UDP packet: %s\n", strerror(errno));
+			printf("Error - can't send UDP packet: %s\n", strerror(errno));
 		}
 		return -1;
 	}
