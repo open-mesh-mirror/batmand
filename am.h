@@ -42,11 +42,13 @@ extern enum role_type{
 };
 
 extern enum pthread_status{
-	IN_USE,
-	READY
+	IN_USE = 0,
+	READY = 99
 };
 
-void authenticate(struct bat_packet *bat_packet, struct batman_if *batman_if);
+void *authenticate2();
+//void authenticate(struct bat_packet *bat_packet, struct batman_if *batman_if);
+void *authenticate();
 void setup_am_socks();
 void setup_am_recv_sock();
 void setup_am_send_sock();

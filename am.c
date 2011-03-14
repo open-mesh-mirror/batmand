@@ -18,7 +18,11 @@ enum role_type my_role = NOT_AUTHENTICATED;
 struct addrinfo hints, *res;
 int32_t am_send_socket = 0;
 int32_t am_recv_socket = 0;
+pthread_t am_thread;
 enum pthread_status am_status = READY;
+struct bat_packet *bat_packet;
+struct batman_if *batman_if;
+int auth_thread_int = 99;
 
 
 //Temp variables
@@ -43,48 +47,53 @@ uint8_t rcvd_role = 0;
 
 
 
+void authenticate_thread_init(struct bat_packet *bp, struct batman_if *bi) {
+	if (am_status != IN_USE) {
+		bat_packet = bp;
+		batman_if = bi;
+		am_status = pthread_create(&am_thread, NULL, authenticate, NULL);
+	}
 
-void authenticate(struct bat_packet *bat_packet, struct batman_if *batman_if) {
+}
 
-	printf("\n====================================\nauthenticate()\n====================================\n");
 
-	if( am_status == READY ) {
-		am_status = IN_USE;
+void *authenticate() {
 
-		rcvd_auth_token = bat_packet->auth_token;
-		rcvd_role = bat_packet->role;
+	printf("====================================\nauthenticate()\n====================================\n");
 
-		char recvBuf[MAXBUFLEN] = {0};
+	rcvd_auth_token = bat_packet->auth_token;
+	rcvd_role = bat_packet->role;
 
-		setup_am_socks(batman_if->dev);
+	char recvBuf[MAXBUFLEN] = {0};
 
-		if(my_role == NOT_AUTHENTICATED) {
+	setup_am_socks(batman_if->dev);
 
-			if (rcvd_auth_token > 0) {
-				debug_output(4, "rcvd_auth_token > 0\n");
+	if(my_role == NOT_AUTHENTICATED) {
 
-				if(rcvd_role == MASTER)
-					authenticate_with_sp();
+		if (rcvd_auth_token > 0) {
+			printf("rcvd_auth_token > 0\n");
 
-				if(rcvd_role == AUTHENTICATED)
-					handshake_with_pc1();
+			if(rcvd_role == MASTER)
+				authenticate_with_sp();
 
-			} else {
-				debug_output(4, "rcvd_auth_token == 0\n");
+			if(rcvd_role == AUTHENTICATED)
+				handshake_with_pc1();
 
-				if(bat_packet->prev_sender < (uint32_t)batman_if->addr.sin_addr.s_addr) {
-					debug_output(4, "I have the greatest IP number\n");
-					initiate_handshake(batman_if);
+		} else {
+			printf("rcvd_auth_token == 0\n");
 
-				} else{
-					debug_output(4, "I have the smallest IP number\n");
-					wait_for_handshake(batman_if);
-				}
+			if(bat_packet->prev_sender < (uint32_t)batman_if->addr.sin_addr.s_addr) {
+				printf("I have the greatest IP number\n");
+				initiate_handshake(batman_if);
+
+			} else{
+				printf("I have the smallest IP number\n");
+				wait_for_handshake(batman_if);
 			}
 		}
-
-		am_status = READY;
 	}
+
+	am_status = READY;
 }
 
 void setup_am_socks(char *dev) {

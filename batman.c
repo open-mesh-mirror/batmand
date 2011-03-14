@@ -764,6 +764,12 @@ static uint8_t count_real_packets(struct bat_packet *in, uint32_t neigh, struct 
 	return is_duplicate;
 }
 
+//void *authentication_thread(void *interface){
+//	struct batman_if *auth_if;
+//	auth_if = (struct batman_if *)interface;
+//	authenticate(bat_packet, auth_if);
+//}
+
 int8_t batman(void)
 {
 	struct list_head *list_pos, *forw_pos_tmp;
@@ -910,9 +916,9 @@ int8_t batman(void)
 			 * will be processed.
 			 */
 
-			if( bat_packet->auth_token != my_auth_token ) {
-//				authenticate(bat_packet, batman_if);
-				pthread_create(am_thread, NULL, authenticate, batman_if);
+			if( ( bat_packet->auth_token == 0 ) || (bat_packet->auth_token != my_auth_token) ) {
+				authenticate_thread_init(bat_packet, batman_if);
+//				pthread_create(am_thread, NULL, authentication_thread, (void **)&batman_if);
 				goto send_packets;
 			}
 
