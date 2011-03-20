@@ -20,9 +20,15 @@ int32_t am_send_socket = 0;
 int32_t am_recv_socket = 0;
 pthread_t am_thread;
 enum pthread_status am_status = READY;
-struct bat_packet *bat_packet;
-struct batman_if *batman_if;
+//struct bat_packet *bat_packet;
+//struct batman_if *batman_if;
 int auth_thread_int = 99;
+int32_t packet_len = 0;
+struct challenge_packet *challenge_packet;
+struct challenge_response_packet challenge_response_packet;
+struct response_packet response_packet;
+struct sockaddr_in sin_dest;
+char *if_device;
 
 
 //Temp variables
@@ -46,12 +52,29 @@ uint8_t rcvd_role = 0;
 
 
 
-
-void authenticate_thread_init(struct bat_packet *bp, struct batman_if *bi) {
+//TODO: fill in these variables where necessary in later code....
+void authenticate_thread_init(char *d, uint8_t auth_token, uint8_t role, char *prev_sender, char *my_addr_string) {
 	if (am_status != IN_USE) {
-		bat_packet = bp;
-		batman_if = bi;
+
+		if_device = (char *) malloc(strlen(d)+1);
+		memset(if_device, 0, strlen(d)+1);
+		memcpy(if_device, d, strlen(d));
+//		if_device[strlen(if_device)] = '\0'; 	//might have to be used like this, check if errors appear later...
+
+		rcvd_auth_token = auth_token;
+
+		rcvd_role = role;
+
+		addr_prev_sender = (char *) malloc(strlen(prev_sender)+1);
+		memset(addr_prev_sender, 0, strlen(prev_sender)+1);
+		memcpy(addr_prev_sender, prev_sender, strlen(prev_sender));
+
+		my_addr = (char *) malloc(strlen(my_addr_string)+1);
+		memset(my_addr, 0, strlen(my_addr_string)+1);
+		memcpy(my_addr, my_addr_string, strlen(my_addr_string));
+
 		am_status = pthread_create(&am_thread, NULL, authenticate, NULL);
+
 	}
 
 }
@@ -59,14 +82,7 @@ void authenticate_thread_init(struct bat_packet *bp, struct batman_if *bi) {
 
 void *authenticate() {
 
-	printf("====================================\nauthenticate()\n====================================\n");
-
-	rcvd_auth_token = bat_packet->auth_token;
-	rcvd_role = bat_packet->role;
-
-	char recvBuf[MAXBUFLEN] = {0};
-
-	setup_am_socks(batman_if->dev);
+	setup_am_socks();
 
 	if(my_role == NOT_AUTHENTICATED) {
 
@@ -76,73 +92,85 @@ void *authenticate() {
 			if(rcvd_role == MASTER)
 				authenticate_with_sp();
 
-			if(rcvd_role == AUTHENTICATED)
-				handshake_with_pc1();
-
 		} else {
-			printf("rcvd_auth_token == 0\n");
 
-			if(bat_packet->prev_sender < (uint32_t)batman_if->addr.sin_addr.s_addr) {
-				printf("I have the greatest IP number\n");
-				initiate_handshake(batman_if);
+			if(inet_addr(addr_prev_sender) < inet_addr(my_addr)) {
+//				printf("I have the greatest IP number\n");
+				initiate_handshake();
 
 			} else{
-				printf("I have the smallest IP number\n");
-				wait_for_handshake(batman_if);
+//				printf("I have the smallest IP number\n");
+				wait_for_handshake();
 			}
 		}
 	}
 
 	am_status = READY;
+	free(if_device);
+	free(addr_prev_sender);
+	free(my_addr);
+	pthread_exit(NULL); //Necessary in order not to end a non-void function without a return value.
 }
 
-void setup_am_socks(char *dev) {
+void setup_am_socks() {
 
 	memset(&hints, 0, sizeof hints);
 	hints.ai_family = AF_UNSPEC;  // use IPv4 or IPv6, whichever
 	hints.ai_socktype = SOCK_DGRAM;
 	hints.ai_flags = AI_PASSIVE;
+	hints.ai_protocol = IPPROTO_UDP;
+
+	memset((char *) &sin_dest, 0, sizeof(sin_dest));
+	sin_dest.sin_family = AF_INET;
+	sin_dest.sin_port = htons(64305);
+	if (inet_aton(addr_prev_sender, &sin_dest.sin_addr)==0) {
+		printf("inet_aton() failed\n");
+		exit(1);
+	}
 
 	getaddrinfo(NULL, "64305", &hints, &res);
-
-	setup_am_recv_sock(dev);
-	setup_am_send_sock(dev);
+	setup_am_recv_sock();
+	setup_am_send_sock();
 }
 
-void setup_am_recv_sock(char *dev) {
-	printf("Attempting to create AM receive socket\n");
-	if ( (am_recv_socket = socket(res->ai_family, res->ai_socktype, res->ai_protocol)) < 0 ) {
+void setup_am_recv_sock() {
+
+	if ( (am_recv_socket = socket(PF_INET, SOCK_DGRAM, 0)) < 0 ) {
 		printf("Error - can't create AM receive socket: %s\n", strerror(errno) );
 		destroy_am_socks();
 	}
 
-	if ( bind_to_iface( am_recv_socket, dev ) < 0 ) {
-		printf("Cannot bind socket to device %s : %s \n", dev, strerror(errno));
-		destroy_am_socks();
-	}
+//	if ( bind_to_iface( am_recv_socket, if_device ) < 0 ) {
+//		printf("Cannot bind socket to device %s : %s \n", if_device, strerror(errno));
+//		destroy_am_socks();
+//	}
 
+	setsockopt(am_recv_socket, SOL_SOCKET, SO_BINDTODEVICE, if_device, strlen(if_device) + 1);
+
+//	bind(am_recv_socket, (struct sockaddr*)&sin_dest, sizeof(sin_dest));
 	bind(am_recv_socket, res->ai_addr, res->ai_addrlen);
 
-	printf("Successfully created AM receive socket\n");
 }
 
-void setup_am_send_sock(char *dev) {
-	printf("Attempting to create AM send socket\n");
-	if ( (am_send_socket = socket(res->ai_family, res->ai_socktype, res->ai_protocol)) < 0 ) {
+void setup_am_send_sock() {
+
+	if ( (am_send_socket = socket(PF_INET, SOCK_DGRAM, 0)) < 0 ) {
 		printf("Error - can't create AM send socket: %s\n", strerror(errno) );
 		destroy_am_socks();
 	}
 
-	if ( bind_to_iface( am_send_socket, dev ) < 0 ) {
-		printf("Cannot bind socket to device %s : %s \n", dev, strerror(errno));
-		destroy_am_socks();
-	}
+//	if ( bind_to_iface( am_send_socket, if_device ) < 0 ) {
+//		printf("Cannot bind socket to device %s : %s \n", if_device, strerror(errno));
+//		destroy_am_socks();
+//	}
 
-	printf("Successfully created AM send socket\n");
+	setsockopt(am_send_socket, SOL_SOCKET, SO_BINDTODEVICE, if_device, strlen(if_device) + 1);
+
+
 }
 
 void destroy_am_socks() {
-	printf("Destroying AM sockets\n");
+//	printf("Destroying AM sockets\n");
 	if (am_recv_socket != 0)
 		close(am_recv_socket);
 
@@ -155,49 +183,60 @@ void destroy_am_socks() {
 	freeaddrinfo(res);
 }
 
-void wait_for_handshake(struct batman_if *batman_if) {
-	printf("\n====================================\nwait_for_handshake()\n====================================\n");
-	int rcvd_packet_size;
-
-	if(rcvd_packet_size = recvfrom(am_recv_socket, &recvBuf, MAXBUFLEN - 1, 0, &batman_if->addr, sizeof(&batman_if->addr)) == sizeof(struct challenge_packet)) {
-		struct challenge_packet *rcvd_challenge_packet = recvBuf;
-		memset(recvBuf, 0, sizeof(recvBuf));
-		printf("FOUND THE CHALLENGE!\n");
+//void wait_for_handshake(struct batman_if *batman_if) {
+void wait_for_handshake() {
+	if(recvfrom(am_recv_socket, &recvBuf, MAXBUFLEN - 1, 0, NULL, NULL) < 0) {
+		printf("Error - can't receive packet: %s\n", strerror(errno));
 	}
-	memset(recvBuf, 0, sizeof(recvBuf));
 
+//	printf("\nTEST\n\n");// - strlen(prev_sender) = %d\n\n", strlen(prev_sender));
+
+	rcvd_challenge_packet = (struct challenge_packet *)recvBuf;
+
+	printf("Challenge Received: %d\n", rcvd_challenge_packet->challenge_value);
+	destroy_am_socks();
 }
 
-void initiate_handshake(struct batman_if *batman_if) {
-	printf("\n====================================\ninitiate_handshake()\n====================================\n");
+/*void dump_memory(void* data, size_t len)
+{
+size_t i;
+printf("Data in [%p..%p): ",data,data+len);
+for (i=0;i<len;i++)
+printf("%02X ", ((unsigned char*)data)[i] );
+printf("\n");
+}*/
+
+
+void initiate_handshake() {
+	printf("\ninitiate_handshake()\n");
 
 	my_challenge = 1 + (rand() % UINT8_MAX);
 
-	struct challenge_packet *challenge_packet;
 	challenge_packet = (struct challenge_packet *) malloc(sizeof(struct challenge_packet));
 	challenge_packet->role = my_role;
 	challenge_packet->challenge_value = my_challenge;
 
-//	send_udp_packet(challenge_packet, sizeof(challenge_packet), &batman_if->addr, batman_if->udp_send_sock, NULL);
 
-	if ( sendto( am_send_socket, challenge_packet, sizeof(challenge_packet), 0, &batman_if->addr, sizeof(struct sockaddr_in) ) < 0 ) {
-		if ( errno == 1 ) {
-			printf("Error - can't send UDP packet: %s.\n", strerror(errno));
-			printf("Does your Firewall allow outgoing packets on port 64305?\n");
-		} else {
-			printf("Error - can't send UDP packet: %s\n", strerror(errno));
-		}
-		return -1;
-	}
+//	challenge_packet.role = my_role;
+//	challenge_packet.challenge_value = my_challenge;
+
+
+	printf("Trying to send challenge value %d\n", challenge_packet->challenge_value);
+
+	memset(&sendBuf, 0, sizeof(sendBuf));
+	memcpy(&sendBuf, challenge_packet, sizeof(*challenge_packet));
+	packet_len = sizeof(*challenge_packet);
+
+//	dump_memory(&sendBuf, sizeof(sendBuf));
+//	dump_memory(&challenge_packet, sizeof(challenge_packet));
+
+
+	send_udp_packet((unsigned char *)&sendBuf, packet_len, &sin_dest, am_send_socket, NULL);
+//	send_udp_packet((unsigned char *)&sendBuf, &packet_len, res->ai_addr, am_send_socket, NULL);
 
 }
 
 void authenticate_with_sp() {
-
-}
-
-
-void handshake_with_pc1() {
 
 }
 

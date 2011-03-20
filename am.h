@@ -16,47 +16,77 @@
 #define AM_H
 
 #include "batman.h"
+//#include "os.h"
 #include <sys/socket.h>
-
 #include <netinet/in.h>
 #include <sys/types.h>
+#include <arpa/inet.h>
 #include <netdb.h>
 #include <errno.h>
+#include <unistd.h>
+#include <stdlib.h>
+#include <linux/string.h>
+#include <stdio.h>
 
-#define MAXBUFLEN 5000
+#define MAXBUFLEN 512	//max bytes, may have to be changed depending on certs sizes...
+#define IF_NAMESIZE	16
 
-struct challenge_packet {
-	uint8_t role;
-	uint8_t challenge_value;
-} __attribute__((packed));
+enum am_type{
+	CHALLENGE = 0,
+	CHALLENGE_RESPONSE = 1,
+	RESPONSE = 2
+};
 
-char recvBuf[MAXBUFLEN];
-struct addrinfo hints, *res;
-int32_t am_send_socket;
-int32_t am_recv_socket;
-
-extern enum role_type{
+enum role_type{
 	NOT_AUTHENTICATED = 0,
 	AUTHENTICATED = 1,
 	MASTER = 2
 };
 
-extern enum pthread_status{
+enum pthread_status{
 	IN_USE = 0,
 	READY = 99
 };
 
-void *authenticate2();
-//void authenticate(struct bat_packet *bat_packet, struct batman_if *batman_if);
+struct am_packet {
+	uint8_t id;
+	enum role_type role;
+	enum am_type type;
+} __attribute__((packed));
+
+struct challenge_packet {
+	uint8_t role;	//fjernes når den slås sammen med am_packet
+	uint8_t challenge_value;
+} __attribute__((packed));
+
+struct challenge_response_packet {
+	uint8_t challenge_value;
+	uint8_t response_value;
+} __attribute__((packed));
+
+struct response_packet {
+	uint8_t response_value;
+} __attribute__((packed));
+
+unsigned char recvBuf[MAXBUFLEN];
+unsigned char sendBuf[MAXBUFLEN];
+struct addrinfo hints, *res;
+int32_t am_send_socket;
+int32_t am_recv_socket;
+struct challenge_packet *rcvd_challenge_packet;
+char *if_device;
+char *addr_prev_sender;
+char *my_addr;
+
+void authenticate_thread_init(char *, uint8_t, uint8_t, char *, char *);
 void *authenticate();
 void setup_am_socks();
 void setup_am_recv_sock();
 void setup_am_send_sock();
 void destroy_am_socks();
-void wait_for_handshake(struct batman_if *batman_if);
-void initiate_handshake(struct batman_if *batman_if);
+void wait_for_handshake();
+void initiate_handshake();
 void authenticate_with_sp();
-void handshake_with_pc1();
 
 
 

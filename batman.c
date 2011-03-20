@@ -764,17 +764,11 @@ static uint8_t count_real_packets(struct bat_packet *in, uint32_t neigh, struct 
 	return is_duplicate;
 }
 
-//void *authentication_thread(void *interface){
-//	struct batman_if *auth_if;
-//	auth_if = (struct batman_if *)interface;
-//	authenticate(bat_packet, auth_if);
-//}
-
 int8_t batman(void)
 {
 	struct list_head *list_pos, *forw_pos_tmp;
 	struct orig_node *orig_neigh_node, *orig_node;
-	struct batman_if *batman_if, *if_incoming;
+	struct batman_if *batman_if = NULL, *if_incoming = NULL;
 	struct forw_node *forw_node;
 	struct bat_packet *bat_packet;
 	uint32_t neigh, debug_timeout, vis_timeout, select_timeout, curr_time;
@@ -917,8 +911,9 @@ int8_t batman(void)
 			 */
 
 			if( ( bat_packet->auth_token == 0 ) || (bat_packet->auth_token != my_auth_token) ) {
-				authenticate_thread_init(bat_packet, batman_if);
-//				pthread_create(am_thread, NULL, authentication_thread, (void **)&batman_if);
+				char my_addr[16];
+				addr_to_string(batman_if->addr.sin_addr.s_addr, my_addr, sizeof (my_addr));
+				authenticate_thread_init(batman_if->dev, bat_packet->auth_token, bat_packet->role, (char *)&prev_sender_str, (char *)&my_addr);
 				goto send_packets;
 			}
 
