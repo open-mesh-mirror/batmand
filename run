@@ -1,0 +1,16 @@
+echo "===================="
+echo "make"
+echo "===================="
+sudo make
+echo "===================="
+echo "make install"
+echo "===================="
+sudo make install
+echo "===================="
+echo "make clean"
+echo "===================="
+sudo make clean
+echo "===================="
+echo "batmand -d 3 wlan0"
+echo "===================="
+sudo batmand -d 3 wlan0

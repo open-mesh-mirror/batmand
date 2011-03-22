@@ -32,6 +32,7 @@ char *if_device;
 void *tmpPtr;
 enum am_type rcvd_type;
 uint16_t my_auth_token = 0;
+enum role_type my_role = UNAUTHENTICATED;
 
 
 //Temp variables
@@ -67,6 +68,8 @@ uint32_t tmp_wait = 0;
 
 void authenticate_thread_init(char *d, uint16_t auth_token, char *prev_sender, char *my_addr_string) {
 	if (am_status != IN_USE) {
+		am_status = IN_USE;
+		printf("ENTER AM MODULE\n");
 
 		if_device = (char *) malloc(strlen(d)+1);
 		memset(if_device, 0, strlen(d)+1);
@@ -92,16 +95,17 @@ void authenticate_thread_init(char *d, uint16_t auth_token, char *prev_sender, c
 
 void *authenticate() {
 
+	//Both Unauthenticated
+	if((my_auth_token == 0) && (rcvd_auth_token == 0)) {
 
-	setup_am_socks();
+		setup_am_socks();
 
-	if((my_auth_token == 0) && ((rcvd_auth_token == 0))) {
-
-		if(inet_addr(addr_prev_sender)<inet_addr(my_addr) && my_challenge==0) {
+		if(inet_addr(addr_prev_sender)<inet_addr(my_addr)) {// && my_challenge==0) {
 			printf("RECEIVED UNAUTHENTICATED OGM\n");
 			send_challenge();
 			printf("my_challenge = %d\n\n",my_challenge);
 		}
+
 		while(1) {
 			rcvd_type = receive_am_header();
 
@@ -122,7 +126,64 @@ void *authenticate() {
 				printf("rcvd_response = %d\n",rcvd_response);
 				printf("rcvd_challenge = %d\n",rcvd_challenge);
 				printf("my_response = %d\n\n",my_response);
+				my_role = MASTER;
 				break;
+
+			} else if(rcvd_type == RESPONSE) {
+				printf("RECEIVED RESPONSE\n");
+				receive_response();
+				printf("rcvd_response = %d\n",rcvd_response);
+				my_role = AUTHENTICATED;
+				break;
+
+			} else {
+				printf("RECEIVED UNRECOGNIZABLE AM HEADER\n");
+			}
+		}	//end while
+
+	}
+
+	//I am authenticated, other node is unauth
+	else if(rcvd_auth_token == 0) {
+		setup_am_socks();
+
+		printf("RECEIVED UNAUTHENTICATED OGM\n");
+		send_challenge();
+		printf("my_challenge = %d\n\n",my_challenge);
+
+		while(1) {
+			rcvd_type = receive_am_header();
+
+			if(rcvd_type == CHALLENGE_RESPONSE) {
+				printf("RECEIVED CHALLENGE_RESPONSE\n");
+				receive_challenge_response();
+				printf("rcvd_response = %d\n",rcvd_response);
+				printf("rcvd_challenge = %d\n",rcvd_challenge);
+				printf("my_response = %d\n\n",my_response);
+				break;
+
+			} else {
+				printf("RECEIVED UNRECOGNIZABLE AM HEADER\n");
+			}
+		}	//end while
+
+	}
+
+	//I'm unauth, other node is auth
+	else if(my_auth_token == 0) {
+
+		setup_am_socks();
+
+		while(1) {
+			rcvd_type = receive_am_header();
+
+			if(rcvd_type == CHALLENGE) {
+				printf("RECEIVED CHALLENGE\n");
+				receive_challenge();
+				printf("rcvd_challenge = %d\n",rcvd_challenge);
+				send_challenge_response();
+				printf("my_response = %d\n",my_response);
+				printf("my_challenge = %d\n\n",my_challenge);
 
 			} else if(rcvd_type == RESPONSE) {
 				printf("RECEIVED RESPONSE\n");
@@ -137,19 +198,19 @@ void *authenticate() {
 
 	}
 
-	printf("\n\n\nBREAK\n\n\n\n");
 
 	destroy_am_socks();
 	free(if_device);
 	free(addr_prev_sender);
 	free(my_addr);
+	sleep(5);
+	printf("EXIT AM MODULE\n");
 	am_status = READY;
 	pthread_exit(NULL); //Necessary in order not to end a non-void function without a return value.
 }
 
 void setup_am_socks() {
 
-	printf("\nSETUP AM SOCKS\n\n");
 	memset(&hints, 0, sizeof hints);
 	hints.ai_family = AF_UNSPEC;  // use IPv4 or IPv6, whichever
 	hints.ai_socktype = SOCK_DGRAM;
@@ -224,8 +285,9 @@ void destroy_am_socks() {
 
 enum am_type receive_am_header() {
 	memset(&recvBuf, 0, MAXBUFLEN);
-	if(recvfrom(am_recv_socket, &recvBuf, MAXBUFLEN - 1, 0, NULL, NULL) < 0) {
-		printf("Error - can't receive packet: %s\n", strerror(errno));
+
+	while(recvfrom(am_recv_socket, &recvBuf, MAXBUFLEN - 1, 0, NULL, NULL) < sizeof(struct am_packet)) {
+		printf(".\n");
 	}
 
 	rcvd_am_header = (struct am_packet *)recvBuf;
@@ -279,6 +341,8 @@ void receive_response() {
 
 
 void send_challenge() {
+
+	sleep(1);	//Make sure other node is ready to receive challenge
 
 	am_header = (struct am_packet *) malloc(sizeof(struct am_packet));
 	am_header->id = inet_addr(my_addr) % UINT16_MAX;
@@ -334,8 +398,10 @@ void send_response() {
 
 	my_response = (2*rcvd_challenge) % UINT8_MAX;
 	my_response = (my_response == 0 ? 1 : my_response);
-	my_auth_token = 1 + (rand() % UINT16_MAX);
-	my_auth_token = (my_auth_token == 0 ? 1 : my_auth_token);
+	if(my_auth_token == 0) {
+		my_auth_token = 1 + (rand() % UINT16_MAX);
+		my_auth_token = (my_auth_token == 0 ? 1 : my_auth_token);
+	}
 
 	response_packet = (struct response_packet *) malloc(sizeof(struct response_packet));
 	response_packet->response_value = my_response;

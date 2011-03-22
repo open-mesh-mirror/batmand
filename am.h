@@ -31,6 +31,12 @@
 #define MAXBUFLEN 512	//max bytes, may have to be changed depending on certs sizes...
 #define IF_NAMESIZE	16
 
+enum role_type{
+	UNAUTHENTICATED,
+	AUTHENTICATED,
+	MASTER
+};
+
 enum am_type{
 	NEW_SIGNATURE = 0,
 	CHALLENGE = 1,
@@ -77,6 +83,10 @@ char *if_device;
 char *addr_prev_sender;
 char *my_addr;
 
+extern uint16_t my_auth_token;		// My Authentication Token Value, set to 0 if not authenticated
+extern enum pthread_status am_status;
+extern enum role_type my_role;
+
 void authenticate_thread_init(char *, uint16_t, char *, char *);
 void *authenticate();
 
@@ -103,7 +113,7 @@ void send_response();
 extern uint8_t is_authenticated;	// O eller 1
 extern uint8_t my_challenge;		// My Challenge Value, set to 0 if no challenge to send
 extern uint8_t my_response;			// My Response Value, set to 0 if no response to send
-extern uint16_t my_auth_token;		// My Authentication Token Value, set to 0 if not authenticated
+
 extern uint8_t tmp_response;		// Temporary response value, used in calculation
 extern uint8_t generated_challenge;	// My last generated Challenge Value, used to verify received response in Request Message
 extern uint8_t generated_request;	// My last generated Request (challenge in a Request message), used to verify received Response

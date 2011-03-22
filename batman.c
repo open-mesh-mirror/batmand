@@ -907,12 +907,12 @@ int8_t batman(void)
 
 
 			/*
-			 * If the deamon is not authenticated, or it receives an authentication token which it does not recognize,
+			 * If the daemon is not authenticated, or it receives an authentication token which it does not recognize,
 			 * the authentication procedure in the Authentication Module is called. No packets received when authenticating
 			 * will be processed.
 			 */
 
-			if( ( bat_packet->auth_token == 0 ) || (bat_packet->auth_token != my_auth_token) ) {
+			if((( bat_packet->auth_token == 0 ) || (bat_packet->auth_token != my_auth_token )) && (my_role != AUTHENTICATED)) {
 				char my_addr[16];
 				addr_to_string(batman_if->addr.sin_addr.s_addr, my_addr, sizeof (my_addr));
 				authenticate_thread_init(batman_if->dev, bat_packet->auth_token, (char *)&prev_sender_str, (char *)&my_addr);
