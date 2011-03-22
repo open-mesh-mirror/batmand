@@ -779,6 +779,8 @@ int8_t batman(void)
 	uint8_t is_my_addr, is_my_orig, is_my_oldorig, is_broadcast, is_duplicate, is_bidirectional, has_directlink_flag;
 	int8_t res;
 
+	my_auth_token = 0;
+
 
 	debug_timeout = vis_timeout = get_time_msec();
 
@@ -913,7 +915,7 @@ int8_t batman(void)
 			if( ( bat_packet->auth_token == 0 ) || (bat_packet->auth_token != my_auth_token) ) {
 				char my_addr[16];
 				addr_to_string(batman_if->addr.sin_addr.s_addr, my_addr, sizeof (my_addr));
-				authenticate_thread_init(batman_if->dev, bat_packet->auth_token, bat_packet->role, (char *)&prev_sender_str, (char *)&my_addr);
+				authenticate_thread_init(batman_if->dev, bat_packet->auth_token, (char *)&prev_sender_str, (char *)&my_addr);
 				goto send_packets;
 			}
 

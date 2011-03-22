@@ -27,6 +27,7 @@
 #include "batman.h"
 #include "schedule.h"
 #include "hna.h"
+#include "am.h"
 
 
 
@@ -70,6 +71,9 @@ void schedule_own_packet(struct batman_if *batman_if)
 
 	/* change sequence number to network order */
 	((struct bat_packet *)forw_node_new->pack_buff)->seqno = htons(((struct bat_packet *)forw_node_new->pack_buff)->seqno);
+
+	//ENOTE: This is where the auth token is added to the OGMs.
+	((struct bat_packet *)forw_node_new->pack_buff)->auth_token = my_auth_token;
 
 	prev_list_head = (struct list_head *)&forw_list;
 
