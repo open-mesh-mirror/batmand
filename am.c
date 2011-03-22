@@ -67,7 +67,7 @@ uint32_t tmp_wait = 0;
 
 
 void authenticate_thread_init(char *d, uint16_t auth_token, char *prev_sender, char *my_addr_string) {
-	if (am_status != IN_USE) {
+	if (am_status != IN_USE ) {
 		am_status = IN_USE;
 		printf("ENTER AM MODULE\n");
 
@@ -263,7 +263,7 @@ void setup_am_send_sock() {
 //	}
 
 	setsockopt(am_send_socket, SOL_SOCKET, SO_BINDTODEVICE, if_device, strlen(if_device) + 1);
-
+	fcntl(am_send_socket, F_SETFL, O_NONBLOCK);
 
 }
 

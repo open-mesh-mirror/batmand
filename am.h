@@ -27,6 +27,7 @@
 #include <stdlib.h>
 #include <linux/string.h>
 #include <stdio.h>
+#include <fcntl.h>
 
 #define MAXBUFLEN 512	//max bytes, may have to be changed depending on certs sizes...
 #define IF_NAMESIZE	16
