@@ -66,8 +66,10 @@ SRC_O= $(SRC_C:.c=.o)
 
 BINARY_NAME =	batmand
 
-REVISION :=	$(shell if [ -d .svn ]; then svn info | grep "Rev:" | sed -e '1p' -n | awk '{print $$4}'; else if [ -d ~/.svk ]; then echo $$(svk info | grep "Mirrored From" | awk '{print $$5}'); fi; fi)
-REVISION_VERSION =\"\ rv$(REVISION)\"
+REVISION= $(shell      if [ -d .git ]; then \
+                               echo $$(git describe --always --dirty 2> /dev/null || echo "[unknown]"); \
+                        fi)
+REVISION_VERSION =\"\ $(REVISION)\"
 
 NUM_CPUS = $(shell NUM_CPUS=`cat /proc/cpuinfo | grep -v 'model name' | grep processor | tail -1 | awk -F' ' '{print $$3}'`;echo `expr $$NUM_CPUS + 1`)
 

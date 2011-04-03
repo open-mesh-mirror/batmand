@@ -12,21 +12,9 @@ endif
 UNAME:=$(shell uname -r)
 LINUX24=2.4
 LINUX_VERSION:=$(findstring $(LINUX24),$(UNAME))
-REVISION:=	$(shell if [ -d .svn ]; then \
-						if which svn > /dev/null; then \
-							svn info | grep "Rev:" | sed -e '1p' -n | awk '{print $$4}'; \
-						else \
-							echo "[unknown]"; \
-						fi ; \
-					else \
-						if [ -d ~/.svk ]; then \
-							if which svk > /dev/null; then \
-								echo $$(svk info | grep "Mirrored From" | awk '{print $$5}'); \
-							else \
-								echo "[unknown]"; \
-							fi; \
-						fi; \
-					fi)
+REVISION= $(shell      if [ -d ../../.git ]; then \
+                               echo $$(git describe --always --dirty 2> /dev/null || echo "[unknown]"); \
+                        fi)
 
 include $(PWD)/Makefile.kbuild
 
