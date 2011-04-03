@@ -86,7 +86,7 @@ $(BINARY_NAME): $(SRC_O) $(SRC_H) Makefile
 
 clean:
 	rm -f $(BINARY_NAME) *.o posix/*.o linux/*.o bsd/*.o
-	rm -f `find . -name '*.d' -print`
+	rm -f *.d posix/*.d linux/*.d bsd/*.d
 
 install:
 	mkdir -p $(SBINDIR)
