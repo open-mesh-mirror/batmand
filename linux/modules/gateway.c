@@ -53,7 +53,7 @@ static int proc_clients_read(char *buf, char **start, off_t offset, int size, in
 static struct file_operations fops = {
 	.open = batgat_open,
 	.release = batgat_release,
-	.ioctl = batgat_ioctl,
+	.unlocked_ioctl = batgat_ioctl,
 };
 
 
