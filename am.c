@@ -286,7 +286,7 @@ void destroy_am_socks() {
 enum am_type receive_am_header() {
 	memset(&recvBuf, 0, MAXBUFLEN);
 
-	while(recvfrom(am_recv_socket, &recvBuf, MAXBUFLEN - 1, 0, NULL, NULL) < sizeof(struct am_packet)) {
+	while((unsigned)recvfrom(am_recv_socket, &recvBuf, MAXBUFLEN - 1, 0, NULL, NULL) < sizeof(struct am_packet)) {
 		printf(".\n");
 	}
 
@@ -416,4 +416,246 @@ void send_response() {
 	packet_len += sizeof(struct response_packet);
 
 	send_udp_packet((unsigned char *)&sendBuf, packet_len, &sin_dest, am_send_socket, NULL);
+}
+
+
+void init_am() {
+	BIO *bio_err;
+	X509_REQ *req = NULL;
+	EVP_PKEY *pkey = NULL;
+
+	create_proxy_cert_req();
+	free_proxy_cert_req;
+}
+
+void create_proxy_cert_req() {
+
+	CRYPTO_mem_ctrl(CRYPTO_MEM_CHECK_ON);
+
+	bio_err = BIO_new_fp(stderr, BIO_NOCLOSE);
+
+	mkreq(&req, &pkey,512, 0, 1); //512 changed to EC key size
+
+	RSA_print_fp(stdout, pkey->pkey.rsa, 0);	//pkey.rsa changed with pkey.ec
+	X509_REQ_print_fp(stdout, req);
+
+	PEM_write_X509_REQ(stdout, req);
+
+
+	free_proxy_cert_req();
+}
+
+void free_proxy_cert_req(){
+
+	X509_REQ_free(req);
+	EVP_PKEY_free(pkey);
+
+#ifndef OPENSSL_NO_ENGINE
+	ENGINE_cleanup();
+#endif
+	CRYPTO_cleanup_all_ex_data();
+
+	CRYPTO_mem_leaks(bio_err);
+	BIO_free(bio_err);
+
+}
+
+static void callback(int p, int n, void *arg) {
+	char c='B';
+
+	if (p == 0) c='.';
+	if (p == 1) c='+';
+	if (p == 2) c='*';
+	if (p == 3) c='\n';
+	fputc(c,stderr);
+}
+
+int mkreq(X509_REQ **x509p, EVP_PKEY **pkeyp, int bits, int serial, int days) {
+	X509_REQ *x;
+	EVP_PKEY *pk;
+	RSA *rsa;
+	X509_NAME *name=NULL;
+	STACK_OF(X509_EXTENSION) *exts = NULL;
+
+	if ((pk=EVP_PKEY_new()) == NULL)
+		goto err;
+
+	if ((x=X509_REQ_new()) == NULL)
+		goto err;
+
+	rsa=RSA_generate_key(bits,RSA_F4,callback,NULL);
+	if (!EVP_PKEY_assign_RSA(pk,rsa))
+		goto err;
+
+	rsa=NULL;
+
+	X509_REQ_set_pubkey(x,pk);
+
+	name=X509_REQ_get_subject_name(x);
+
+	/*
+	 * This is where we add the Subject (unique) Common Name.
+	 * The Issuer name will be prepended by the issuer on creation.
+	 * TODO: Maybe use hash of public key, for now only a random number
+	 */
+	unsigned char subject_name[32];
+	sprintf(&subject_name,"%d",rand()%UINT32_MAX);
+	X509_NAME_add_entry_by_txt(name,"CN", MBSTRING_ASC, subject_name, -1, -1, 0);
+
+#ifdef REQUEST_EXTENSIONS
+	/* Certificate requests can contain extensions, which can be used
+	 * to indicate the extensions the requestor would like added to
+	 * their certificate. CAs might ignore them however or even choke
+	 * if they are present.
+	 */
+
+	/* For request extensions they are all packed in a single attribute.
+	 * We save them in a STACK and add them all at once later...
+	 */
+
+	exts = sk_X509_EXTENSION_new_null();
+	/* Standard extenions */
+
+	add_ext(exts, NID_key_usage, "critical,digitalSignature,keyEncipherment");
+
+
+	/* PROCYCERTINFO */
+
+	//Les http://root.cern.ch/svn/root/vendors/xrootd/current/src/XrdCrypto/XrdCryptosslgsiAux.cc
+
+	//Create ProxyPolicy
+    PROXYPOLICY *proxyPolicy;
+    proxyPolicy = NULL;
+//    ASN1_CTX c; /* Function below needs this to be defined */
+//    M_ASN1_New_Malloc(proxyPolicy, PROXYPOLICY);
+    proxyPolicy = (PROXYPOLICY *)OPENSSL_malloc(sizeof(PROXYPOLICY));
+    proxyPolicy->policy_language = OBJ_nid2obj(NID_id_ppl_inheritAll);
+    proxyPolicy->policy = NULL;
+//    M_ASN1_New_Error(ASN1_F_PROXYPOLICY_NEW);
+
+    //Create ProxyCertInfo
+    PROXYCERTINFO *proxyCertInfo;
+    proxyCertInfo = NULL;
+//    M_ASN1_New_Malloc(proxyCertInfo, PROXYCERTINFO);
+    proxyCertInfo = (PROXYCERTINFO *)OPENSSL_malloc(sizeof(PROXYCERTINFO));
+    memset(proxyCertInfo, (int) NULL, sizeof(PROXYCERTINFO));
+    proxyCertInfo->path_length = NULL;
+    proxyCertInfo->policy = proxyPolicy;
+
+
+    //Mucho try-as-i-go, need cleanup!!!
+    X509V3_CTX ctx;
+    X509V3_CONF_METHOD method = { NULL, NULL, NULL, NULL };
+    long db = 0;
+
+    char language[80];
+    int pathlen;
+    unsigned char *policy = NULL;
+    int policy_len;
+    char *value;
+    char *tmp;
+
+    ASN1_OCTET_STRING *             ext_data;
+    int                             length;
+    unsigned char *                 data;
+    unsigned char *                 der_data;
+    X509_EXTENSION *                proxyCertInfo_ext;
+    const X509V3_EXT_METHOD *       proxyCertInfo_ext_method;
+
+    proxyCertInfo_ext_method = X509V3_EXT_get_nid(NID_proxyCertInfo);
+
+//    proxyCertInfo_ext_method = X509V3_EXT_get_nid(OBJ_txt2nid(PROXYCERTINFO_OLD_OID));
+
+
+
+//    OBJ_obj2txt(language, 80, proxyCertInfo->policy->policy_language, 1);
+//    sprintf(&language, "blablabla");
+//    proxyCertInfo->policy->policy_language = OBJ_txt2obj(language, 1);
+
+    pathlen = 0;
+    ASN1_INTEGER_set(&(proxyCertInfo->path_length), (long)pathlen);
+
+//    if (proxyCertInfo->policy->policy) {
+//    	policy_len = M_ASN1_STRING_length(proxyCertInfo->policy->policy);
+//    	policy = malloc(policy_len + 1);
+//    	memcpy(policy, M_ASN1_STRING_data(proxyCertInfo->policy->policy), policy_len);
+//    	policy[policy_len] = '\0';
+//    }
+
+
+//    X509V3_set_ctx(&ctx, NULL, NULL, NULL, NULL, 0L);
+//    ctx.db_meth = &method;
+//    ctx.db = &db;
+
+//    pci_ext = X509V3_EXT_conf_nid(NULL, &ctx, NID_proxyCertInfo, value);
+//    X509_EXTENSION_set_critical(pci_ext, 1);
+
+//    add_ext(exts, NID_proxyCertInfo, value);
+
+    if(proxyCertInfo_ext_method) {
+    	printf("\n\next_method\n\n\n");
+    }
+    if (proxyCertInfo_ext_method->i2v) {
+    	printf("\n\next_method->i2v\n\n\n");
+    }
+    if(proxyCertInfo_ext_method->v2i) {
+    	printf("\n\next_method->v2i\n\n\n");
+    }
+    if (proxyCertInfo_ext_method->i2r) {
+    	printf("\n\next_method->i2r\n\n\n");
+    }
+    if(proxyCertInfo_ext_method->r2i) {
+    	printf("\n\next_method->r2i\n\n\n");
+    }
+
+
+    printf("\n\nTEST\n\n\n");
+    proxyCertInfo_ext_method->i2d(proxyCertInfo, NULL);
+
+
+//    } else {
+//    	printf("\n\nFAEN\n\n\n");
+//    }
+
+
+
+
+#ifdef CUSTOM_EXT
+	/* Maybe even add our own extension based on existing */
+	{
+		int nid;
+		nid = OBJ_create("1.2.3.4", "MyAlias", "My Test Alias Extension");
+		X509V3_EXT_add_alias(nid, NID_netscape_comment);
+		add_ext(x, nid, "example comment alias");
+	}
+#endif
+
+	/* Now we've created the extensions we add them to the request */
+
+	X509_REQ_add_extensions(x, exts);
+
+	sk_X509_EXTENSION_pop_free(exts, X509_EXTENSION_free);
+
+#endif
+
+	if (!X509_REQ_sign(x,pk,EVP_sha1()))
+		goto err;
+
+	req=x;
+	*pkeyp=pk;
+	return(1);
+err:
+	return(0);
+
+}
+
+int add_ext(STACK_OF(X509_REQUEST) *sk, int nid, char *value) {
+	X509_EXTENSION *ex;
+	ex = X509V3_EXT_conf_nid(NULL, NULL, nid, value);
+	if (!ex)
+		return 0;
+	sk_X509_EXTENSION_push(sk, ex);
+
+	return 1;
+
 }

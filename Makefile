@@ -31,7 +31,7 @@ endif
 CC =		gcc
 CFLAGS +=	-pedantic -Wall -W -O1 -g3 -std=gnu99
 EXTRA_CFLAGS =	-DDEBUG_MALLOC -DMEMORY_USAGE -DPROFILE_DATA $(NO_POLICY_ROUTING) -DREVISION_VERSION=$(REVISION_VERSION)
-LDFLAGS +=	-lpthread
+LDFLAGS +=	-lpthread -lssl
 
 SBINDIR =	$(INSTALL_PREFIX)/usr/sbin
 

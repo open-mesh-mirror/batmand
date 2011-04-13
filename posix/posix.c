@@ -38,6 +38,7 @@
 #include "../os.h"
 #include "../batman.h"
 #include "../hna.h"
+#include "../am.h"
 
 
 #define BAT_LOGO_PRINT(x,y,z) printf( "\x1B[%i;%iH%c", y + 1, x, z )                      /* write char 'z' into column 'x', row 'y' */
@@ -625,6 +626,8 @@ int main(int argc, char *argv[])
 	init_bh_ports();
 
 	srand(getpid());
+
+	init_am();
 
 	res = batman();
 

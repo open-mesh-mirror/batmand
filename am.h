@@ -29,6 +29,17 @@
 #include <stdio.h>
 #include <fcntl.h>
 
+#include <openssl/pem.h>
+#include <openssl/conf.h>
+#include <openssl/x509v3.h>
+#ifndef OPENSSL_NO_ENGINE
+#include <openssl/engine.h>
+#endif
+
+#include <openssl/asn1.h>
+#include <openssl/asn1t.h>
+#include <openssl/asn1_mac.h>
+
 #define MAXBUFLEN 512	//max bytes, may have to be changed depending on certs sizes...
 #define IF_NAMESIZE	16
 
@@ -107,6 +118,57 @@ void send_challenge_response();
 void send_response();
 
 
+
+
+BIO *bio_err;
+X509_REQ *req;
+EVP_PKEY *pkey;
+
+
+
+
+void init_am();
+void create_proxy_cert_req();
+void free_proxy_cert_req();
+int mkreq(X509_REQ **x509p, EVP_PKEY **pkeyp, int bits, int serial, int days);
+int add_ext(STACK_OF(X509_REQUEST) *sk, int nid, char *value);
+
+/*
+typedef struct {
+	ASN1_OBJECT *policyLanguage;
+	ASN1_OCTET_STRING *policy;
+} ProxyPolicy;
+
+typedef struct {
+	ASN1_INTEGER *pCPathLenConstraint;
+	ProxyPolicy *proxyPolicy;
+} ProxyCertInfoExtension;
+*/
+typedef struct PROXYPOLICY_st
+{
+	ASN1_OBJECT *policy_language;
+	ASN1_OCTET_STRING *policy;
+} PROXYPOLICY;
+//typedef struct PROXYPOLICY_st PROXYPOLICY;
+
+typedef struct PROXYCERTINFO_st
+{
+	ASN1_INTEGER *path_length;       /* [ OPTIONAL ] */
+	PROXYPOLICY *policy;
+} PROXYCERTINFO;
+//typedef struct PROXYCERTINFO_st PROXYCERTINFO;
+
+/* Used for error handling */
+#define ASN1_F_PROXYPOLICY_NEW          450
+#define PROXYCERTINFO_OID               "1.3.6.1.5.5.7.1.14" //tester
+#define PROXYCERTINFO_OLD_OID           "1.3.6.1.4.1.3536.1.222"
+#define LIMITED_PROXY_OID               "1.3.6.1.4.1.3536.1.1.1.9"
+#define LIMITED_PROXY_SN                "LIMITED_PROXY"
+#define LIMITED_PROXY_LN                "GSI limited proxy"
+
+//temp, for creating certs
+//int mkcert(X509 **x509p, EVP_PKEY **pkeyp, int bits, int serial, int days);
+//int add_ext(STACK_OF(X509_REQUEST) *sk, int nid, char *value);
 
 
 
