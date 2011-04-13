@@ -627,7 +627,7 @@ int main(int argc, char *argv[])
 
 	srand(getpid());
 
-	init_am();
+//	init_am();
 
 	res = batman();
 

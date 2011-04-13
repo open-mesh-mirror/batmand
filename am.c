@@ -238,11 +238,6 @@ void setup_am_recv_sock() {
 		destroy_am_socks();
 	}
 
-//	if ( bind_to_iface( am_recv_socket, if_device ) < 0 ) {
-//		printf("Cannot bind socket to device %s : %s \n", if_device, strerror(errno));
-//		destroy_am_socks();
-//	}
-
 	setsockopt(am_recv_socket, SOL_SOCKET, SO_BINDTODEVICE, if_device, strlen(if_device) + 1);
 
 //	bind(am_recv_socket, (struct sockaddr*)&sin_dest, sizeof(sin_dest));	//for this to work, sender must be assigned same port number...
@@ -256,11 +251,6 @@ void setup_am_send_sock() {
 		printf("Error - can't create AM send socket: %s\n", strerror(errno) );
 		destroy_am_socks();
 	}
-
-//	if ( bind_to_iface( am_send_socket, if_device ) < 0 ) {
-//		printf("Cannot bind socket to device %s : %s \n", if_device, strerror(errno));
-//		destroy_am_socks();
-//	}
 
 	setsockopt(am_send_socket, SOL_SOCKET, SO_BINDTODEVICE, if_device, strlen(if_device) + 1);
 	fcntl(am_send_socket, F_SETFL, O_NONBLOCK);
@@ -434,7 +424,8 @@ void create_proxy_cert_req() {
 
 	bio_err = BIO_new_fp(stderr, BIO_NOCLOSE);
 
-	mkreq(&req, &pkey,512, 0, 1); //512 changed to EC key size
+//	mkreq(&req, &pkey,512, 0, 1); //512 changed to EC key size
+	mkreq();
 
 	RSA_print_fp(stdout, pkey->pkey.rsa, 0);	//pkey.rsa changed with pkey.ec
 	X509_REQ_print_fp(stdout, req);
@@ -470,7 +461,8 @@ static void callback(int p, int n, void *arg) {
 	fputc(c,stderr);
 }
 
-int mkreq(X509_REQ **x509p, EVP_PKEY **pkeyp, int bits, int serial, int days) {
+//int mkreq(X509_REQ **x509p, EVP_PKEY **pkeyp, int bits, int serial, int days) {
+int mkreq() {
 	X509_REQ *x;
 	EVP_PKEY *pk;
 	RSA *rsa;
@@ -483,7 +475,7 @@ int mkreq(X509_REQ **x509p, EVP_PKEY **pkeyp, int bits, int serial, int days) {
 	if ((x=X509_REQ_new()) == NULL)
 		goto err;
 
-	rsa=RSA_generate_key(bits,RSA_F4,callback,NULL);
+	rsa=RSA_generate_key(512,RSA_F4,callback,NULL);
 	if (!EVP_PKEY_assign_RSA(pk,rsa))
 		goto err;
 
