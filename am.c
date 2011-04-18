@@ -27,12 +27,33 @@ struct am_packet *am_header;
 struct challenge_packet *challenge_packet;
 struct challenge_response_packet *challenge_response_packet;
 struct response_packet *response_packet;
+
+struct invite_pc_packet *send_invite;
+struct invite_pc_packet *recv_invite;
+
+struct pc_req_packet *send_req;
+struct pc_req_packet *recv_req;
+
 struct sockaddr_in sin_dest;
 char *if_device;
 void *tmpPtr;
 enum am_type rcvd_type;
 uint16_t my_auth_token = 0;
 enum role_type my_role = UNAUTHENTICATED;
+
+
+BIO *bio_err;
+X509_REQ *req = NULL;
+EVP_PKEY *pkey = NULL;
+FILE *fp;
+unsigned char req_filename[35];
+unsigned char subject_name[32];
+unsigned char pkey_filename[41];
+ssize_t bytes_read;
+
+
+enum key_algorithm requested_key_algorithm = ECC_key;
+uint16_t requested_key_size = 224;
 
 
 //Temp variables
@@ -47,7 +68,7 @@ uint16_t rcvd_auth_token = 0;
 uint8_t expecting_token = 0;
 uint8_t num_waits = 0;
 uint32_t random_wait_time = 0;
-uint8_t generated_challenge = 0;
+uint8_t generated_challenge = 0;//	req=x;
 uint8_t generated_request = 0;
 uint8_t generated_auth = 0;
 uint8_t tmp_response = 0;
@@ -102,8 +123,8 @@ void *authenticate() {
 
 		if(inet_addr(addr_prev_sender)<inet_addr(my_addr)) {// && my_challenge==0) {
 			printf("RECEIVED UNAUTHENTICATED OGM\n");
-			send_challenge();
-			printf("my_challenge = %d\n\n",my_challenge);
+//			send_challenge();
+			send_pc_invite();
 		}
 
 		while(1) {
@@ -135,6 +156,15 @@ void *authenticate() {
 				printf("rcvd_response = %d\n",rcvd_response);
 				my_role = AUTHENTICATED;
 				break;
+
+			} else if(rcvd_type == INVITE) {
+				printf("RECEIVED INVITE\n");
+				receive_pc_invite();
+				send_pc_req();
+
+			} else if(rcvd_type == PC_REQ) {
+				printf("RECEIVED PC REQUEST\n");
+				receive_pc_req();
 
 			} else {
 				printf("RECEIVED UNRECOGNIZABLE AM HEADER\n");
@@ -238,6 +268,11 @@ void setup_am_recv_sock() {
 		destroy_am_socks();
 	}
 
+//	if ( bind_to_iface( am_recv_socket, if_device ) < 0 ) {
+//		printf("Cannot bind socket to device %s : %s \n", if_device, strerror(errno));
+//		destroy_am_socks();
+//	}
+
 	setsockopt(am_recv_socket, SOL_SOCKET, SO_BINDTODEVICE, if_device, strlen(if_device) + 1);
 
 //	bind(am_recv_socket, (struct sockaddr*)&sin_dest, sizeof(sin_dest));	//for this to work, sender must be assigned same port number...
@@ -251,6 +286,11 @@ void setup_am_send_sock() {
 		printf("Error - can't create AM send socket: %s\n", strerror(errno) );
 		destroy_am_socks();
 	}
+
+//	if ( bind_to_iface( am_send_socket, if_device ) < 0 ) {
+//		printf("Cannot bind socket to device %s : %s \n", if_device, strerror(errno));
+//		destroy_am_socks();
+//	}
 
 	setsockopt(am_send_socket, SOL_SOCKET, SO_BINDTODEVICE, if_device, strlen(if_device) + 1);
 	fcntl(am_send_socket, F_SETFL, O_NONBLOCK);
@@ -327,6 +367,24 @@ void receive_response() {
 		printf("Correct Response\n");
 		my_auth_token = rcvd_response_packet->auth_token;
 	} else printf("Wrong Response\n");
+}
+
+
+void receive_pc_invite() {
+
+	recv_invite = tmpPtr;
+	recv_invite = (struct invite_pc_packet *)recv_invite;
+	requested_key_algorithm = recv_invite->key_algorithm;
+	requested_key_size = recv_invite->key_size;
+}
+
+void receive_pc_req() {
+
+	if(!(fp = fopen("./tmp_crypto/recv_pc_req", "w")))
+		fprintf(stderr, "Error opening file ./tmp_crypto/recv_pc_req for writing!\n");
+
+	fwrite(tmpPtr, 1, strlen(tmpPtr), fp);
+	fclose(fp);
 }
 
 
@@ -409,34 +467,82 @@ void send_response() {
 }
 
 
-void init_am() {
-	BIO *bio_err;
-	X509_REQ *req = NULL;
-	EVP_PKEY *pkey = NULL;
+void send_pc_invite() {
+	sleep(1);	//Make sure other node is ready to receive challenge
 
-	create_proxy_cert_req();
-	free_proxy_cert_req;
+	am_header = (struct am_packet *) malloc(sizeof(struct am_packet));
+	am_header->id = inet_addr(my_addr) % UINT16_MAX;
+	am_header->type = INVITE;
+
+	send_invite = (struct invite_pc_packet *) malloc(sizeof(struct invite_pc_packet));
+	send_invite->key_algorithm = RSA_key;
+	send_invite->key_size = 2048;
+
+	memset(&sendBuf, 0, sizeof(sendBuf));
+	memcpy(&sendBuf, am_header, sizeof(struct am_packet));
+	tmpPtr = &sendBuf;
+	tmpPtr += sizeof(struct am_packet);
+	memcpy(tmpPtr, send_invite, sizeof(struct invite_pc_packet));
+	packet_len = sizeof(struct am_packet);
+	packet_len += sizeof(struct invite_pc_packet);
+
+	printf("SENT = %d\n", send_udp_packet((unsigned char *)&sendBuf, packet_len, &sin_dest, am_send_socket, NULL));
+
 }
+
+void send_pc_req() {
+	create_proxy_cert_req();
+
+	am_header = (struct am_packet *) malloc(sizeof(struct am_packet));
+	am_header->id = inet_addr(my_addr) % UINT16_MAX;
+	am_header->type = PC_REQ;
+
+	memset(&sendBuf, 0, sizeof(sendBuf));
+	memcpy(&sendBuf, am_header, sizeof(struct am_packet));
+	tmpPtr = &sendBuf;
+	tmpPtr += sizeof(struct am_packet);
+
+	packet_len = sizeof(struct am_packet);
+	if(!(fp = fopen(req_filename, "r")))
+			fprintf(stderr, "Error opening file %s for writing!\n",subject_name);
+
+	packet_len += fread(tmpPtr, 1, PEM_BUFSIZE, fp);
+	fclose(fp);
+
+	send_udp_packet((unsigned char *)&sendBuf, packet_len, &sin_dest, am_send_socket, NULL);
+
+}
+
 
 void create_proxy_cert_req() {
 
-	CRYPTO_mem_ctrl(CRYPTO_MEM_CHECK_ON);
+	req = NULL;
+	pkey = NULL;
 
+	CRYPTO_mem_ctrl(CRYPTO_MEM_CHECK_ON);
 	bio_err = BIO_new_fp(stderr, BIO_NOCLOSE);
 
-//	mkreq(&req, &pkey,512, 0, 1); //512 changed to EC key size
-	mkreq();
+	mkreq(&req, &pkey,512); //512 changed to EC key size
 
 	RSA_print_fp(stdout, pkey->pkey.rsa, 0);	//pkey.rsa changed with pkey.ec
 	X509_REQ_print_fp(stdout, req);
-
 	PEM_write_X509_REQ(stdout, req);
 
+	/* Write X509_REQ to a file */
+	sprintf(&req_filename, "./tmp_crypto/pc_req");
+	if(!(fp = fopen(req_filename, "w")))
+		fprintf(stderr, "Error opening file %s for writing!\n",req_filename);
+	if(PEM_write_X509_REQ(fp, req) != 1)
+		fprintf(stderr, "Error while writing request to file %s", req_filename);
+	fclose(fp);
 
-	free_proxy_cert_req();
-}
-
-void free_proxy_cert_req(){
+	/* Write Private Key to a file */
+	sprintf(&pkey_filename, "./tmp_crypto/pkey");
+	if(!(fp = fopen(pkey_filename, "w")))
+		fprintf(stderr, "Error opening file %s for writing!\n",pkey_filename);
+	if(PEM_write_PrivateKey(fp, pkey, NULL, NULL, 0, NULL, NULL) != 1)
+		fprintf(stderr, "Error while writing the RSA private key to file %s\n%s", pkey_filename, errno);
+	fclose(fp);
 
 	X509_REQ_free(req);
 	EVP_PKEY_free(pkey);
@@ -451,6 +557,7 @@ void free_proxy_cert_req(){
 
 }
 
+
 static void callback(int p, int n, void *arg) {
 	char c='B';
 
@@ -461,8 +568,7 @@ static void callback(int p, int n, void *arg) {
 	fputc(c,stderr);
 }
 
-//int mkreq(X509_REQ **x509p, EVP_PKEY **pkeyp, int bits, int serial, int days) {
-int mkreq() {
+int mkreq(X509_REQ **x509p, EVP_PKEY **pkeyp, int bits) {
 	X509_REQ *x;
 	EVP_PKEY *pk;
 	RSA *rsa;
@@ -475,7 +581,7 @@ int mkreq() {
 	if ((x=X509_REQ_new()) == NULL)
 		goto err;
 
-	rsa=RSA_generate_key(512,RSA_F4,callback,NULL);
+	rsa=RSA_generate_key(bits,RSA_F4,callback,NULL);
 	if (!EVP_PKEY_assign_RSA(pk,rsa))
 		goto err;
 
@@ -490,7 +596,6 @@ int mkreq() {
 	 * The Issuer name will be prepended by the issuer on creation.
 	 * TODO: Maybe use hash of public key, for now only a random number
 	 */
-	unsigned char subject_name[32];
 	sprintf(&subject_name,"%d",rand()%UINT32_MAX);
 	X509_NAME_add_entry_by_txt(name,"CN", MBSTRING_ASC, subject_name, -1, -1, 0);
 
@@ -633,7 +738,7 @@ int mkreq() {
 	if (!X509_REQ_sign(x,pk,EVP_sha1()))
 		goto err;
 
-	req=x;
+	*x509p=x;
 	*pkeyp=pk;
 	return(1);
 err:
@@ -649,5 +754,13 @@ int add_ext(STACK_OF(X509_REQUEST) *sk, int nid, char *value) {
 	sk_X509_EXTENSION_push(sk, ex);
 
 	return 1;
+
+}
+
+create_proxy_cert() {
+
+}
+
+mkcert() {
 
 }

@@ -40,7 +40,7 @@
 #include <openssl/asn1t.h>
 #include <openssl/asn1_mac.h>
 
-#define MAXBUFLEN 512	//max bytes, may have to be changed depending on certs sizes...
+#define MAXBUFLEN 1500	//max bytes, may have to be changed depending on certs sizes...
 #define IF_NAMESIZE	16
 
 enum role_type{
@@ -55,12 +55,20 @@ enum am_type{
 	CHALLENGE_RESPONSE = 2,
 	RESPONSE = 3,
 	AUTHENTICATED_LIST = 4,		//Full AL update
-	AL_UPDATE = 5				//Single row update of the AL
+	AL_UPDATE = 5,				//Single row update of the AL
+	INVITE = 6,
+	PC_REQ = 7,
+	PC_ISSUE = 8
 };
 
 enum pthread_status{
 	IN_USE = 0,
 	READY = 99
+};
+
+enum key_algorithm{
+	ECC_key = 1,
+	RSA_key = 2
 };
 
 struct am_packet {
@@ -80,6 +88,16 @@ struct challenge_response_packet {
 struct response_packet {
 	uint8_t response_value;
 	uint16_t auth_token;
+} __attribute__((packed));
+
+struct invite_pc_packet {
+	uint8_t key_algorithm;
+	uint16_t key_size;
+} __attribute__((packed));
+
+struct pc_req_packet {
+	uint16_t length;
+	X509_REQ req;
 } __attribute__((packed));
 
 unsigned char recvBuf[MAXBUFLEN];
@@ -117,6 +135,14 @@ void send_challenge();
 void send_challenge_response();
 void send_response();
 
+void send_pc_invite();
+void send_pc_req();
+void send_pc_issue();
+
+void receive_pc_invite();
+void receive_pc_req();
+void receive_pc_issue();
+
 
 
 
@@ -130,7 +156,8 @@ EVP_PKEY *pkey;
 void init_am();
 void create_proxy_cert_req();
 void free_proxy_cert_req();
-int mkreq(X509_REQ **x509p, EVP_PKEY **pkeyp, int bits, int serial, int days);
+int mkreq(X509_REQ **x509p, EVP_PKEY **pkeyp, int bits);
+//int mkreq();
 int add_ext(STACK_OF(X509_REQUEST) *sk, int nid, char *value);
 
 /*
@@ -158,13 +185,15 @@ typedef struct PROXYCERTINFO_st
 } PROXYCERTINFO;
 //typedef struct PROXYCERTINFO_st PROXYCERTINFO;
 
-/* Used for error handling */
+
+/*
 #define ASN1_F_PROXYPOLICY_NEW          450
 #define PROXYCERTINFO_OID               "1.3.6.1.5.5.7.1.14" //tester
 #define PROXYCERTINFO_OLD_OID           "1.3.6.1.4.1.3536.1.222"
 #define LIMITED_PROXY_OID               "1.3.6.1.4.1.3536.1.1.1.9"
 #define LIMITED_PROXY_SN                "LIMITED_PROXY"
 #define LIMITED_PROXY_LN                "GSI limited proxy"
+*/
 
 //temp, for creating certs
 //int mkcert(X509 **x509p, EVP_PKEY **pkeyp, int bits, int serial, int days);

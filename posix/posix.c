@@ -628,6 +628,8 @@ int main(int argc, char *argv[])
 	srand(getpid());
 
 //	init_am();
+//	create_proxy_cert_req();
+//	free_proxy_cert_req();
 
 	res = batman();
 
