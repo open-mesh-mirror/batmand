@@ -17,7 +17,7 @@
 struct addrinfo hints, *res;
 int32_t am_send_socket = 0;
 int32_t am_recv_socket = 0;
-pthread_t am_thread;
+pthread_t am_main_thread, am_authentication_thread;
 enum pthread_status am_status = READY;
 //struct bat_packet *bat_packet;
 //struct batman_if *batman_if;
@@ -43,12 +43,13 @@ enum role_type my_role = UNAUTHENTICATED;
 
 
 BIO *bio_err;
+X509 *pc1 = NULL, *pc0 = NULL;
 X509_REQ *req = NULL;
-EVP_PKEY *pkey = NULL;
+EVP_PKEY *pkey = NULL, *my_pkey = NULL;
+
 FILE *fp;
-unsigned char req_filename[35];
 unsigned char subject_name[32];
-unsigned char pkey_filename[41];
+unsigned char filename[41];
 ssize_t bytes_read;
 
 
@@ -87,6 +88,17 @@ uint32_t tmp_wait = 0;
 //	dump_memory(tmpPtr, 4);
 
 
+void am_main_thread_init() {
+	pthread_create(&am_main_thread, NULL, authenticate, NULL);
+}
+
+void *am_main() {
+
+	//send new signature
+	//sleep
+	//
+}
+
 void authenticate_thread_init(char *d, uint16_t auth_token, char *prev_sender, char *my_addr_string) {
 	if (am_status != IN_USE ) {
 		am_status = IN_USE;
@@ -107,7 +119,7 @@ void authenticate_thread_init(char *d, uint16_t auth_token, char *prev_sender, c
 		memset(my_addr, 0, strlen(my_addr_string)+1);
 		memcpy(my_addr, my_addr_string, strlen(my_addr_string));
 
-		am_status = pthread_create(&am_thread, NULL, authenticate, NULL);
+		am_status = pthread_create(&am_authentication_thread, NULL, authenticate, NULL);
 
 	}
 
@@ -124,6 +136,7 @@ void *authenticate() {
 		if(inet_addr(addr_prev_sender)<inet_addr(my_addr)) {// && my_challenge==0) {
 			printf("RECEIVED UNAUTHENTICATED OGM\n");
 //			send_challenge();
+			create_proxy_cert_0();
 			send_pc_invite();
 		}
 
@@ -165,6 +178,11 @@ void *authenticate() {
 			} else if(rcvd_type == PC_REQ) {
 				printf("RECEIVED PC REQUEST\n");
 				receive_pc_req();
+				send_pc_issue();
+
+			} else if(rcvd_type == PC_ISSUE) {
+				printf("RECEIVED PC ISSUE\n");
+				receive_pc_issue();
 
 			} else {
 				printf("RECEIVED UNRECOGNIZABLE AM HEADER\n");
@@ -379,9 +397,19 @@ void receive_pc_invite() {
 }
 
 void receive_pc_req() {
+	memset(filename, 0, sizeof(filename));
+	strncpy(&filename, RECV_REQ, sizeof(filename));
+	strncat(&filename, addr_prev_sender, sizeof(filename)-strlen(filename));
+	if(!(fp = fopen(filename, "w")))
+		fprintf(stderr, "Error opening file %s for writing!\n", filename);
 
-	if(!(fp = fopen("./tmp_crypto/recv_pc_req", "w")))
-		fprintf(stderr, "Error opening file ./tmp_crypto/recv_pc_req for writing!\n");
+	fwrite(tmpPtr, 1, strlen(tmpPtr), fp);
+	fclose(fp);
+}
+
+void receive_pc_issue() {
+	if(!(fp = fopen(MY_CERT, "w")))
+		fprintf(stderr, "Error opening file %s for writing!\n", MY_CERT);
 
 	fwrite(tmpPtr, 1, strlen(tmpPtr), fp);
 	fclose(fp);
@@ -503,8 +531,8 @@ void send_pc_req() {
 	tmpPtr += sizeof(struct am_packet);
 
 	packet_len = sizeof(struct am_packet);
-	if(!(fp = fopen(req_filename, "r")))
-			fprintf(stderr, "Error opening file %s for writing!\n",subject_name);
+	if(!(fp = fopen(MY_REQ, "r")))
+			fprintf(stderr, "Error opening file %s for reading!\n",MY_REQ);
 
 	packet_len += fread(tmpPtr, 1, PEM_BUFSIZE, fp);
 	fclose(fp);
@@ -513,8 +541,30 @@ void send_pc_req() {
 
 }
 
+void send_pc_issue() {
+	create_proxy_cert_1();
 
-void create_proxy_cert_req() {
+	am_header = (struct am_packet *) malloc(sizeof(struct am_packet));
+	am_header->id = inet_addr(my_addr) % UINT16_MAX;
+	am_header->type = PC_ISSUE;
+
+	memset(&sendBuf, 0, sizeof(sendBuf));
+	memcpy(&sendBuf, am_header, sizeof(struct am_packet));
+	tmpPtr = &sendBuf;
+	tmpPtr += sizeof(struct am_packet);
+
+	packet_len = sizeof(struct am_packet);
+	if(!(fp = fopen(ISSUED_CERT, "r")))
+			fprintf(stderr, "Error opening file %s for reading!\n",ISSUED_CERT);
+
+	packet_len += fread(tmpPtr, 1, PEM_BUFSIZE, fp);
+	fclose(fp);
+
+	send_udp_packet((unsigned char *)&sendBuf, packet_len, &sin_dest, am_send_socket, NULL);
+}
+
+
+int create_proxy_cert_req() {
 
 	req = NULL;
 	pkey = NULL;
@@ -528,20 +578,18 @@ void create_proxy_cert_req() {
 	X509_REQ_print_fp(stdout, req);
 	PEM_write_X509_REQ(stdout, req);
 
-	/* Write X509_REQ to a file */
-	sprintf(&req_filename, "./tmp_crypto/pc_req");
-	if(!(fp = fopen(req_filename, "w")))
-		fprintf(stderr, "Error opening file %s for writing!\n",req_filename);
-	if(PEM_write_X509_REQ(fp, req) != 1)
-		fprintf(stderr, "Error while writing request to file %s", req_filename);
+	/* Write Private Key to a file */
+	if(!(fp = fopen(MY_KEY, "w")))
+		fprintf(stderr, "Error opening file %s for writing!\n",MY_KEY);
+	if(PEM_write_PrivateKey(fp, pkey, NULL, NULL, 0, NULL, NULL) != 1)
+		fprintf(stderr, "Error while writing the RSA private key to file %s\n",MY_KEY);
 	fclose(fp);
 
-	/* Write Private Key to a file */
-	sprintf(&pkey_filename, "./tmp_crypto/pkey");
-	if(!(fp = fopen(pkey_filename, "w")))
-		fprintf(stderr, "Error opening file %s for writing!\n",pkey_filename);
-	if(PEM_write_PrivateKey(fp, pkey, NULL, NULL, 0, NULL, NULL) != 1)
-		fprintf(stderr, "Error while writing the RSA private key to file %s\n%s", pkey_filename, errno);
+	/* Write X509_REQ to a file */
+	if(!(fp = fopen(MY_REQ, "w")))
+		fprintf(stderr, "Error opening file %s for writing!\n",MY_REQ);
+	if(PEM_write_X509_REQ(fp, req) != 1)
+		fprintf(stderr, "Error while writing request to file %s", MY_REQ);
 	fclose(fp);
 
 	X509_REQ_free(req);
@@ -555,6 +603,7 @@ void create_proxy_cert_req() {
 	CRYPTO_mem_leaks(bio_err);
 	BIO_free(bio_err);
 
+	return(0);
 }
 
 
@@ -757,10 +806,302 @@ int add_ext(STACK_OF(X509_REQUEST) *sk, int nid, char *value) {
 
 }
 
-create_proxy_cert() {
+int create_proxy_cert_0() {
+
+	CRYPTO_mem_ctrl(CRYPTO_MEM_CHECK_ON);
+
+	bio_err=BIO_new_fp(stderr, BIO_NOCLOSE);
+
+	selfsign(&pc0,&pkey,2048);
+
+	RSA_print_fp(stdout,pkey->pkey.rsa,0);
+	X509_print_fp(stdout,pc0);
+
+	PEM_write_PrivateKey(stdout,pkey,NULL,NULL,0,NULL, NULL);
+	PEM_write_X509(stdout,pc0);
+
+	/* Write X509 PC0 to a file */
+	/*memset(filename, 0, sizeof(filename));
+	strncpy(&filename, "./tmp_crypto/my_pc0", sizeof(filename));*/
+	if(!(fp = fopen(MY_CERT, "w")))
+		fprintf(stderr, "Error opening file %s for writing!\n",MY_CERT);
+	if(PEM_write_X509(fp, pc0) != 1)
+		fprintf(stderr, "Error while writing request to file %s", MY_CERT);
+	fclose(fp);
+
+	/* Write Private Key to a file */
+	if(!(fp = fopen(MY_KEY, "w")))
+		fprintf(stderr, "Error opening file %s for writing!\n",MY_KEY);
+	if(PEM_write_PrivateKey(fp, pkey, NULL, NULL, 0, NULL, NULL) != 1)
+		fprintf(stderr, "Error while writing the RSA private key to file %s\n", MY_KEY);
+	fclose(fp);
+
+	X509_free(pc0);
+	EVP_PKEY_free(pkey);
+
+#ifdef CUSTOM_EXT
+	/* Only needed if we add objects or custom extensions */
+	X509V3_EXT_cleanup();
+	OBJ_cleanup();
+#endif
+
+	CRYPTO_mem_leaks(bio_err);
+	BIO_free(bio_err);
+	return(0);
 
 }
 
-mkcert() {
+int selfsign(X509 **x509p, EVP_PKEY **pkeyp, int bits) {
+	X509 *x;
+	EVP_PKEY *pk;
+	RSA *rsa;
+	X509_NAME *name=NULL;
+	X509_NAME_ENTRY *ne=NULL;
+	X509_EXTENSION *ex=NULL;
+
+
+	if ((pkeyp == NULL) || (*pkeyp == NULL))
+		{
+		if ((pk=EVP_PKEY_new()) == NULL)
+			{
+			abort();
+			return(0);
+			}
+		}
+	else
+		pk= *pkeyp;
+
+	if ((x509p == NULL) || (*x509p == NULL))
+		{
+		if ((x=X509_new()) == NULL)
+			goto err;
+		}
+	else
+		x= *x509p;
+
+	rsa=RSA_generate_key(bits,RSA_F4,callback,NULL);
+	if (!EVP_PKEY_assign_RSA(pk,rsa))
+		{
+		abort();
+		goto err;
+		}
+	rsa=NULL;
+
+	if(X509_set_version(x,2L) != 1)
+		fprintf(stderr,"Error setting certificate version");
+	ASN1_INTEGER_set(X509_get_serialNumber(x),rand()%INT32_MAX);	//serial, change later to sha1 of public key
+	X509_gmtime_adj(X509_get_notBefore(x),0);
+	X509_gmtime_adj(X509_get_notAfter(x),(long)60*60*8);	//60 sec, 60 min, 8 hrs
+	X509_set_pubkey(x,pk);
+
+	name=X509_get_subject_name(x);
+
+	/* This function creates and adds the entry, working out the
+	 * correct string type and performing checks on its length.
+	 * Normally we'd check the return value for errors...
+	 */
+	sprintf(&subject_name,"SP_%d",rand()%UINT32_MAX);
+	X509_NAME_add_entry_by_txt(name,"CN", MBSTRING_ASC, subject_name, -1, -1, 0);
+
+	X509_set_issuer_name(x,name);
+
+#if 0
+	/* Add extension using V3 code: we can set the config file as NULL
+	 * because we wont reference any other sections. We can also set
+         * the context to NULL because none of these extensions below will need
+	 * to access it.
+	 */
+
+	ex = X509V3_EXT_conf_nid(NULL, NULL, NID_netscape_cert_type, "server");
+	X509_add_ext(x,ex,-1);
+	X509_EXTENSION_free(ex);
+
+	ex = X509V3_EXT_conf_nid(NULL, NULL, NID_netscape_comment,
+						"example comment extension");
+	X509_add_ext(x,ex,-1);
+	X509_EXTENSION_free(ex);
+
+	ex = X509V3_EXT_conf_nid(NULL, NULL, NID_netscape_ssl_server_name,
+							"www.openssl.org");
+
+	X509_add_ext(x,ex,-1);
+	X509_EXTENSION_free(ex);
+
+
+	/* might want something like this too.... */
+	ex = X509V3_EXT_conf_nid(NULL, NULL, NID_basic_constraints,
+							"critical,CA:TRUE");
+
+
+	X509_add_ext(x,ex,-1);
+	X509_EXTENSION_free(ex);
+#endif
+
+#ifdef CUSTOM_EXT
+	/* Maybe even add our own extension based on existing */
+	{
+		int nid;
+		nid = OBJ_create("1.2.3.4", "MyAlias", "My Test Alias Extension");
+		X509V3_EXT_add_alias(nid, NID_netscape_comment);
+		ex = X509V3_EXT_conf_nid(NULL, NULL, nid,
+						"example comment alias");
+		X509_add_ext(x,ex,-1);
+		X509_EXTENSION_free(ex);
+	}
+#endif
+
+	if (!X509_sign(x,pk,EVP_md5()))
+		goto err;
+
+	*x509p=x;
+	*pkeyp=pk;
+	return(1);
+err:
+	return(0);
+	}
+
+int create_proxy_cert_1() {
+
+	OpenSSL_add_all_algorithms();
+	ERR_load_crypto_strings();
+
+	CRYPTO_mem_ctrl(CRYPTO_MEM_CHECK_ON);
+
+	bio_err=BIO_new_fp(stderr, BIO_NOCLOSE);
+
+	/* Read the X509_REQ received */
+	memset(filename, 0, sizeof(filename));
+	strncpy(&filename, RECV_REQ, sizeof(filename));
+	strncat(&filename, addr_prev_sender, sizeof(filename)-strlen(filename));
+	if(!(fp = fopen(filename, "r")))
+		fprintf(stderr, "Error opening file %s for reading!\n",filename);
+	if(!(req = PEM_read_X509_REQ(fp, NULL, NULL, NULL)))
+			fprintf(stderr, "Error while reading request from file %s", filename);
+	fclose(fp);
+
+
+	/* Read the SP's PC0  */
+	if(!(fp = fopen(MY_CERT, "r")))
+		fprintf(stderr, "Error opening file %s for reading!\n",MY_CERT);
+	if(!(pc0 = PEM_read_X509(fp, NULL, NULL, NULL)))
+			fprintf(stderr, "Error while reading request from file %s", RECV_REQ);
+	fclose(fp);
+
+
+	if(mkcert(&req, &pc1, &pc0) == 0) {
+		X509_print_fp(stdout,pc1);
+		PEM_write_X509(stdout,pc1);
+
+		/* Write issued X509 PC1 to a file */
+		if(!(fp = fopen(ISSUED_CERT, "w")))
+			fprintf(stderr, "Error opening file %s for writing!\n",ISSUED_CERT);
+		if(PEM_write_X509(fp, pc1) != 1)
+			fprintf(stderr, "Error while writing request to file %s", ISSUED_CERT);
+		fclose(fp);
+		X509_free(pc1);
+	}
+
+	EVP_PKEY_free(my_pkey);
+
+#ifdef CUSTOM_EXT
+	/* Only needed if we add objects or custom extensions */
+	X509V3_EXT_cleanup();
+	OBJ_cleanup();
+#endif
+
+	CRYPTO_mem_leaks(bio_err);
+	BIO_free(bio_err);
+	return(0);
+
+}
+
+int mkcert(X509_REQ **reqp,X509 **pc1p, X509 **pc0p) {
+	EVP_PKEY *req_pkey;
+	X509_NAME *name, *req_name, *issuer_name;
+	X509_NAME_ENTRY *req_name_entry;
+	X509  *cert;
+	const EVP_MD *digest;
+
+	/* Verify signature on REQ */
+	if(!(req_pkey = X509_REQ_get_pubkey(*reqp)))
+		fprintf(stderr,"Error getting public key from request");
+	if(X509_REQ_verify(*reqp, req_pkey) != 1)
+		fprintf(stderr,"Error verifying signature on certificate");
+
+	/* Read my private key */
+	if(!(fp = fopen(MY_KEY, "r")))
+		fprintf(stderr, "Error opening file %s for reading!\n",RECV_REQ);
+	if(!(my_pkey = PEM_read_PrivateKey(fp, NULL, NULL, NULL)))
+		fprintf(stderr,"Error reading private key of SP");
+	fclose(fp);
+
+
+	/* Read Subject Name of request */
+	if(!(req_name = X509_REQ_get_subject_name(*reqp)))
+		fprintf(stderr,"Error getting subject name from request\n");
+
+	/* Read Subject Name of PC0 */
+	if(!(issuer_name = X509_get_subject_name(*pc0p)))
+		fprintf(stderr,"Error getting subject name from request\n");
+
+
+	/* Create new X509 (PC1) */
+	if(!(cert = X509_new()))
+		fprintf(stderr,"Error creating X509 object\n");
+
+
+	/* Set version */
+	if(X509_set_version(cert,2L) != 1)
+		fprintf(stderr,"Error setting certificate version");
+
+	/* Set serial number, change to relevant hash later */
+	ASN1_INTEGER_set(X509_get_serialNumber(cert), rand()%INT32_MAX);
+
+	/* Set issuer */
+	if(X509_set_issuer_name(cert, issuer_name) != 1)
+		fprintf(stderr,"Error setting the issuer name");
+
+	/* Set subject name from issuer name */
+	if((name = X509_NAME_dup(issuer_name)) == NULL)
+		fprintf(stderr,"Error setting subject name from issuer name\n");
+
+	/* Append subject request name to the subject name */
+	req_name_entry = X509_NAME_get_entry(req_name,0);
+	X509_NAME_add_entry(name, req_name_entry, X509_NAME_entry_count(name), 0);
+
+	if(X509_set_subject_name(cert, name) != 1)
+		fprintf(stderr,"Error setting the subject name to the certificate\n");
+
+
+	/* Set public key */
+	if(X509_set_pubkey(cert, req_pkey) != 1)
+		fprintf(stderr,"Error setting the public key to the certificate\n");
+
+	/* Set lifetime of cert */
+	if(!(X509_gmtime_adj(X509_get_notBefore(cert), 0)))
+		fprintf(stderr,"Error setting the start lifetime of cert");
+	if(!(X509_gmtime_adj(X509_get_notAfter(cert), (long)60*60*8)))
+		fprintf(stderr,"Error setting the end lifetime of cert");
+
+	/* Sign the certificate with PC0 */
+	if(EVP_PKEY_type(my_pkey->type) == EVP_PKEY_RSA)
+		digest = EVP_sha1();
+
+	if(!(X509_sign(cert, my_pkey, digest)))
+		fprintf(stderr,"Error signing cert");
+
+	/* Write the cert to disk */
+	if(!(fp = fopen(ISSUED_CERT, "w")))
+		fprintf(stderr,"Errpr writing to file %s\n", ISSUED_CERT);
+	if(PEM_write_X509(fp, cert) != 1)
+		fprintf(stderr,"Error writing cert to file\n");
+	fclose(fp);
+
+
+	*pc1p = cert;
+
+	return(0);
+
+
 
 }

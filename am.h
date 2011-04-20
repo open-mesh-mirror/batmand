@@ -150,14 +150,24 @@ BIO *bio_err;
 X509_REQ *req;
 EVP_PKEY *pkey;
 
-
-
+#define CRYPTO_DIR	"./tmp_crypto/"
+#define MY_KEY		CRYPTO_DIR "my_private_key"
+#define MY_CERT		CRYPTO_DIR "my_pc"
+#define MY_REQ 		CRYPTO_DIR "my_pc_req"
+#define RECV_REQ	CRYPTO_DIR "recv_pc_req_"
+#define RECV_CERT	CRYPTO_DIR "recv_pc_"
+#define ISSUED_CERT	CRYPTO_DIR "issued_pc"
 
 void init_am();
-void create_proxy_cert_req();
-void free_proxy_cert_req();
+
+int create_proxy_cert_req();
+int create_proxy_cert_0();
+int create_proxy_cert_1();
+
+int selfsign(X509 **x509p, EVP_PKEY **pkeyp, int bits);
 int mkreq(X509_REQ **x509p, EVP_PKEY **pkeyp, int bits);
-//int mkreq();
+int mkcert(X509_REQ **reqp, X509 **pc1p, X509 **pc0p);
+
 int add_ext(STACK_OF(X509_REQUEST) *sk, int nid, char *value);
 
 /*
