@@ -779,9 +779,6 @@ int8_t batman(void)
 	uint8_t is_my_addr, is_my_orig, is_my_oldorig, is_broadcast, is_duplicate, is_bidirectional, has_directlink_flag;
 	int8_t res;
 
-	my_auth_token = 0;
-
-
 	debug_timeout = vis_timeout = get_time_msec();
 
 	if ( NULL == ( orig_hash = hash_new( 128, compare_orig, choose_orig ) ) )
@@ -797,6 +794,13 @@ int8_t batman(void)
 	prof_init(PROF_purge_originator, "purge_orig");
 	prof_init(PROF_schedule_forward_packet, "schedule_forward_packet");
 	prof_init(PROF_send_outstanding_packets, "send_outstanding_packets");
+
+
+	/*Initialize AM variables */
+	uint8_t neigh_counter = 0;
+	num_trusted_neighbors = 0;
+	memset(signature_extract, 0, sizeof(signature_extract));
+
 
 	list_for_each(list_pos, &if_list) {
 		batman_if = list_entry(list_pos, struct batman_if, list);
@@ -827,10 +831,13 @@ int8_t batman(void)
 	forward_old = get_forwarding();
 	set_forwarding(1);
 
+	/* Initiate AM thread */
+	am_thread_init(batman_if->dev, batman_if->addr, batman_if->broad);
+
+
 	while (!is_aborted()) {
 
 		debug_output( 4, " \n" );
-
 		/* harden select_timeout against sudden time change (e.g. ntpdate) */
 		curr_time = get_time_msec();
 		select_timeout = ((int)(((struct forw_node *)forw_list.next)->send_time - curr_time) > 0 ?
@@ -906,18 +913,41 @@ int8_t batman(void)
 			}
 
 
+//			/* Initiate AM thread */
+//			am_thread_init(batman_if->dev, batman_if->addr, (char *)&prev_sender_str);
 			/*
 			 * If the daemon is not authenticated, or it receives an authentication token which it does not recognize,
 			 * the authentication procedure in the Authentication Module is called. No packets received when authenticating
 			 * will be processed.
 			 */
-
-			if((( bat_packet->auth_token == 0 ) || (bat_packet->auth_token != my_auth_token )) && (my_role != AUTHENTICATED)) {
+			/*if((( bat_packet->auth_token == 0 ) || (bat_packet->auth_token != my_auth_token )) && ((my_role == UNAUTHENTICATED) || (my_role == MASTER))) {
 				char my_addr[16];
 				addr_to_string(batman_if->addr.sin_addr.s_addr, my_addr, sizeof (my_addr));
 				authenticate_thread_init(batman_if->dev, bat_packet->auth_token, (char *)&prev_sender_str, (char *)&my_addr);
 				goto send_packets;
+			}*/
+
+			if(num_trusted_neighbors) {
+				while(neigh_counter < num_trusted_neighbors) {
+					if(trusted_neighbors[neigh_counter] == neigh) {
+						neigh_counter = UINT8_MAX; //Max value reserved, so max allowed neighbors is UINT8_MAX-1 (254)
+						break;
+					}
+					neigh_counter++;
+				}
 			}
+
+			if(neigh_counter < UINT8_MAX) {
+				if(my_role == SP && new_neighbor == 0) {
+					new_neighbor = neigh;
+				}
+
+				if(my_role == UNAUTHENTICATED && new_neighbor == 0) {
+					//TODO: Wait for invite?
+				}
+				goto send_packets;
+			}
+
 
 
 			if (bat_packet->gwflags != 0)

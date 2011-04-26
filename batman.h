@@ -214,7 +214,7 @@ struct bat_packet
 	uint32_t prev_sender;
 	uint8_t tq;
 	uint8_t hna_len;
-	uint16_t auth_token;	//Signature, 0 if not authenticated
+	char sig[2];
 } __attribute__((packed));
 
 struct orig_node                 /* structure for orig_list maintaining nodes of mesh */

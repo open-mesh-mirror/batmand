@@ -40,6 +40,7 @@
 #include "../os.h"
 #include "../batman.h"
 #include "../hna.h"
+#include "../am.h"
 
 #define IOCSETDEV 1
 
@@ -152,13 +153,15 @@ void apply_init_args( int argc, char *argv[] ) {
 	char routing_class_opt = 0, gateway_class_opt = 0, pref_gw_opt = 0;
 	char hop_penalty_opt = 0, purge_timeout_opt = 0;
 	uint32_t vis_server = 0;
+	my_role = UNAUTHENTICATED;
 	struct option long_options[] =
 	{
-		{"policy-routing-script",     required_argument,       0, 'n'},
-		{"hop-penalty",     required_argument,       0, 'm'},
-		{"purge-timeout",     required_argument,       0, 'q'},
-		{"disable-aggregation",     no_argument,       0, 'x'},
-		{"disable-client-nat",     no_argument,       0, 'z'},
+		{"policy-routing-script",	required_argument,  0, 'n'},
+		{"hop-penalty",     		required_argument,  0, 'm'},
+		{"purge-timeout",     		required_argument,	0, 'q'},
+		{"disable-aggregation",     no_argument,       	0, 'x'},
+		{"disable-client-nat",     	no_argument,       	0, 'z'},
+		{"SP",						no_argument,		0, 'S'},
 		{0, 0, 0, 0}
 	};
 
@@ -169,7 +172,7 @@ void apply_init_args( int argc, char *argv[] ) {
 	if ( strstr( SOURCE_VERSION, "-" ) != NULL )
 		printf( "WARNING: You are using the unstable batman branch. If you are interested in *using* batman get the latest stable release !\n" );
 
-	while ( ( optchar = getopt_long( argc, argv, "a:A:bcd:hHio:g:p:r:s:vV", long_options, &option_index ) ) != -1 ) {
+	while ( ( optchar = getopt_long( argc, argv, "a:A:bcd:hHio:g:p:r:s:vV:S", long_options, &option_index ) ) != -1 ) {
 
 		switch ( optchar ) {
 
@@ -355,6 +358,12 @@ void apply_init_args( int argc, char *argv[] ) {
 
 
 				found_args += ((*((char*)( optarg - 1)) == optchar) ? 1 : 2);
+				break;
+
+			case 'S':
+				printf("Assumed Service Proxy Role\n");
+				my_role = SP;
+				found_args++;
 				break;
 
 			case 'v':

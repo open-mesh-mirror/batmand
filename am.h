@@ -18,8 +18,10 @@
 #include "batman.h"
 //#include "os.h"
 #include <sys/socket.h>
-#include <netinet/in.h>
 #include <sys/types.h>
+#include <sys/select.h>
+#include <sys/time.h>
+#include <netinet/in.h>
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <errno.h>
@@ -32,6 +34,7 @@
 #include <openssl/pem.h>
 #include <openssl/conf.h>
 #include <openssl/x509v3.h>
+#include <openssl/evp.h>
 #ifndef OPENSSL_NO_ENGINE
 #include <openssl/engine.h>
 #endif
@@ -40,92 +43,89 @@
 #include <openssl/asn1t.h>
 #include <openssl/asn1_mac.h>
 
-#define MAXBUFLEN 1500	//max bytes, may have to be changed depending on certs sizes...
 #define IF_NAMESIZE	16
+#define AM_PORT 64305
 
-enum role_type{
+
+typedef enum role_type_en{
 	UNAUTHENTICATED,
 	AUTHENTICATED,
-	MASTER
-};
+	MASTER,
+	SP
+} role_type;
 
-enum am_type{
-	NEW_SIGNATURE = 0,
-	CHALLENGE = 1,
-	CHALLENGE_RESPONSE = 2,
-	RESPONSE = 3,
-	AUTHENTICATED_LIST = 4,		//Full AL update
-	AL_UPDATE = 5,				//Single row update of the AL
-	INVITE = 6,
-	PC_REQ = 7,
-	PC_ISSUE = 8
-};
+typedef enum am_type_en{
+	NO_AM_DATA = 0,
+	NEW_SIGNATURE = 1,
+	AUTHENTICATED_LIST = 2,		//Full AL update
+	AL_UPDATE = 3,				//Single row update of the AL
+	INVITE = 4,
+	PC_REQ = 5,
+	PC_ISSUE = 6
+} am_type;
 
-enum pthread_status{
+typedef enum pthread_status_en{
 	IN_USE = 0,
 	READY = 99
-};
+} pthread_status;
 
-enum key_algorithm{
+typedef enum key_algorithm_en{
 	ECC_key = 1,
 	RSA_key = 2
-};
+} key_algorithm;
 
-struct am_packet {
+typedef struct am_packet_st {
 	uint16_t id;
 	uint8_t type;
-} __attribute__((packed));
+} __attribute__((packed)) am_packet;
 
-struct challenge_packet {
+typedef struct challenge_packet_st {
 	uint8_t challenge_value;
-} __attribute__((packed));
+} __attribute__((packed)) challenge_packet;
 
-struct challenge_response_packet {
+typedef struct challenge_response_packet_st {
 	uint8_t challenge_value;
 	uint8_t response_value;
-} __attribute__((packed));
+} __attribute__((packed)) challenge_response_packet;
 
-struct response_packet {
+typedef struct response_packet_st {
 	uint8_t response_value;
 	uint16_t auth_token;
-} __attribute__((packed));
+} __attribute__((packed)) response_packet;
 
-struct invite_pc_packet {
+typedef struct invite_pc_packet_st {
 	uint8_t key_algorithm;
 	uint16_t key_size;
-} __attribute__((packed));
+} __attribute__((packed)) invite_pc_packet;
 
-struct pc_req_packet {
+typedef struct pc_req_packet_st {
 	uint16_t length;
 	X509_REQ req;
-} __attribute__((packed));
+} __attribute__((packed)) pc_req_packet;
 
-unsigned char recvBuf[MAXBUFLEN];
-unsigned char sendBuf[MAXBUFLEN];
-struct addrinfo hints, *res;
-int32_t am_send_socket;
-int32_t am_recv_socket;
-struct am_packet *rcvd_am_header;
-struct challenge_packet *rcvd_challenge_packet;
-struct challenge_response_packet *rcvd_challenge_response_packet;
-struct response_packet *rcvd_response_packet;
+//unsigned char recvBuf[MAXBUFLEN];	//tror ikke trengs
+//unsigned char sendBuf[MAXBUFLEN];	//tor ikke trengs
+struct addrinfo hints, *res;	//tror ikke trengs
+int32_t auth_send_socket;	//tror ikke trengs
+int32_t auth_recv_socket;	//tror ikke denne trengs
+am_packet *rcvd_am_header;	//tror ikke trengs
+challenge_packet *rcvd_challenge_packet;	//tror ikke trengs
+challenge_response_packet *rcvd_challenge_response_packet;	//tror ikke trengs
+response_packet *rcvd_response_packet;	//tror ikke trengs
 char *if_device;
 char *addr_prev_sender;
-char *my_addr;
+
 
 extern uint16_t my_auth_token;		// My Authentication Token Value, set to 0 if not authenticated
-extern enum pthread_status am_status;
-extern enum role_type my_role;
+extern pthread_status am_status;
 
-void authenticate_thread_init(char *, uint16_t, char *, char *);
-void *authenticate();
 
 void setup_am_socks();
 void setup_am_recv_sock();
 void setup_am_send_sock();
 void destroy_am_socks();
 
-enum am_type receive_am_header();
+am_type receive_am_header();
 
 void receive_challenge();
 void receive_challenge_response();
@@ -154,6 +154,7 @@ EVP_PKEY *pkey;
 #define MY_KEY		CRYPTO_DIR "my_private_key"
 #define MY_CERT		CRYPTO_DIR "my_pc"
 #define MY_REQ 		CRYPTO_DIR "my_pc_req"
+#define MY_SIG		CRYPTO_DIR "my_signature"
 #define RECV_REQ	CRYPTO_DIR "recv_pc_req_"
 #define RECV_CERT	CRYPTO_DIR "recv_pc_"
 #define ISSUED_CERT	CRYPTO_DIR "issued_pc"
@@ -161,12 +162,10 @@ EVP_PKEY *pkey;
 void init_am();
 
 int create_proxy_cert_req();
-int create_proxy_cert_0();
+
 int create_proxy_cert_1();
 
-int selfsign(X509 **x509p, EVP_PKEY **pkeyp, int bits);
-int mkreq(X509_REQ **x509p, EVP_PKEY **pkeyp, int bits);
-int mkcert(X509_REQ **reqp, X509 **pc1p, X509 **pc0p);
+
 
 int add_ext(STACK_OF(X509_REQUEST) *sk, int nid, char *value);
 
@@ -186,14 +185,14 @@ typedef struct PROXYPOLICY_st
 	ASN1_OBJECT *policy_language;
 	ASN1_OCTET_STRING *policy;
 } PROXYPOLICY;
-//typedef struct PROXYPOLICY_st PROXYPOLICY;
+
 
 typedef struct PROXYCERTINFO_st
 {
 	ASN1_INTEGER *path_length;       /* [ OPTIONAL ] */
 	PROXYPOLICY *policy;
 } PROXYCERTINFO;
-//typedef struct PROXYCERTINFO_st PROXYCERTINFO;
+
 
 
 /*
@@ -204,11 +203,6 @@ typedef struct PROXYCERTINFO_st
 #define LIMITED_PROXY_SN                "LIMITED_PROXY"
 #define LIMITED_PROXY_LN                "GSI limited proxy"
 */
-
-//temp, for creating certs
-//int mkcert(X509 **x509p, EVP_PKEY **pkeyp, int bits, int serial, int days);
-//int add_ext(STACK_OF(X509_REQUEST) *sk, int nid, char *value);
-
 
 
 //Temp variables for simple auth
@@ -228,5 +222,55 @@ extern uint32_t	random_wait_time;	// Random backoff time, tmp_wait + curr_time
 extern uint32_t tmp_wait;			// Random backoff time value
 
 
+
+
+
+
+/*
+ *
+ * New ones, in right order
+ *
+ */
+
+/* Definitions */
+#define MAXBUFLEN 1500
+#define SUBJECT_NAME_SIZE 16
+
+/* Naming standard structs */
+typedef struct addrinfo addrinfo;
+typedef struct sockaddr_in sockaddr_in;
+typedef struct sockaddr_storage sockaddr_storage;
+typedef struct sockaddr sockaddr;
+typedef struct timeval timeval;
+
+/* AM Structs */
+
+
+/* AM Enums */
+
+
+/* Functions */
+void am_thread_init(char *dev, sockaddr_in addr, sockaddr_in broad);
+void setup_am_socks(int32_t *recv, int32_t *send, addrinfo hints, addrinfo *res);
+int setup_am_recv_socks(int32_t *recv, addrinfo *res);
+int setup_am_send_socks(int32_t *send, addrinfo *res);
+void destroy_am_socks(int32_t *send, int32_t *recv, addrinfo *res);
+void *am_main();
+static void callback(int p, int n, void *arg);
+int create_proxy_cert_0(BIO *bio_err, X509 *pc0, EVP_PKEY *pkey, FILE *fp, unsigned char *subject_name);
+int selfsign(X509 **x509p, EVP_PKEY **pkeyp, unsigned char *subject_name);
+int mkreq(X509_REQ **x509p, EVP_PKEY **pkeyp, unsigned char *subject_name);
+int mkcert(X509_REQ **reqp, X509 **pc1p, X509 **pc0p, FILE *fp);
+int seed_prng(int bytes);
+am_type extract_am_header(am_packet *header, char *buf[MAXBUFLEN], void *ptr);
+void send_pc_invite(am_packet *header, invite_pc_packet *payload, char *buf[MAXBUFLEN], void *ptr, sockaddr_in *sin_dest);
+
+/* Necessary external variables */
+extern role_type my_role;
+extern pthread_t am_main_thread;
+extern uint32_t new_neighbor;
+extern uint32_t trusted_neighbors[100];
+extern uint8_t num_trusted_neighbors;
+extern char signature_extract[3];
 
 #endif

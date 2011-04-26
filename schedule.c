@@ -72,8 +72,13 @@ void schedule_own_packet(struct batman_if *batman_if)
 	/* change sequence number to network order */
 	((struct bat_packet *)forw_node_new->pack_buff)->seqno = htons(((struct bat_packet *)forw_node_new->pack_buff)->seqno);
 
-	//ENOTE: This is where the auth token is added to the OGMs.
-	((struct bat_packet *)forw_node_new->pack_buff)->auth_token = my_auth_token;
+
+	/* Begin Authentication Module Extension */
+
+	/* Add Signature Extract to OGM */
+	memcpy(((struct bat_packet *)forw_node_new->pack_buff)->sig, &signature_extract, 2);
+
+	/* End Authentication Module Extension */
 
 	prev_list_head = (struct list_head *)&forw_list;
 

@@ -11,6 +11,6 @@ echo "make clean"
 echo "===================="
 sudo make clean
 echo "===================="
-echo "batmand -d 3 wlan0"
+echo "batmand -d 3 eth0"
 echo "===================="
-sudo batmand -d 3 wlan0
+sudo batmand -d 3 eth0

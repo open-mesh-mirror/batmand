@@ -1,5 +1,19 @@
 ***AN UPDATED VERSION FOR THE SECURE VERSION OF BATMAN WILL BE COMMITED SOON***
 
+Code snippet for dumping memory:
+
+void dump_memory(void* data, size_t len)
+{
+size_t i;
+printf("Data in [%p..%p): ",data,data+len);
+for (i=0;i<len;i++)
+printf("%02X ", ((unsigned char*)data)[i] );
+printf("\n");
+}
+
+dump_memory(&recvBuf, 4);
+dump_memory(tmpPtr, 4);
+
 
 Getting started with the batman daemon
 ======================================

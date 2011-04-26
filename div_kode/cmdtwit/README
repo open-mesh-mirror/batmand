@@ -1,8 +1,0 @@
-I've added an exit code:
- - Exit Code 7 - Less than 30 API calls remaining, or if there's an unknown error.
- 
-Otherwise I've followed all exit code specifications. 
-I therefore also exit the program with code 2 when authentication fails, even in interactive mode.
-
-I have not implemented url-shortening, but everything else should be implemented. 
-No segfaults should occur either.

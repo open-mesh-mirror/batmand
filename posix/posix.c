@@ -627,11 +627,16 @@ int main(int argc, char *argv[])
 
 	srand(getpid());
 
-//	init_am();
-//	create_proxy_cert_req();
-//	free_proxy_cert_req();
+	/* Seed the PRNG for AM */
+	printf("Attempting to seed the PRNG...\n");
+	if(seed_prng(1024)) {
+		printf("Successfully seeded the PRNG with 1024 bytes from /dev/random.\n");
+		res = batman();
+	} else {
+		printf("Seeding failed. Try to run different tasks before restarting B.A.T.M.A.N.!\n");
+	}
 
-	res = batman();
+//	res = batman();
 
 	/* cleaning up */
 	hna_free();
