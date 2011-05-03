@@ -938,13 +938,10 @@ int8_t batman(void)
 			}
 
 			if(neigh_counter < UINT8_MAX) {
-				if(my_role == SP && new_neighbor == 0) {
+				if(my_role == SP && !new_neighbor) {
 					new_neighbor = neigh;
 				}
 
-				if(my_role == UNAUTHENTICATED && new_neighbor == 0) {
-					//TODO: Wait for invite?
-				}
 				goto send_packets;
 			}
 

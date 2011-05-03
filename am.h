@@ -135,13 +135,9 @@ void send_challenge();
 void send_challenge_response();
 void send_response();
 
-void send_pc_invite();
-void send_pc_req();
-void send_pc_issue();
+
 
 void receive_pc_invite();
-void receive_pc_req();
-void receive_pc_issue();
 
 
 
@@ -161,9 +157,9 @@ EVP_PKEY *pkey;
 
 void init_am();
 
-int create_proxy_cert_req();
 
-int create_proxy_cert_1();
+
+
 
 
 
@@ -251,19 +247,39 @@ typedef struct timeval timeval;
 
 /* Functions */
 void am_thread_init(char *dev, sockaddr_in addr, sockaddr_in broad);
-void setup_am_socks(int32_t *recv, int32_t *send, addrinfo hints, addrinfo *res);
-int setup_am_recv_socks(int32_t *recv, addrinfo *res);
-int setup_am_send_socks(int32_t *send, addrinfo *res);
-void destroy_am_socks(int32_t *send, int32_t *recv, addrinfo *res);
 void *am_main();
+
+void setup_am_socks(int32_t *recv, int32_t *send);
+int setup_am_recv_socks(int32_t *recv, addrinfo *res);
+int setup_am_send_socks(int32_t *send);
+void destroy_am_socks(int32_t *send, int32_t *recv, addrinfo *res);
+
 static void callback(int p, int n, void *arg);
-int create_proxy_cert_0(BIO *bio_err, X509 *pc0, EVP_PKEY *pkey, FILE *fp, unsigned char *subject_name);
+
+void create_signature();
+int create_proxy_cert_0(EVP_PKEY *pkey, unsigned char *subject_name);
+int create_proxy_cert_req(EVP_PKEY *pkey, unsigned char *subject_name);
+int create_proxy_cert_1(char *addr);
+
 int selfsign(X509 **x509p, EVP_PKEY **pkeyp, unsigned char *subject_name);
 int mkreq(X509_REQ **x509p, EVP_PKEY **pkeyp, unsigned char *subject_name);
-int mkcert(X509_REQ **reqp, X509 **pc1p, X509 **pc0p, FILE *fp);
+int mkcert(X509_REQ **reqp, X509 **pc1p, X509 **pc0p);
+
 int seed_prng(int bytes);
-am_type extract_am_header(am_packet *header, char *buf[MAXBUFLEN], void *ptr);
-void send_pc_invite(am_packet *header, invite_pc_packet *payload, char *buf[MAXBUFLEN], void *ptr, sockaddr_in *sin_dest);
+
+void send_signature();
+
+void send_pc_invite(sockaddr_in *sin_dest);
+void send_pc_req(sockaddr_in *sin_dest);
+void send_pc_issue(sockaddr_in *sin_dest);
+
+am_type extract_am_header(char *buf, char **ptr);
+
+int receive_pc_req(char *addr, char *ptr);
+int receive_pc_issue(char *ptr);
+
+
+
 
 /* Necessary external variables */
 extern role_type my_role;

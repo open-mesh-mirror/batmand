@@ -19,7 +19,7 @@
 /* External Variables */
 role_type my_role;
 pthread_t am_main_thread;
-uint32_t new_neighbor;
+uint32_t new_neighbor, prev_neighbor;
 uint32_t trusted_neighbors[100];
 uint8_t num_trusted_neighbors;
 char signature_extract[3];
@@ -50,35 +50,39 @@ void am_thread_init(char *dev, sockaddr_in addr, sockaddr_in broad) {
 	pthread_create(&am_main_thread, NULL, am_main, NULL);
 }
 
+void *get_in_addr(struct sockaddr *sa)
+{
+    if (sa->sa_family == AF_INET) {
+        return &(((struct sockaddr_in*)sa)->sin_addr);
+    }
+
+    return &(((struct sockaddr_in6*)sa)->sin6_addr);
+}
+
 /* AM main thread */
 void *am_main() {
 
 	sockaddr_in *dest;
 	sockaddr_storage recv_addr;
 	socklen_t addr_len;
-	addrinfo hints, *res;
 	fd_set readfds;
 	timeval tv;
 	char am_recv_buf[MAXBUFLEN];
+	char *am_recv_buf_ptr;
 	char am_send_buf[MAXBUFLEN];
-	void *am_payload_ptr;
-	BIO *bio_err;
-	X509 *pc0;
-	X509_REQ *req;
-	EVP_PKEY *pkey;
-	FILE *fp;
-	unsigned char *subject_name;
+	char *am_send_buf_ptr;
+	char *am_payload_ptr;
+	EVP_PKEY *pkey = NULL;
+	unsigned char *subject_name = NULL;
 	ssize_t data_rcvd;
-	am_packet *am_header;
 	am_type am_type_rcvd;
-	invite_pc_packet *invite_payload;
 
 	/* Load all algorithms and error messages used by OpenSSL */
 	OpenSSL_add_all_algorithms();
 	ERR_load_crypto_strings();
 
 	/* Setup socks for the all AM purposes, except initial authentication */
-	setup_am_socks(&am_recv_socket, &am_send_socket, hints, res);
+	setup_am_socks(&am_recv_socket, &am_send_socket);
 
 	/* Clear the set */
 	FD_ZERO(&readfds);
@@ -98,7 +102,7 @@ void *am_main() {
 
 	/* If you are the SP, create a PC0 */
 	if(my_role == SP) {
-		create_proxy_cert_0(bio_err, pc0, pkey, fp, subject_name);
+		create_proxy_cert_0(pkey, subject_name);
 
 		/* Send Signature */
 		create_signature();
@@ -108,13 +112,18 @@ void *am_main() {
 
 	/* Else create a PC Request	 */
 	else {
-		create_proxy_cert_req(bio_err, req, pkey, fp, subject_name);
+		create_proxy_cert_req(pkey, subject_name);
 	}
 
 
 	data_rcvd = 0;
 	am_type_rcvd = NO_AM_DATA;
 	addr_len = sizeof recv_addr;
+	prev_neighbor = 0;
+	am_recv_buf_ptr = am_recv_buf;
+	am_send_buf_ptr = am_send_buf;
+	am_payload_ptr = NULL;
+	dest = NULL;
 
 	/* Main loop for the AM thread, will only exit when Batman is terminated */
 	while(1) {
@@ -125,10 +134,10 @@ void *am_main() {
 		select(am_recv_socket+1, &readfds, NULL, NULL, &tv);
 		if(FD_ISSET(am_recv_socket,&readfds)) {
 			memset(&am_recv_buf, 0, MAXBUFLEN);
-			data_rcvd = recvfrom(am_recv_socket, &am_recv_buf, MAXBUFLEN - 1, 0, (struct sockaddr_in *)&recv_addr, &addr_len); //maybe check length is greater than am_header?
+			data_rcvd = recvfrom(am_recv_socket, &am_recv_buf, MAXBUFLEN - 1, 0, (struct sockaddr *)&recv_addr, &addr_len); //maybe check length is greater than am_header?
 		}
 		if(data_rcvd) {
-			am_type_rcvd = extract_am_header(am_header, &am_recv_buf, am_payload_ptr);
+			am_type_rcvd = extract_am_header(am_recv_buf_ptr, &am_payload_ptr);
 
 			switch (am_type_rcvd) {
 				case NO_AM_DATA:
@@ -147,25 +156,44 @@ void *am_main() {
 					break;
 
 				case INVITE:
-					printf("Received Invite\n");
+					printf("Received Invite!\n");
 					dest = (sockaddr_in *) malloc(sizeof(sockaddr_in));
-					dest = (sockaddr_in *)&recv_addr;
+					dest->sin_addr = ((sockaddr_in*)((sockaddr *)&recv_addr))->sin_addr;
 					dest->sin_family = AF_INET;
 					dest->sin_port = htons(AM_PORT);
-
-					/*printf("Got packet from %s\n", inet_ntop(their_addr.ss_family,get_in_addr((struct sockaddr *)&their_addr),
-					            s, sizeof s));*/
-
-					send_pc_req(am_header, invite_payload, &am_send_buf, am_payload_ptr, fp, dest);
-//					free(dest);
+					send_pc_req(dest);
+					free(dest);
 
 					break;
 
 				case PC_REQ:
 					printf("Received PC Request!\n");
+
+					if((uint32_t)((sockaddr_in*)((sockaddr *)&recv_addr))->sin_addr.s_addr == prev_neighbor) {
+
+						char *recv_addr_string = malloc(16);
+						recv_addr_string = inet_ntoa(((sockaddr_in*)((sockaddr *)&recv_addr))->sin_addr);
+						if(receive_pc_req(recv_addr_string, am_payload_ptr)) {
+							dest = (sockaddr_in *) malloc(sizeof(sockaddr_in));
+							dest->sin_addr = ((sockaddr_in*)((sockaddr *)&recv_addr))->sin_addr;
+							dest->sin_family = AF_INET;
+							dest->sin_port = htons(AM_PORT);
+							create_proxy_cert_1(recv_addr_string);
+							send_pc_issue(dest);
+							free(dest);
+
+						}
+
+					} else
+						printf("Request from unknown node!\n");
+
 					break;
 
 				case PC_ISSUE:
+					printf("Received PC Issue!\n");
+					if(receive_pc_issue(am_payload_ptr)) {
+						printf("\n\nI w0Z heR3!!\n\n\n");
+					}
 
 					break;
 
@@ -181,12 +209,13 @@ void *am_main() {
 		if(my_role == SP) {
 
 			/* Check for new neighbors */
-			if(new_neighbor) {
+			if(new_neighbor && !prev_neighbor) {
+				prev_neighbor = new_neighbor;
 				dest = (sockaddr_in *) malloc(sizeof(sockaddr_in));
 				dest->sin_addr.s_addr = new_neighbor;
 				dest->sin_family = AF_INET;
 				dest->sin_port = htons(AM_PORT);
-				send_pc_invite(am_header, invite_payload, &am_send_buf, am_payload_ptr, dest);
+				send_pc_invite(dest);
 				free(dest);
 
 			}
@@ -202,10 +231,11 @@ void *am_main() {
 }
 
 /* Create PC0 for the SP */
-int create_proxy_cert_0(BIO *bio_err, X509 *pc0, EVP_PKEY *pkey, FILE *fp, unsigned char *subject_name) {
+int create_proxy_cert_0(EVP_PKEY *pkey, unsigned char *subject_name) {
 
-	req = NULL;
-	pkey = NULL;
+	X509 *pc0 = NULL;
+	FILE *fp;
+	BIO *bio_err;
 
 	CRYPTO_mem_ctrl(CRYPTO_MEM_CHECK_ON);
 	bio_err=BIO_new_fp(stderr, BIO_NOCLOSE);
@@ -248,7 +278,11 @@ int create_proxy_cert_0(BIO *bio_err, X509 *pc0, EVP_PKEY *pkey, FILE *fp, unsig
 }
 
 /* Create PC REQ for an UNAUTHENTICATED Node */
-int create_proxy_cert_req(BIO *bio_err, X509_REQ *req, EVP_PKEY *pkey, FILE *fp, unsigned char *subject_name) {
+int create_proxy_cert_req(EVP_PKEY *pkey, unsigned char *subject_name) {
+
+	X509_REQ *req;
+	FILE *fp;
+	BIO *bio_err;
 
 	req = NULL;
 	pkey = NULL;
@@ -277,7 +311,7 @@ int create_proxy_cert_req(BIO *bio_err, X509_REQ *req, EVP_PKEY *pkey, FILE *fp,
 	fclose(fp);
 
 	X509_REQ_free(req);
-	EVP_PKEY_free(pkey);
+//	EVP_PKEY_free(pkey);
 
 #ifndef OPENSSL_NO_ENGINE
 	ENGINE_cleanup();
@@ -291,7 +325,67 @@ int create_proxy_cert_req(BIO *bio_err, X509_REQ *req, EVP_PKEY *pkey, FILE *fp,
 }
 
 
+/* Create PC1 */
+int create_proxy_cert_1(char *addr) {
 
+	char *filename;
+	FILE *fp;
+	X509 *pc0 = NULL, *pc1 = NULL;
+	X509_REQ *req = NULL;
+
+	OpenSSL_add_all_algorithms();
+	ERR_load_crypto_strings();
+
+	CRYPTO_mem_ctrl(CRYPTO_MEM_CHECK_ON);
+
+	bio_err=BIO_new_fp(stderr, BIO_NOCLOSE);
+
+	/* Read the X509_REQ received */
+	filename = (char *) malloc(255);
+	memset(filename, 0, sizeof(filename));
+	sprintf(filename, "%s", RECV_REQ);
+	strncat(filename, addr, sizeof(filename)-strlen(filename)-1);
+	if(!(fp = fopen(filename, "r")))
+		fprintf(stderr, "Error opening file %s for reading!\n",filename);
+	if(!(req = PEM_read_X509_REQ(fp, NULL, NULL, NULL)))
+			fprintf(stderr, "Error while reading request from file %s", filename);
+	fclose(fp);
+	free(filename);
+
+
+	/* Read the SP's PC0  */
+	if(!(fp = fopen(MY_CERT, "r")))
+		fprintf(stderr, "Error opening file %s for reading!\n",MY_CERT);
+	if(!(pc0 = PEM_read_X509(fp, NULL, NULL, NULL)))
+			fprintf(stderr, "Error while reading request from file %s", RECV_REQ);
+	fclose(fp);
+
+
+	if(mkcert(&req, &pc1, &pc0) == 0) {
+		X509_print_fp(stdout,pc1);
+		PEM_write_X509(stdout,pc1);
+
+		/* Write issued X509 PC1 to a file */
+		if(!(fp = fopen(ISSUED_CERT, "w")))
+			fprintf(stderr, "Error opening file %s for writing!\n",ISSUED_CERT);
+		if(PEM_write_X509(fp, pc1) != 1)
+			fprintf(stderr, "Error while writing request to file %s", ISSUED_CERT);
+		fclose(fp);
+		X509_free(pc1);
+	}
+
+
+#ifdef CUSTOM_EXT
+	/* Only needed if we add objects or custom extensions */
+	X509V3_EXT_cleanup();
+	OBJ_cleanup();
+#endif
+
+	CRYPTO_mem_leaks(bio_err);
+	BIO_free(bio_err);
+	return(0);
+
+}
 
 
 /* Create Signature */
@@ -299,8 +393,9 @@ int create_proxy_cert_req(BIO *bio_err, X509_REQ *req, EVP_PKEY *pkey, FILE *fp,
 void create_signature() {
 
 	FILE *fp;
-	static char pseudo_random[20];
-	int sig_len;
+	unsigned char *pseudo_random = NULL;
+	unsigned char *sig_buf = NULL;
+	unsigned int sig_len;
 	BIO *bio, *b64;
 	EVP_MD_CTX *md_ctx;
 
@@ -312,20 +407,21 @@ void create_signature() {
 	fclose(fp);
 
 	/* Create Random Bytes String */
-	if(!RAND_pseudo_bytes(&pseudo_random, 20)) {
+	pseudo_random = malloc(20);
+	if(!RAND_pseudo_bytes(pseudo_random, 20)) {
 		fprintf(stderr, "Could not generate pseudo random value for signature\n");
 	}
 
 	/* Create Message Digest of Random String to Sign (Signature) */
 	md_ctx = EVP_MD_CTX_create();
-	unsigned char sig_buf[EVP_PKEY_size(pkey)];
 	EVP_SignInit(md_ctx, EVP_sha1());
 	EVP_SignUpdate(md_ctx, pseudo_random, sizeof(pseudo_random));
-	sig_len = sizeof(sig_buf);
-	if(EVP_SignFinal(md_ctx, &sig_buf, &sig_len, pkey) != 1) {
+	sig_len = EVP_PKEY_size(pkey);
+	sig_buf = malloc(sig_len);
+	if(EVP_SignFinal(md_ctx, sig_buf, &sig_len, pkey) != 1) {
 		ERR_print_errors_fp(stderr);
 	}
-	printf("Created new signature!\n", sig_len);
+	printf("Created new signature!\n");
 
 	if(!(fp = fopen(MY_SIG, "w")))
 		fprintf(stderr, "Error opening file %s for writing!\n",MY_SIG);
@@ -333,7 +429,7 @@ void create_signature() {
 	b64 = BIO_new(BIO_f_base64());
 	bio = BIO_new_fp(fp, BIO_NOCLOSE);
 	bio = BIO_push(b64, bio);
-	BIO_write(bio, sig_buf, strlen(sig_buf));
+	BIO_write(bio, sig_buf, sig_len);
 
 	BIO_flush(bio);
 	fclose(fp);
@@ -350,32 +446,38 @@ void create_signature() {
 void send_signature() {
 
 	am_packet *am_header;
-	void *tmpPtr;
+	char *ptr;
 	int32_t packet_len;
 	FILE *fp;
-	unsigned char sendBuf[MAXBUFLEN];
+	char *buf;
 
 	am_header = (am_packet *) malloc(sizeof(am_packet));
 	am_header->id = id;
 	am_header->type = NEW_SIGNATURE;
 
-	memset(&sendBuf, 0, sizeof(sendBuf));
-	memcpy(&sendBuf, am_header, sizeof(am_packet));
-	tmpPtr = &sendBuf;
-	tmpPtr += sizeof(am_packet);
+	buf = malloc(MAXBUFLEN);
+	memset(buf, 0, sizeof(buf));
+	memcpy(buf, am_header, sizeof(am_packet));
+	ptr = buf;
+	ptr += sizeof(am_packet);
 	packet_len = sizeof(am_packet);
 	if(!(fp = fopen(MY_SIG, "r")))
 			fprintf(stderr, "Error opening file %s for reading!\n",MY_SIG);
-	packet_len += fread(tmpPtr, 1, PEM_BUFSIZE, fp);
+	packet_len += fread(ptr, 1, PEM_BUFSIZE, fp);
 	fclose(fp);
 
-	send_udp_packet((unsigned char *)&sendBuf, packet_len, &broadcast_addr, am_send_socket, NULL);
+	send_udp_packet((unsigned char *)buf, packet_len, &broadcast_addr, am_send_socket, NULL);
 	printf("Sending new signature!\n");
 
 }
 
 /* Send PC Handshake Invite */
-void send_pc_invite(am_packet *header, invite_pc_packet *payload, char *buf[MAXBUFLEN], void *ptr, sockaddr_in *sin_dest) {
+void send_pc_invite(sockaddr_in *sin_dest) {
+
+	char *buf;
+	char *ptr;
+	am_packet *header;
+	invite_pc_packet *payload;
 
 	header = (am_packet *) malloc(sizeof(am_packet));
 	header->id = id;
@@ -385,6 +487,7 @@ void send_pc_invite(am_packet *header, invite_pc_packet *payload, char *buf[MAXB
 	payload->key_algorithm = RSA_key;
 	payload->key_size = 2048;
 
+	buf = malloc(MAXBUFLEN);
 	memset(buf, 0, sizeof(buf));
 	memcpy(buf, header, sizeof(am_packet));
 	ptr = buf;
@@ -396,18 +499,24 @@ void send_pc_invite(am_packet *header, invite_pc_packet *payload, char *buf[MAXB
 
 	send_udp_packet((unsigned char *)buf, packet_len, sin_dest, am_send_socket, NULL);
 
+	free(buf);
 	free(header);
-	sleep(10);
 
 }
 
 /* Send PC Request */
-void send_pc_req(am_packet *header, invite_pc_packet *payload, char *buf[MAXBUFLEN], void *ptr, FILE *fp, sockaddr_in *sin_dest) {
+void send_pc_req(sockaddr_in *sin_dest) {
+
+	am_packet *header;
+	char *buf;
+	FILE *fp;
+	char *ptr;
 
 	header = (am_packet *) malloc(sizeof(am_packet));
 	header->id = id;
 	header->type = PC_REQ;
 
+	buf = malloc(MAXBUFLEN);
 	memset(buf, 0, sizeof(buf));
 	memcpy(buf, header, sizeof(am_packet));
 	ptr = buf;
@@ -420,304 +529,64 @@ void send_pc_req(am_packet *header, invite_pc_packet *payload, char *buf[MAXBUFL
 	packet_len += fread(ptr, 1, PEM_BUFSIZE, fp);
 	fclose(fp);
 
-	send_udp_packet((unsigned char *)buf, packet_len, &sin_dest, am_send_socket, NULL);
+	send_udp_packet((unsigned char *)buf, packet_len, sin_dest, am_send_socket, NULL);
 
+	free(header);
+	free(buf);
+
+}
+
+/* Send the issued PC1 */
+void send_pc_issue(sockaddr_in *sin_dest) {
+
+	char *buf;
+	am_packet *am_header;
+	char *ptr;
+	int32_t packet_len;
+	FILE *fp;
+
+	am_header = (am_packet *) malloc(sizeof(am_packet));
+	am_header->id = id;
+	am_header->type = PC_ISSUE;
+
+	buf = malloc(MAXBUFLEN);
+	memset(buf, 0, sizeof(buf));
+	memcpy(buf, am_header, sizeof(am_packet));
+
+	ptr = buf;
+	ptr += sizeof(am_packet);
+
+	packet_len = sizeof(am_packet);
+	if(!(fp = fopen(ISSUED_CERT, "r")))
+			fprintf(stderr, "Error opening file %s for reading!\n",ISSUED_CERT);
+
+	packet_len += fread(ptr, 1, PEM_BUFSIZE, fp);
+	fclose(fp);
+
+	send_udp_packet((unsigned char *)buf, packet_len, sin_dest, am_send_socket, NULL);
+
+	free(am_header);
+	free(buf);
 }
 
 
 
-/* Extract AM Data Type From Received AM Packet */
-am_type extract_am_header(am_packet *header, char *buf[MAXBUFLEN], void *ptr) {
 
+
+/* Extract AM Data Type From Received AM Packet */
+am_type extract_am_header(char *buf, char **ptr) {
+
+	am_packet *header;
 	header = (am_packet *)buf;
-	ptr = &buf;
-	ptr += sizeof(am_packet);
+
+	*ptr = buf;
+	*ptr += sizeof(am_packet);
 
 	return header->type;
 
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-///* Initial authentication thread */
-//void *authenticate() {
-//
-//	//Both Unauthenticated
-//	if((my_auth_token == 0) && (rcvd_auth_token == 0)) {
-//
-//		setup_am_socks();
-//
-//		if(inet_addr(addr_prev_sender)<inet_addr(my_addr)) {// && my_challenge==0) {
-//			printf("RECEIVED UNAUTHENTICATED OGM\n");
-////			send_challenge();
-//
-//			send_pc_invite();
-//		}
-//
-//		while(1) {
-//			rcvd_type = receive_am_header();
-//
-//			if(rcvd_type == NEW_SIGNATURE) {
-//				printf("RECEIVED A NEW SIGNATURE\n\n");
-//
-//			} else if(rcvd_type == CHALLENGE) {
-//				printf("RECEIVED CHALLENGE\n");
-//				receive_challenge();
-//				printf("rcvd_challenge = %d\n",rcvd_challenge);
-//				send_challenge_response();
-//				printf("my_response = %d\n",my_response);
-//				printf("my_challenge = %d\n\n",my_challenge);
-//
-//			} else if(rcvd_type == CHALLENGE_RESPONSE) {
-//				printf("RECEIVED CHALLENGE_RESPONSE\n");
-//				receive_challenge_response();
-//				printf("rcvd_response = %d\n",rcvd_response);
-//				printf("rcvd_challenge = %d\n",rcvd_challenge);
-//				printf("my_response = %d\n\n",my_response);
-//				my_role = MASTER;
-//				break;
-//
-//			} else if(rcvd_type == RESPONSE) {
-//				printf("RECEIVED RESPONSE\n");
-//				receive_response();
-//				printf("rcvd_response = %d\n",rcvd_response);
-//				my_role = AUTHENTICATED;
-//				break;
-//
-//			} else if(rcvd_type == INVITE) {
-//				printf("RECEIVED INVITE\n");
-//				receive_pc_invite();
-//				send_pc_req();
-//
-//			} else if(rcvd_type == PC_REQ) {
-//				printf("RECEIVED PC REQUEST\n");
-//				receive_pc_req();
-//				send_pc_issue();
-//
-//			} else if(rcvd_type == PC_ISSUE) {
-//				printf("RECEIVED PC ISSUE\n");
-//				receive_pc_issue();
-//
-//			} else {
-//				printf("RECEIVED UNRECOGNIZABLE AM HEADER\n");
-//			}
-//		}	//end while
-//
-//	}
-//
-//	//I am authenticated, other node is unauth
-//	else if(rcvd_auth_token == 0) {
-//		setup_am_socks();
-//
-//		printf("RECEIVED UNAUTHENTICATED OGM\n");
-//		send_challenge();
-//		printf("my_challenge = %d\n\n",my_challenge);
-//
-//		while(1) {
-//			rcvd_type = receive_am_header();
-//
-//			if(rcvd_type == CHALLENGE_RESPONSE) {
-//				printf("RECEIVED CHALLENGE_RESPONSE\n");
-//				receive_challenge_response();
-//				printf("rcvd_response = %d\n",rcvd_response);
-//				printf("rcvd_challenge = %d\n",rcvd_challenge);
-//				printf("my_response = %d\n\n",my_response);
-//				break;
-//
-//			} else {
-//				printf("RECEIVED UNRECOGNIZABLE AM HEADER\n");
-//			}
-//		}	//end while
-//
-//	}
-//
-//	//I'm unauth, other node is auth
-//	else if(my_auth_token == 0) {
-//
-//		setup_am_socks();
-//
-//		while(1) {
-//			rcvd_type = receive_am_header();
-//
-//			if(rcvd_type == CHALLENGE) {
-//				printf("RECEIVED CHALLENGE\n");
-//				receive_challenge();
-//				printf("rcvd_challenge = %d\n",rcvd_challenge);
-//				send_challenge_response();
-//				printf("my_response = %d\n",my_response);
-//				printf("my_challenge = %d\n\n",my_challenge);
-//
-//			} else if(rcvd_type == RESPONSE) {
-//				printf("RECEIVED RESPONSE\n");
-//				receive_response();
-//				printf("rcvd_response = %d\n",rcvd_response);
-//				break;
-//
-//			} else {
-//				printf("RECEIVED UNRECOGNIZABLE AM HEADER\n");
-//			}
-//		}	//end while
-//
-//	}
-//
-//
-//	destroy_am_socks();
-//	free(if_device);
-//	free(addr_prev_sender);
-//	free(my_addr);
-//	sleep(5);
-//	printf("EXIT AM MODULE\n");
-//	am_status = READY;
-//	pthread_exit(NULL); //Necessary in order not to end a non-void function without a return value.
-//}
-//
-//void setup_am_socks() {
-//
-//	memset(&hints, 0, sizeof hints);
-//	hints.ai_family = AF_INET;  // use IPv4 or IPv6, whichever
-//	hints.ai_socktype = SOCK_DGRAM;
-//	hints.ai_flags = AI_PASSIVE;
-//	hints.ai_protocol = IPPROTO_UDP;
-//
-//	memset((char *) &sin_dest, 0, sizeof(sin_dest));
-//	sin_dest.sin_family = AF_INET;
-//	sin_dest.sin_port = htons(64305);
-//	if (inet_aton(addr_prev_sender, &sin_dest.sin_addr)==0) {
-//		printf("inet_aton() failed\n");
-//		exit(1);
-//	}
-//
-//	getaddrinfo(NULL, "64305", &hints, &res);
-//	setup_am_recv_sock();
-//	setup_am_send_sock();
-//}
-//
-//
-//void setup_am_recv_sock() {
-//
-//	if ( (auth_recv_socket = socket(PF_INET, SOCK_DGRAM, 0)) < 0 ) {
-//		printf("Error - can't create AM receive socket: %s\n", strerror(errno) );
-//		destroy_am_socks();
-//	}
-//
-////	if ( bind_to_iface( am_recv_socket, if_device ) < 0 ) {
-////		printf("Cannot bind socket to device %s : %s \n", if_device, strerror(errno));
-////		destroy_am_socks();
-////	}
-//
-//	setsockopt(auth_recv_socket, SOL_SOCKET, SO_BINDTODEVICE, if_device, strlen(if_device) + 1);
-//
-////	bind(am_recv_socket, (struct sockaddr*)&sin_dest, sizeof(sin_dest));	//for this to work, sender must be assigned same port number...
-//	bind(auth_recv_socket, res->ai_addr, res->ai_addrlen);
-//
-//}
-//
-//void setup_am_send_sock() {
-//
-//	if ( (auth_send_socket = socket(PF_INET, SOCK_DGRAM, 0)) < 0 ) {
-//		printf("Error - can't create AM send socket: %s\n", strerror(errno) );
-//		destroy_am_socks();
-//	}
-//
-////	if ( bind_to_iface( am_send_socket, if_device ) < 0 ) {
-////		printf("Cannot bind socket to device %s : %s \n", if_device, strerror(errno));
-////		destroy_am_socks();
-////	}
-//
-//	setsockopt(auth_send_socket, SOL_SOCKET, SO_BINDTODEVICE, if_device, strlen(if_device) + 1);
-//	fcntl(auth_send_socket, F_SETFL, O_NONBLOCK);
-//
-//}
-//
-//void destroy_am_socks() {
-//	if (auth_recv_socket != 0)
-//		close(auth_recv_socket);
-//
-//	if (auth_send_socket != 0)
-//		close(auth_send_socket);
-//
-//	auth_recv_socket = 0;
-//	auth_send_socket = 0;
-//
-//	freeaddrinfo(res);
-//}
-//
-//
-//
-//
-//am_type receive_am_header() {
-//	memset(&recvBuf, 0, MAXBUFLEN);
-//
-//	while((unsigned)recvfrom(auth_recv_socket, &recvBuf, MAXBUFLEN - 1, 0, NULL, NULL) < sizeof(am_packet)) {
-//		printf(".\n");
-//	}
-//
-//	rcvd_am_header = (am_packet *)recvBuf;
-//	tmpPtr = &recvBuf;
-//	tmpPtr += sizeof(am_packet);
-//
-//	printf("\nTYPE = %d\n\n",rcvd_am_header->type);
-//
-//	return rcvd_am_header->type;
-//
-//}
-//
-//void receive_challenge() {
-//
-//	rcvd_challenge_packet = tmpPtr;
-//	rcvd_challenge_packet = (challenge_packet *)rcvd_challenge_packet;
-//	rcvd_challenge = rcvd_challenge_packet->challenge_value;
-//}
-//
-//void receive_challenge_response() {
-//	rcvd_challenge_response_packet = tmpPtr;
-//	rcvd_challenge_response_packet = (challenge_response_packet *)rcvd_challenge_response_packet;
-//
-//	rcvd_challenge = rcvd_challenge_response_packet->challenge_value;
-//	rcvd_response = rcvd_challenge_response_packet->response_value;
-//
-//	my_challenge = (2*my_challenge) % UINT8_MAX;
-//	my_challenge = (my_challenge == 0 ? 1 : my_challenge);
-//
-//	if(my_challenge==rcvd_response) {
-//		printf("Correct Response\n");
-//		send_response();
-//	} else printf("Wrong Response\n");
-//
-//}
-//
-//void receive_response() {
-//	rcvd_response_packet = tmpPtr;
-//	rcvd_response_packet = (response_packet *)rcvd_response_packet;
-//
-//	rcvd_response = rcvd_response_packet->response_value;
-//
-//	my_challenge = (2*my_challenge) % UINT8_MAX;
-//	my_challenge = (my_challenge == 0 ? 1 : my_challenge);
-//
-//	if(my_challenge==rcvd_response) {
-//		printf("Correct Response\n");
-//		my_auth_token = rcvd_response_packet->auth_token;
-//	} else printf("Wrong Response\n");
-//}
-//
-//
+/* Receive Invite */
 //void receive_pc_invite() {
 //
 //	recv_invite = tmpPtr;
@@ -725,249 +594,44 @@ am_type extract_am_header(am_packet *header, char *buf[MAXBUFLEN], void *ptr) {
 //	requested_key_algorithm = recv_invite->key_algorithm;
 //	requested_key_size = recv_invite->key_size;
 //}
-//
-//void receive_pc_req() {
-//	memset(filename, 0, sizeof(filename));
-//	strncpy(&filename, RECV_REQ, sizeof(filename));
-//	strncat(&filename, addr_prev_sender, sizeof(filename)-strlen(filename));
-//	if(!(fp = fopen(filename, "w")))
-//		fprintf(stderr, "Error opening file %s for writing!\n", filename);
-//
-//	fwrite(tmpPtr, 1, strlen(tmpPtr), fp);
-//	fclose(fp);
-//}
-//
-//void receive_pc_issue() {
-//	if(!(fp = fopen(MY_CERT, "w")))
-//		fprintf(stderr, "Error opening file %s for writing!\n", MY_CERT);
-//
-//	fwrite(tmpPtr, 1, strlen(tmpPtr), fp);
-//	fclose(fp);
-//}
-//
-//
-//void send_challenge() {
-//
-//	sleep(1);	//Make sure other node is ready to receive challenge
-//
-//	am_header = (am_packet *) malloc(sizeof(am_packet));
-//	am_header->id = inet_addr(my_addr) % UINT16_MAX;
-//	am_header->type = CHALLENGE;
-//
-//	my_challenge = 1 + (rand() % UINT8_MAX);
-//	challenge_pkt = (challenge_packet *) malloc(sizeof(challenge_packet));
-//	challenge_pkt->challenge_value = my_challenge;
-//
-//	memset(&sendBuf, 0, sizeof(sendBuf));
-//	memcpy(&sendBuf, am_header, sizeof(am_packet));
-//	tmpPtr = &sendBuf;
-//	tmpPtr += sizeof(am_packet);
-//	memcpy(tmpPtr, challenge_pkt, sizeof(challenge_packet));
-//	packet_len = sizeof(am_packet);
-//	packet_len += sizeof(challenge_packet);
-//
-//	send_udp_packet((unsigned char *)&sendBuf, packet_len, &sin_dest, auth_send_socket, NULL);
-//
-//}
-//
-//
-//void send_challenge_response(){
-//	am_header = (am_packet *) malloc(sizeof(am_packet));
-//	am_header->id = inet_addr(my_addr) % UINT16_MAX;
-//	am_header->type = CHALLENGE_RESPONSE;
-//
-//	my_response = (2*rcvd_challenge) % UINT8_MAX;
-//	my_response = (my_response == 0 ? 1 : my_response);
-//	challenge_response_pkt = (challenge_response_packet *) malloc(sizeof(challenge_response_packet));
-//	challenge_response_pkt->response_value = my_response;
-//
-//	my_challenge = 1 + (rand() % UINT8_MAX);
-//	challenge_response_pkt->challenge_value = my_challenge;
-//
-//	memset(&sendBuf, 0, sizeof(sendBuf));
-//	memcpy(&sendBuf, am_header, sizeof(am_packet));
-//	tmpPtr = &sendBuf;
-//	tmpPtr += sizeof(am_packet);
-//	memcpy(tmpPtr, challenge_response_pkt, sizeof(challenge_response_packet));
-//	packet_len = sizeof(am_packet);
-//	packet_len += sizeof(challenge_response_packet);
-//
-//	send_udp_packet((unsigned char *)&sendBuf, packet_len, &sin_dest, auth_send_socket, NULL);
-//
-//}
-//
-//
-//void send_response() {
-//	am_header = (am_packet *) malloc(sizeof(am_packet));
-//	am_header->id = inet_addr(my_addr) % UINT16_MAX;
-//	am_header->type = RESPONSE;
-//
-//	my_response = (2*rcvd_challenge) % UINT8_MAX;
-//	my_response = (my_response == 0 ? 1 : my_response);
-//	if(my_auth_token == 0) {
-//		my_auth_token = 1 + (rand() % UINT16_MAX);
-//		my_auth_token = (my_auth_token == 0 ? 1 : my_auth_token);
-//	}
-//
-//	response_pkt = (response_packet *) malloc(sizeof(response_packet));
-//	response_pkt->response_value = my_response;
-//	response_pkt->auth_token = my_auth_token;
-//
-//	memset(&sendBuf, 0, sizeof(sendBuf));
-//	memcpy(&sendBuf, am_header, sizeof(am_packet));
-//	tmpPtr = &sendBuf;
-//	tmpPtr += sizeof(am_packet);
-//	memcpy(tmpPtr, response_pkt, sizeof(response_packet));
-//	packet_len = sizeof(am_packet);
-//	packet_len += sizeof(response_packet);
-//
-//	send_udp_packet((unsigned char *)&sendBuf, packet_len, &sin_dest, auth_send_socket, NULL);
-//}
-//
-//
-//void send_pc_invite() {
-//	sleep(1);	//Make sure other node is ready to receive challenge
-//
-//	am_header = (am_packet *) malloc(sizeof(am_packet));
-//	am_header->id = inet_addr(my_addr) % UINT16_MAX;
-//	am_header->type = INVITE;
-//
-//	send_invite = (invite_pc_packet *) malloc(sizeof(invite_pc_packet));
-//	send_invite->key_algorithm = RSA_key;
-//	send_invite->key_size = 2048;
-//
-//	memset(&sendBuf, 0, sizeof(sendBuf));
-//	memcpy(&sendBuf, am_header, sizeof(am_packet));
-//	tmpPtr = &sendBuf;
-//	tmpPtr += sizeof(am_packet);
-//	memcpy(tmpPtr, send_invite, sizeof(invite_pc_packet));
-//	packet_len = sizeof(am_packet);
-//	packet_len += sizeof(invite_pc_packet);
-//
-//	printf("SENT = %d\n", send_udp_packet((unsigned char *)&sendBuf, packet_len, &sin_dest, auth_send_socket, NULL));
-//
-//}
-//
-//void send_pc_req() {
-//
-//
-//	am_header = (am_packet *) malloc(sizeof(am_packet));
-//	am_header->id = inet_addr(my_addr) % UINT16_MAX;
-//	am_header->type = PC_REQ;
-//
-//	memset(&sendBuf, 0, sizeof(sendBuf));
-//	memcpy(&sendBuf, am_header, sizeof(am_packet));
-//	tmpPtr = &sendBuf;
-//	tmpPtr += sizeof(am_packet);
-//
-//	packet_len = sizeof(am_packet);
-//	if(!(fp = fopen(MY_REQ, "r")))
-//			fprintf(stderr, "Error opening file %s for reading!\n",MY_REQ);
-//
-//	packet_len += fread(tmpPtr, 1, PEM_BUFSIZE, fp);
-//	fclose(fp);
-//
-//	send_udp_packet((unsigned char *)&sendBuf, packet_len, &sin_dest, auth_send_socket, NULL);
-//
-//}
-//
-//void send_pc_issue() {
-//	create_proxy_cert_1();
-//
-//	am_header = (am_packet *) malloc(sizeof(am_packet));
-//	am_header->id = inet_addr(my_addr) % UINT16_MAX;
-//	am_header->type = PC_ISSUE;
-//
-//	memset(&sendBuf, 0, sizeof(sendBuf));
-//	memcpy(&sendBuf, am_header, sizeof(am_packet));
-//	tmpPtr = &sendBuf;
-//	tmpPtr += sizeof(am_packet);
-//
-//	packet_len = sizeof(am_packet);
-//	if(!(fp = fopen(ISSUED_CERT, "r")))
-//			fprintf(stderr, "Error opening file %s for reading!\n",ISSUED_CERT);
-//
-//	packet_len += fread(tmpPtr, 1, PEM_BUFSIZE, fp);
-//	fclose(fp);
-//
-//	send_udp_packet((unsigned char *)&sendBuf, packet_len, &sin_dest, auth_send_socket, NULL);
-//}
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//int create_proxy_cert_1() {
-//
-//	OpenSSL_add_all_algorithms();
-//	ERR_load_crypto_strings();
-//
-//	CRYPTO_mem_ctrl(CRYPTO_MEM_CHECK_ON);
-//
-//	bio_err=BIO_new_fp(stderr, BIO_NOCLOSE);
-//
-//	/* Read the X509_REQ received */
-//	memset(filename, 0, sizeof(filename));
-//	strncpy(&filename, RECV_REQ, sizeof(filename));
-//	strncat(&filename, addr_prev_sender, sizeof(filename)-strlen(filename));
-//	if(!(fp = fopen(filename, "r")))
-//		fprintf(stderr, "Error opening file %s for reading!\n",filename);
-//	if(!(req = PEM_read_X509_REQ(fp, NULL, NULL, NULL)))
-//			fprintf(stderr, "Error while reading request from file %s", filename);
-//	fclose(fp);
-//
-//
-//	/* Read the SP's PC0  */
-//	if(!(fp = fopen(MY_CERT, "r")))
-//		fprintf(stderr, "Error opening file %s for reading!\n",MY_CERT);
-//	if(!(pc0 = PEM_read_X509(fp, NULL, NULL, NULL)))
-//			fprintf(stderr, "Error while reading request from file %s", RECV_REQ);
-//	fclose(fp);
-//
-//
-//	if(mkcert(&req, &pc1, &pc0, FILE *fp) == 0) {
-//		X509_print_fp(stdout,pc1);
-//		PEM_write_X509(stdout,pc1);
-//
-//		/* Write issued X509 PC1 to a file */
-//		if(!(fp = fopen(ISSUED_CERT, "w")))
-//			fprintf(stderr, "Error opening file %s for writing!\n",ISSUED_CERT);
-//		if(PEM_write_X509(fp, pc1) != 1)
-//			fprintf(stderr, "Error while writing request to file %s", ISSUED_CERT);
-//		fclose(fp);
-//		X509_free(pc1);
-//	}
-//
-//	EVP_PKEY_free(my_pkey);
-//
-//#ifdef CUSTOM_EXT
-//	/* Only needed if we add objects or custom extensions */
-//	X509V3_EXT_cleanup();
-//	OBJ_cleanup();
-//#endif
-//
-//	CRYPTO_mem_leaks(bio_err);
-//	BIO_free(bio_err);
-//	return(0);
-//
-//}
-//
-//
-//
-//
 
+/* Receive PC Request */
+int receive_pc_req(char *addr, char *ptr) {
 
+		char *filename;
+		FILE *fp;
 
+		filename = (char *) malloc(255);
+		memset(filename, 0, sizeof(filename));
+		sprintf(filename, "%s", RECV_REQ);
+		strncat(filename, addr, sizeof(filename)-strlen(filename)-1);
+
+		if(!(fp = fopen(filename, "w"))) {
+			fprintf(stderr, "Error opening file %s for writing!\n", filename);
+			return 0;
+		}
+
+		fwrite(ptr, 1, strlen(ptr), fp);
+		fclose(fp);
+		free(filename);
+		return 1;
+
+}
+
+/* Receive PC Issue */
+int receive_pc_issue(char *ptr) {
+
+	FILE *fp;
+
+	if(!(fp = fopen(MY_CERT, "w"))) {
+		fprintf(stderr, "Error opening file %s for writing!\n", MY_CERT);
+		return 0;
+	}
+
+	fwrite(ptr, 1, strlen(ptr), fp);
+	fclose(fp);
+	return 1;
+}
 
 
 
@@ -977,7 +641,9 @@ am_type extract_am_header(am_packet *header, char *buf[MAXBUFLEN], void *ptr) {
 
 /* Socket abstraction functions */
 
-void setup_am_socks(int32_t *recvsock, int32_t *sendsock, addrinfo hints, addrinfo *res) {
+void setup_am_socks(int32_t *recvsock, int32_t *sendsock) {
+
+	addrinfo hints, *res;
 
 	/* Set family information */
 	memset(&hints, 0, sizeof hints);
@@ -996,7 +662,7 @@ void setup_am_socks(int32_t *recvsock, int32_t *sendsock, addrinfo hints, addrin
 	/* Setup Receive and Send Sockets */
 	if(!setup_am_recv_socks(recvsock, res))
 		destroy_am_socks(sendsock, recvsock, res);
-	if(!setup_am_send_socks(sendsock, res))
+	if(!setup_am_send_socks(sendsock))
 		destroy_am_socks(sendsock, recvsock, res);
 }
 
@@ -1020,7 +686,7 @@ int setup_am_recv_socks(int32_t *recvsock, addrinfo *res) {
 	return 1;
 }
 
-int setup_am_send_socks(int32_t *sendsock, addrinfo *res) {
+int setup_am_send_socks(int32_t *sendsock) {
 
 	/* Assign file descriptor for socket */
 	if ( (*sendsock = socket(PF_INET, SOCK_DGRAM, 0)) < 0 ) {
@@ -1096,6 +762,8 @@ int selfsign(X509 **x509p, EVP_PKEY **pkeyp, unsigned char *subject_name) {
 	else
 		x= *x509p;
 
+
+
 	rsa=RSA_generate_key(bits,RSA_F4,callback,NULL);
 	if (!EVP_PKEY_assign_RSA(pk,rsa))
 		{
@@ -1118,7 +786,7 @@ int selfsign(X509 **x509p, EVP_PKEY **pkeyp, unsigned char *subject_name) {
 	 * Normally we'd check the return value for errors...
 	 */
 	subject_name = (unsigned char *)malloc(SUBJECT_NAME_SIZE);
-	sprintf(subject_name,"SP_%d",rand()%UINT32_MAX);
+	sprintf((char *)subject_name,"SP_%d",rand()%UINT32_MAX);
 	X509_NAME_add_entry_by_txt(name,"CN", MBSTRING_ASC, subject_name, -1, -1, 0);
 
 	X509_set_issuer_name(x,name);
@@ -1210,7 +878,7 @@ int mkreq(X509_REQ **x509p, EVP_PKEY **pkeyp, unsigned char *subject_name) {
 	 * TODO: Maybe use hash of public key, for now only a random number
 	 */
 	subject_name = (unsigned char *)malloc(SUBJECT_NAME_SIZE);
-	sprintf(subject_name,"%d",rand()%UINT32_MAX);
+	sprintf((char *)subject_name,"%d",rand()%UINT32_MAX);
 	X509_NAME_add_entry_by_txt(name,"CN", MBSTRING_ASC, subject_name, -1, -1, 0);
 
 #ifdef REQUEST_EXTENSIONS
@@ -1362,12 +1030,12 @@ err:
 
 
 /* PC1 Creation */
-int mkcert(X509_REQ **reqp,X509 **pc1p, X509 **pc0p, FILE *fp) {
+int mkcert(X509_REQ **reqp,X509 **pc1p, X509 **pc0p) {
 	EVP_PKEY *req_pkey, *my_pkey;
 	X509_NAME *name, *req_name, *issuer_name;
 	X509_NAME_ENTRY *req_name_entry;
 	X509  *cert;
-	const EVP_MD *digest;
+	FILE *fp;
 
 	/* Verify signature on REQ */
 	if(!(req_pkey = X509_REQ_get_pubkey(*reqp)))
@@ -1431,21 +1099,30 @@ int mkcert(X509_REQ **reqp,X509 **pc1p, X509 **pc0p, FILE *fp) {
 		fprintf(stderr,"Error setting the end lifetime of cert");
 
 	/* Sign the certificate with PC0 */
-	if(EVP_PKEY_type(my_pkey->type) == EVP_PKEY_RSA)
-		digest = EVP_sha1();
+	if(EVP_PKEY_type(my_pkey->type) == EVP_PKEY_RSA) {
+		const EVP_MD *digest = EVP_sha1();
 
-	if(!(X509_sign(cert, my_pkey, digest)))
-		fprintf(stderr,"Error signing cert");
+		if(!(X509_sign(cert, my_pkey, digest)))
+			fprintf(stderr,"Error signing cert");
+	} else {
+		printf("Error signing the certificate, aborting operation!\n");
+		return 1;
+	}
+
+
+
 
 	/* Write the cert to disk */
 	if(!(fp = fopen(ISSUED_CERT, "w")))
-		fprintf(stderr,"Errpr writing to file %s\n", ISSUED_CERT);
+		fprintf(stderr,"Error writing to file %s\n", ISSUED_CERT);
 	if(PEM_write_X509(fp, cert) != 1)
 		fprintf(stderr,"Error writing cert to file\n");
 	fclose(fp);
 
 
 	*pc1p = cert;
+
+	EVP_PKEY_free(my_pkey);
 
 	return(0);
 
