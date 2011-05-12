@@ -30,6 +30,7 @@
 #include <linux/string.h>
 #include <stdio.h>
 #include <fcntl.h>
+#include <time.h>
 
 #include <openssl/pem.h>
 #include <openssl/conf.h>
@@ -55,19 +56,18 @@ typedef enum role_type_en{
 } role_type;
 
 typedef enum am_type_en{
-	NO_AM_DATA = 0,
-	NEW_SIGNATURE = 1,
-	AUTHENTICATED_LIST = 2,		//Full AL update
-	AL_UPDATE = 3,				//Single row update of the AL
-	INVITE = 4,
-	PC_REQ = 5,
-	PC_ISSUE = 6
+	NO_AM_DATA,
+	NEW_SIGNATURE,
+	AUTHENTICATED_LIST,
+	AL_UPDATE,
+	INVITE,
+	PC_REQ,
+	PC_ISSUE,
+	REQ_NEIGH_PC,
+	REQ_NEIGH_SIG
 } am_type;
 
-typedef enum pthread_status_en{
-	IN_USE = 0,
-	READY = 99
-} pthread_status;
+
 
 typedef enum key_algorithm_en{
 	ECC_key = 1,
@@ -79,19 +79,6 @@ typedef struct am_packet_st {
 	uint8_t type;
 } __attribute__((packed)) am_packet;
 
-typedef struct challenge_packet_st {
-	uint8_t challenge_value;
-} __attribute__((packed)) challenge_packet;
-
-typedef struct challenge_response_packet_st {
-	uint8_t challenge_value;
-	uint8_t response_value;
-} __attribute__((packed)) challenge_response_packet;
-
-typedef struct response_packet_st {
-	uint8_t response_value;
-	uint16_t auth_token;
-} __attribute__((packed)) response_packet;
 
 typedef struct invite_pc_packet_st {
 	uint8_t key_algorithm;
@@ -103,21 +90,13 @@ typedef struct pc_req_packet_st {
 	X509_REQ req;
 } __attribute__((packed)) pc_req_packet;
 
-//unsigned char recvBuf[MAXBUFLEN];	//tror ikke trengs
-//unsigned char sendBuf[MAXBUFLEN];	//tor ikke trengs
-struct addrinfo hints, *res;	//tror ikke trengs
-int32_t auth_send_socket;	//tror ikke trengs
-int32_t auth_recv_socket;	//tror ikke denne trengs
-am_packet *rcvd_am_header;	//tror ikke trengs
-challenge_packet *rcvd_challenge_packet;	//tror ikke trengs
-challenge_response_packet *rcvd_challenge_response_packet;	//tror ikke trengs
-response_packet *rcvd_response_packet;	//tror ikke trengs
+
+
+
+
 char *if_device;
 char *addr_prev_sender;
 
-
-extern uint16_t my_auth_token;		// My Authentication Token Value, set to 0 if not authenticated
-extern pthread_status am_status;
 
 
 void setup_am_socks();
@@ -150,7 +129,8 @@ EVP_PKEY *pkey;
 #define MY_KEY		CRYPTO_DIR "my_private_key"
 #define MY_CERT		CRYPTO_DIR "my_pc"
 #define MY_REQ 		CRYPTO_DIR "my_pc_req"
-#define MY_SIG		CRYPTO_DIR "my_signature"
+#define MY_RAND		CRYPTO_DIR "my_rand"
+#define MY_SIG		CRYPTO_DIR "my_sig"
 #define RECV_REQ	CRYPTO_DIR "recv_pc_req_"
 #define RECV_CERT	CRYPTO_DIR "recv_pc_"
 #define ISSUED_CERT	CRYPTO_DIR "issued_pc"
@@ -219,7 +199,7 @@ extern uint32_t tmp_wait;			// Random backoff time value
 
 
 
-
+void dump_memory(void* data, size_t len);
 
 
 /*
@@ -231,6 +211,10 @@ extern uint32_t tmp_wait;			// Random backoff time value
 /* Definitions */
 #define MAXBUFLEN 1500
 #define SUBJECT_NAME_SIZE 16
+#define AES_BLOCK_SIZE 16
+#define AES_KEY_SIZE 16
+#define AES_IV_SIZE 16
+#define RAND_LEN (AES_BLOCK_SIZE*64)-1
 
 /* Naming standard structs */
 typedef struct addrinfo addrinfo;
@@ -240,9 +224,22 @@ typedef struct sockaddr sockaddr;
 typedef struct timeval timeval;
 
 /* AM Structs */
+typedef struct routing_auth_packet_st {
+	unsigned char rand[RAND_LEN];
+	unsigned char key[AES_KEY_SIZE];
+	unsigned char iv[AES_IV_SIZE];
+}__attribute__((packed)) routing_auth_packet;
 
 
 /* AM Enums */
+typedef enum am_state_en {
+	READY,
+	SEND_INVITE,
+	WAIT_FOR_REQ,
+	SEND_REQ,
+	WAIT_FOR_PC,
+	SEND_PC
+} am_state;
 
 
 /* Functions */
@@ -254,7 +251,7 @@ int setup_am_recv_socks(int32_t *recv, addrinfo *res);
 int setup_am_send_socks(int32_t *send);
 void destroy_am_socks(int32_t *send, int32_t *recv, addrinfo *res);
 
-static void callback(int p, int n, void *arg);
+static void openssl_callback(int p, int n, void *arg);
 
 void create_signature();
 int create_proxy_cert_0(EVP_PKEY *pkey, unsigned char *subject_name);
@@ -272,21 +269,36 @@ void send_signature();
 void send_pc_invite(sockaddr_in *sin_dest);
 void send_pc_req(sockaddr_in *sin_dest);
 void send_pc_issue(sockaddr_in *sin_dest);
+void send_routing_auth_packet(EVP_CIPHER_CTX *master, int *key_count);
 
 am_type extract_am_header(char *buf, char **ptr);
 
 int receive_pc_req(char *addr, char *ptr);
 int receive_pc_issue(char *ptr);
+int receive_routing_auth_packet(char *ptr);
+
+
+unsigned char *generate_new_key(EVP_CIPHER_CTX *aes_master, int key_count);
+void generate_new_rand(unsigned char **rand, int len);
+
+void select_random_key(unsigned char **key, int b);
+void select_random_iv(unsigned char **iv, int b);
+int aes_init(unsigned char *key_data, int key_data_len, EVP_CIPHER_CTX *e_ctx, EVP_CIPHER_CTX *d_ctx);
+
+void init_master_ctx(EVP_CIPHER_CTX *master);
+unsigned char *aes_encrypt(EVP_CIPHER_CTX *e, unsigned char *plaintext, int *len);
 
 
 
 
 /* Necessary external variables */
 extern role_type my_role;
+extern am_state my_state;
 extern pthread_t am_main_thread;
 extern uint32_t new_neighbor;
 extern uint32_t trusted_neighbors[100];
 extern uint8_t num_trusted_neighbors;
-extern char signature_extract[3];
+extern unsigned char *auth_value;
+extern uint8_t auth_seq_num;
 
 #endif

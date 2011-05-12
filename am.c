@@ -16,13 +16,28 @@
 
 
 
+/* Debugging purposes */
+void dump_memory(void* data, size_t len) {
+	size_t i;
+	printf("Data in [%p..%p): ",data,data+len);
+	for (i=0;i<len;i++) {
+		if(!(i%32)) {
+			printf("\n[%d - %d]: ",i, ( i+32 <= len ? i+32 : len ));
+		}
+		printf("%02X ", ((unsigned char*)data)[i]);
+	}
+	printf("\n");
+}
+
 /* External Variables */
 role_type my_role;
+am_state my_state;
 pthread_t am_main_thread;
-uint32_t new_neighbor, prev_neighbor;
+uint32_t new_neighbor;
 uint32_t trusted_neighbors[100];
 uint8_t num_trusted_neighbors;
-char signature_extract[3];
+unsigned char *auth_value;
+uint8_t auth_seq_num;
 
 
 /* Variables used by am thread */
@@ -50,19 +65,19 @@ void am_thread_init(char *dev, sockaddr_in addr, sockaddr_in broad) {
 	pthread_create(&am_main_thread, NULL, am_main, NULL);
 }
 
-void *get_in_addr(struct sockaddr *sa)
+/*void *get_in_addr(struct sockaddr *sa)
 {
     if (sa->sa_family == AF_INET) {
         return &(((struct sockaddr_in*)sa)->sin_addr);
     }
 
     return &(((struct sockaddr_in6*)sa)->sin6_addr);
-}
+}*/
 
 /* AM main thread */
 void *am_main() {
 
-	sockaddr_in *dest;
+	sockaddr_in *dst;
 	sockaddr_storage recv_addr;
 	socklen_t addr_len;
 	fd_set readfds;
@@ -76,6 +91,13 @@ void *am_main() {
 	unsigned char *subject_name = NULL;
 	ssize_t data_rcvd;
 	am_type am_type_rcvd;
+
+	EVP_CIPHER_CTX aes_master;
+
+
+	int key_count = 0;
+
+
 
 	/* Load all algorithms and error messages used by OpenSSL */
 	OpenSSL_add_all_algorithms();
@@ -99,14 +121,17 @@ void *am_main() {
 	addr_to_string(my_addr.sin_addr.s_addr, addr_char, sizeof (addr_char));
 	id = inet_addr(addr_char) % UINT16_MAX;
 
+	/* Generate Master Key and bind it to AES context*/
+	init_master_ctx(&aes_master);
 
-	/* If you are the SP, create a PC0 */
+
 	if(my_role == SP) {
+		/* If you are the SP, create a PC0 */
 		create_proxy_cert_0(pkey, subject_name);
 
-		/* Send Signature */
-		create_signature();
-		send_signature();
+		/* Send Routing Auth Data (for continuous authentication) */
+//		send_routing_auth_packet(&aes_master, &key_count);
+
 
 	}
 
@@ -116,17 +141,23 @@ void *am_main() {
 	}
 
 
+
 	data_rcvd = 0;
 	am_type_rcvd = NO_AM_DATA;
 	addr_len = sizeof recv_addr;
-	prev_neighbor = 0;
 	am_recv_buf_ptr = am_recv_buf;
 	am_send_buf_ptr = am_send_buf;
 	am_payload_ptr = NULL;
-	dest = NULL;
-
+	dst = NULL;
+int tmpx = 1;
 	/* Main loop for the AM thread, will only exit when Batman is terminated */
 	while(1) {
+
+//		if(my_role==SP && tmpx && num_trusted_neighbors) {
+//			sleep(1);
+//			send_routing_auth_packet(&aes_master, &key_count);
+//			tmpx=0;
+//		}
 
 		/* Check For Incoming Data On AM Socket */
 		FD_ZERO(&readfds);
@@ -144,56 +175,100 @@ void *am_main() {
 					break;
 
 				case NEW_SIGNATURE:
-
+					/* Allowed in all states */
+					receive_routing_auth_packet(am_payload_ptr);
 					break;
 
 				case AUTHENTICATED_LIST:
-
+					/* Allowed in all states, must not be SP */
+					if(my_role == AUTHENTICATED) {
+						//TODO: Overwrite current local AL
+					}
 					break;
 
 				case AL_UPDATE:
-
+					/* Allowed in all states, must not be SP */
+					if(my_role == AUTHENTICATED) {
+						//TODO: Append to local AL, maybe check to see if node already exists for error handling?
+					}
 					break;
 
 				case INVITE:
-					printf("Received Invite!\n");
-					dest = (sockaddr_in *) malloc(sizeof(sockaddr_in));
-					dest->sin_addr = ((sockaddr_in*)((sockaddr *)&recv_addr))->sin_addr;
-					dest->sin_family = AF_INET;
-					dest->sin_port = htons(AM_PORT);
-					send_pc_req(dest);
-					free(dest);
+					/* Must be unauthenticated */
+					if(my_role == UNAUTHENTICATED && my_state == READY) {
+						printf("Received Invite!\n");
+						my_state = SEND_REQ;
+						dst = (sockaddr_in *) malloc(sizeof(sockaddr_in));
+						dst->sin_addr = ((sockaddr_in*)((sockaddr *)&recv_addr))->sin_addr;
+						dst->sin_family = AF_INET;
+						dst->sin_port = htons(AM_PORT);
+						send_pc_req(dst);
+						my_state = WAIT_FOR_PC; //TODO: actually check whether the send_pc_req succeeded...
+						free(dst);
+					}
 
 					break;
 
 				case PC_REQ:
-					printf("Received PC Request!\n");
+					/* Must be SP and waiting for req*/
+					if(my_role == SP && my_state == WAIT_FOR_REQ) {
+						printf("Received PC Request!\n");
+						my_state = SEND_PC;
 
-					if((uint32_t)((sockaddr_in*)((sockaddr *)&recv_addr))->sin_addr.s_addr == prev_neighbor) {
+						if((uint32_t)((sockaddr_in*)((sockaddr *)&recv_addr))->sin_addr.s_addr == new_neighbor) {
 
-						char *recv_addr_string = malloc(16);
-						recv_addr_string = inet_ntoa(((sockaddr_in*)((sockaddr *)&recv_addr))->sin_addr);
-						if(receive_pc_req(recv_addr_string, am_payload_ptr)) {
-							dest = (sockaddr_in *) malloc(sizeof(sockaddr_in));
-							dest->sin_addr = ((sockaddr_in*)((sockaddr *)&recv_addr))->sin_addr;
-							dest->sin_family = AF_INET;
-							dest->sin_port = htons(AM_PORT);
-							create_proxy_cert_1(recv_addr_string);
-							send_pc_issue(dest);
-							free(dest);
+							char *recv_addr_string = malloc(16);
+							recv_addr_string = inet_ntoa(((sockaddr_in*)((sockaddr *)&recv_addr))->sin_addr);
+							if(receive_pc_req(recv_addr_string, am_payload_ptr)) {
+								dst = (sockaddr_in *) malloc(sizeof(sockaddr_in));
+								dst->sin_addr = ((sockaddr_in*)((sockaddr *)&recv_addr))->sin_addr;
+								dst->sin_family = AF_INET;
+								dst->sin_port = htons(AM_PORT);
+								create_proxy_cert_1(recv_addr_string);
+								send_pc_issue(dst);
+								trusted_neighbors[num_trusted_neighbors] = dst->sin_addr.s_addr;
+								num_trusted_neighbors++;
+//								new_neighbor = 0;
+								free(dst);
+								sleep(1);
+								send_routing_auth_packet(&aes_master, &key_count);
+							}
 
+						} else {
+							printf("Request from unknown node!\n");
 						}
-
-					} else
-						printf("Request from unknown node!\n");
+					}
 
 					break;
 
 				case PC_ISSUE:
-					printf("Received PC Issue!\n");
-					if(receive_pc_issue(am_payload_ptr)) {
-						printf("\n\nI w0Z heR3!!\n\n\n");
+					/* Must be unauthenticated */
+					if(my_role == UNAUTHENTICATED && my_state == WAIT_FOR_PC) {
+						printf("Received PC Issue!\n");
+
+						if(receive_pc_issue(am_payload_ptr)) {
+//							printf("\n\nI w0Z heR3!!\n\n\n");
+
+
+
+
+
+
+							my_state = READY;
+							my_role = AUTHENTICATED;
+							trusted_neighbors[num_trusted_neighbors] = (uint32_t)((sockaddr_in*)((sockaddr *)&recv_addr))->sin_addr.s_addr;
+							num_trusted_neighbors++;
+						}
 					}
+
+					break;
+
+				case REQ_NEIGH_PC:
+					/* Verify PC */
+					receive_pc_req_from_new_neig(am_payload_ptr);
+					/* Send own PC */
+
+					/* Send Signature */
 
 					break;
 
@@ -205,29 +280,37 @@ void *am_main() {
 			data_rcvd = 0;
 		}
 
-		/* The rest is for SP only! */
-		if(my_role == SP) {
+		if(new_neighbor && my_state == READY) {
 
-			/* Check for new neighbors */
-			if(new_neighbor && !prev_neighbor) {
-				prev_neighbor = new_neighbor;
-				dest = (sockaddr_in *) malloc(sizeof(sockaddr_in));
-				dest->sin_addr.s_addr = new_neighbor;
-				dest->sin_family = AF_INET;
-				dest->sin_port = htons(AM_PORT);
-				send_pc_invite(dest);
-				free(dest);
-
+			/* Check for new nodes */
+			if(my_role == SP) {
+				my_state = SEND_INVITE;
+				dst = (sockaddr_in *) malloc(sizeof(sockaddr_in));
+				dst->sin_addr.s_addr = new_neighbor;
+				dst->sin_family = AF_INET;
+				dst->sin_port = htons(AM_PORT);
+				send_pc_invite(dst);
+				my_state = WAIT_FOR_REQ;
+				free(dst);
 			}
 
-
+			/* Check for new trusted neighbors */
+			if(my_role == AUTHENTICATED) {
+				/* Only one can initiate the neighbor's pc request or else collision */
+				if(my_addr.sin_addr.s_addr < new_neighbor) {
+					send_pc_request_to_new_neig();
+				}
+			}
 		}
-
 	}
+}
 
-
-
-
+/* Create RAND for Routing Auth Data */
+void generate_new_rand(unsigned char **rv, int len) {
+	if(*rv == NULL || rv == NULL) {
+		*rv = malloc(len);
+	}
+	RAND_pseudo_bytes(*rv,len);
 }
 
 /* Create PC0 for the SP */
@@ -242,11 +325,11 @@ int create_proxy_cert_0(EVP_PKEY *pkey, unsigned char *subject_name) {
 
 	selfsign(&pc0, &pkey, subject_name);
 
-	RSA_print_fp(stdout,pkey->pkey.rsa,0);
-	X509_print_fp(stdout,pc0);
+//	RSA_print_fp(stdout,pkey->pkey.rsa,0);
+//	X509_print_fp(stdout,pc0);
 
-	PEM_write_PrivateKey(stdout,pkey,NULL,NULL,0,NULL, NULL);
-	PEM_write_X509(stdout,pc0);
+//	PEM_write_PrivateKey(stdout,pkey,NULL,NULL,0,NULL, NULL);
+//	PEM_write_X509(stdout,pc0);
 
 	/* Write X509 PC0 to a file */
 	if(!(fp = fopen(MY_CERT, "w")))
@@ -292,9 +375,9 @@ int create_proxy_cert_req(EVP_PKEY *pkey, unsigned char *subject_name) {
 
 	mkreq(&req, &pkey, subject_name);
 
-	RSA_print_fp(stdout, pkey->pkey.rsa, 0);	//pkey.rsa changed with pkey.ec
-	X509_REQ_print_fp(stdout, req);
-	PEM_write_X509_REQ(stdout, req);
+//	RSA_print_fp(stdout, pkey->pkey.rsa, 0);	//pkey.rsa changed with pkey.ec
+//	X509_REQ_print_fp(stdout, req);
+//	PEM_write_X509_REQ(stdout, req);
 
 	/* Write Private Key to a file */
 	if(!(fp = fopen(MY_KEY, "w")))
@@ -362,8 +445,8 @@ int create_proxy_cert_1(char *addr) {
 
 
 	if(mkcert(&req, &pc1, &pc0) == 0) {
-		X509_print_fp(stdout,pc1);
-		PEM_write_X509(stdout,pc1);
+//		X509_print_fp(stdout,pc1);
+//		PEM_write_X509(stdout,pc1);
 
 		/* Write issued X509 PC1 to a file */
 		if(!(fp = fopen(ISSUED_CERT, "w")))
@@ -388,88 +471,6 @@ int create_proxy_cert_1(char *addr) {
 }
 
 
-/* Create Signature */
-
-void create_signature() {
-
-	FILE *fp;
-	unsigned char *pseudo_random = NULL;
-	unsigned char *sig_buf = NULL;
-	unsigned int sig_len;
-	BIO *bio, *b64;
-	EVP_MD_CTX *md_ctx;
-
-	/* Read my private key */
-	if(!(fp = fopen(MY_KEY, "r")))
-		fprintf(stderr, "Error opening file %s for reading!\n",MY_KEY);
-	if(!(pkey = PEM_read_PrivateKey(fp, NULL, NULL, NULL)))
-		fprintf(stderr,"Error reading private key of SP");
-	fclose(fp);
-
-	/* Create Random Bytes String */
-	pseudo_random = malloc(20);
-	if(!RAND_pseudo_bytes(pseudo_random, 20)) {
-		fprintf(stderr, "Could not generate pseudo random value for signature\n");
-	}
-
-	/* Create Message Digest of Random String to Sign (Signature) */
-	md_ctx = EVP_MD_CTX_create();
-	EVP_SignInit(md_ctx, EVP_sha1());
-	EVP_SignUpdate(md_ctx, pseudo_random, sizeof(pseudo_random));
-	sig_len = EVP_PKEY_size(pkey);
-	sig_buf = malloc(sig_len);
-	if(EVP_SignFinal(md_ctx, sig_buf, &sig_len, pkey) != 1) {
-		ERR_print_errors_fp(stderr);
-	}
-	printf("Created new signature!\n");
-
-	if(!(fp = fopen(MY_SIG, "w")))
-		fprintf(stderr, "Error opening file %s for writing!\n",MY_SIG);
-
-	b64 = BIO_new(BIO_f_base64());
-	bio = BIO_new_fp(fp, BIO_NOCLOSE);
-	bio = BIO_push(b64, bio);
-	BIO_write(bio, sig_buf, sig_len);
-
-	BIO_flush(bio);
-	fclose(fp);
-	BIO_free_all(bio);
-
-	EVP_MD_CTX_cleanup(md_ctx);
-
-	/* Save signature extract */
-	memcpy(&signature_extract, sig_buf, sizeof(signature_extract));
-
-}
-
-/* Send Signature */
-void send_signature() {
-
-	am_packet *am_header;
-	char *ptr;
-	int32_t packet_len;
-	FILE *fp;
-	char *buf;
-
-	am_header = (am_packet *) malloc(sizeof(am_packet));
-	am_header->id = id;
-	am_header->type = NEW_SIGNATURE;
-
-	buf = malloc(MAXBUFLEN);
-	memset(buf, 0, sizeof(buf));
-	memcpy(buf, am_header, sizeof(am_packet));
-	ptr = buf;
-	ptr += sizeof(am_packet);
-	packet_len = sizeof(am_packet);
-	if(!(fp = fopen(MY_SIG, "r")))
-			fprintf(stderr, "Error opening file %s for reading!\n",MY_SIG);
-	packet_len += fread(ptr, 1, PEM_BUFSIZE, fp);
-	fclose(fp);
-
-	send_udp_packet((unsigned char *)buf, packet_len, &broadcast_addr, am_send_socket, NULL);
-	printf("Sending new signature!\n");
-
-}
 
 /* Send PC Handshake Invite */
 void send_pc_invite(sockaddr_in *sin_dest) {
@@ -497,7 +498,8 @@ void send_pc_invite(sockaddr_in *sin_dest) {
 	packet_len = sizeof(am_packet);
 	packet_len += sizeof(invite_pc_packet);
 
-	send_udp_packet((unsigned char *)buf, packet_len, sin_dest, am_send_socket, NULL);
+//	send_udp_packet((unsigned char *)buf, packet_len, sin_dest, am_send_socket, NULL);
+	sendto(am_send_socket, buf, packet_len, 0, (struct sockaddr *)sin_dest, sizeof(struct sockaddr_in));
 
 	free(buf);
 	free(header);
@@ -529,7 +531,8 @@ void send_pc_req(sockaddr_in *sin_dest) {
 	packet_len += fread(ptr, 1, PEM_BUFSIZE, fp);
 	fclose(fp);
 
-	send_udp_packet((unsigned char *)buf, packet_len, sin_dest, am_send_socket, NULL);
+//	send_udp_packet((unsigned char *)buf, packet_len, sin_dest, am_send_socket, NULL);
+	sendto(am_send_socket, buf, packet_len, 0, (struct sockaddr *)sin_dest, sizeof(struct sockaddr_in));
 
 	free(header);
 	free(buf);
@@ -563,12 +566,116 @@ void send_pc_issue(sockaddr_in *sin_dest) {
 	packet_len += fread(ptr, 1, PEM_BUFSIZE, fp);
 	fclose(fp);
 
-	send_udp_packet((unsigned char *)buf, packet_len, sin_dest, am_send_socket, NULL);
+//	send_udp_packet((unsigned char *)buf, packet_len, sin_dest, am_send_socket, NULL);
+	sendto(am_send_socket, buf, packet_len, 0, (struct sockaddr *)sin_dest, sizeof(struct sockaddr_in));
 
 	free(am_header);
 	free(buf);
 }
 
+/* Send Routing Auth Packet */
+void send_routing_auth_packet(EVP_CIPHER_CTX *master, int *key_count) {
+
+	sleep(2);
+	char *buf, *ptr;
+	unsigned char *current_key, *current_iv, *current_rand = NULL;
+	int i;
+	am_packet *header;
+	routing_auth_packet *payload;
+	int value_len = RAND_LEN;
+
+	/* First Generate New Current Key & IV */
+	*key_count = *key_count + 1;
+	current_key = generate_new_key(master, *key_count);
+	select_random_iv(&current_iv, AES_IV_SIZE);
+
+	/* Generate New RAND */
+	generate_new_rand(&current_rand, RAND_LEN);
+//	dump_memory(current_rand, RAND_LEN);
+
+	/* Sign Payload Using HMAC */
+	//TODO: sign the paayload!
+
+	/* Send Payload & HMAC */
+	header = (am_packet *) malloc(sizeof(am_packet));
+	header->id = id;
+	header->type = NEW_SIGNATURE;
+
+	payload = malloc(sizeof(routing_auth_packet));
+	memcpy(&(payload->key), current_key, AES_KEY_SIZE);
+	memcpy(&(payload->iv), current_iv, AES_IV_SIZE);
+	memcpy(&(payload->rand), current_rand, RAND_LEN);
+
+	buf = malloc(MAXBUFLEN);
+	memset(buf, 0, sizeof(buf));
+	memcpy(buf, header, sizeof(am_packet));
+	ptr = buf;
+	ptr += sizeof(am_packet);
+	memcpy(ptr, payload, sizeof(routing_auth_packet));
+
+	packet_len = sizeof(am_packet);
+	packet_len += sizeof(routing_auth_packet);
+
+	sockaddr_in *tmp_dest = malloc(sizeof(sockaddr_in));
+	tmp_dest->sin_family = AF_INET;
+	tmp_dest->sin_port = htons(AM_PORT);
+	for(i=0; i<num_trusted_neighbors; i++) {
+		tmp_dest->sin_addr.s_addr = trusted_neighbors[i];
+		sendto(am_send_socket, buf, packet_len, 0, (sockaddr *)tmp_dest, sizeof(sockaddr_in));
+	}
+	free(tmp_dest);
+	free(buf);
+	free(header);
+	free(payload);
+
+	/* Generate Routing VALUE from RAND */
+	EVP_CIPHER_CTX current_ctx;
+	EVP_EncryptInit(&current_ctx, EVP_aes_128_cbc(), current_key, current_iv);
+	auth_value = aes_encrypt(&current_ctx, current_rand, &value_len);
+
+//	dump_memory(auth_value, value_len);
+
+
+	new_neighbor = 0;
+	my_state = READY;
+}
+
+void send_pc_request_to_new_neig() {
+	char *buf, *ptr;
+	am_packet *am_header;
+	int32_t packet_len;
+	FILE *fp;
+	sockaddr_in *neigh_addr;
+
+	am_header = (am_packet *) malloc(sizeof(am_packet));
+	am_header->id = id;
+	am_header->type = REQ_NEIGH_PC;
+
+	buf = malloc(MAXBUFLEN);
+	memset(buf, 0, sizeof(buf));
+	memcpy(buf, am_header, sizeof(am_packet));
+
+	ptr = buf;
+	ptr += sizeof(am_packet);
+
+	packet_len = sizeof(am_packet);
+	if(!(fp = fopen(MY_CERT, "r")))
+			fprintf(stderr, "Error opening file %s for reading!\n",MY_CERT);
+
+	packet_len += fread(ptr, 1, PEM_BUFSIZE, fp);
+	fclose(fp);
+
+	neigh_addr = malloc(sizeof(sockaddr_in));
+	neigh_addr->sin_addr.s_addr = new_neighbor;
+	neigh_addr->sin_family = AF_INET;
+	neigh_addr->sin_port = htons(AM_PORT);
+
+	sendto(am_send_socket, buf, packet_len, 0, (sockaddr *)neigh_addr, sizeof(sockaddr_in));
+
+	free(neigh_addr);
+	free(am_header);
+	free(buf);
+}
 
 
 
@@ -594,6 +701,42 @@ am_type extract_am_header(char *buf, char **ptr) {
 //	requested_key_algorithm = recv_invite->key_algorithm;
 //	requested_key_size = recv_invite->key_size;
 //}
+
+/* Receive Routing Auth Packet */
+int receive_routing_auth_packet(char *ptr) {
+
+	routing_auth_packet *payload = (routing_auth_packet *)ptr;
+
+	EVP_CIPHER_CTX received_ctx;
+	EVP_EncryptInit(&received_ctx, EVP_aes_128_cbc(), (unsigned char *)&(payload->key), (unsigned char *)&(payload->iv));
+	unsigned char *value;
+	int value_len = RAND_LEN;
+	value = aes_encrypt(&received_ctx, (unsigned char *)&(payload->rand), &value_len);
+	dump_memory(value, value_len);
+
+	return 1;
+
+}
+
+/* Receive PC request along with the PC of a new neighbor */
+int receive_pc_req_from_new_neig(char *ptr) {
+
+	char *filename;
+	FILE *fp;
+
+	filename = malloc(255);
+	memset(filename, 0, sizeof(filename));
+	sprintf(filename, "%s", RECV_CERT);
+
+	//BYTT ut addr med addressen mottatt fra pakken
+	//IKKE bruk new_neighbor til dette, i tilfelle det er flere nye naboer og du har feil verdi i dette feltet...
+	strncat(filename, addr, sizeof(filename)-strlen(filename)-1);
+
+	if(!(fp = fopen(filename, "w"))) {
+		fprintf(stderr, "Error opening file %s for writing!\n", filename);
+		return 0;
+	}
+}
 
 /* Receive PC Request */
 int receive_pc_req(char *addr, char *ptr) {
@@ -764,7 +907,7 @@ int selfsign(X509 **x509p, EVP_PKEY **pkeyp, unsigned char *subject_name) {
 
 
 
-	rsa=RSA_generate_key(bits,RSA_F4,callback,NULL);
+	rsa=RSA_generate_key(bits,RSA_F4,openssl_callback,NULL);
 	if (!EVP_PKEY_assign_RSA(pk,rsa))
 		{
 		abort();
@@ -862,7 +1005,7 @@ int mkreq(X509_REQ **x509p, EVP_PKEY **pkeyp, unsigned char *subject_name) {
 	if ((x=X509_REQ_new()) == NULL)
 		goto err;
 
-	rsa=RSA_generate_key(bits,RSA_F4,callback,NULL);
+	rsa=RSA_generate_key(bits,RSA_F4,openssl_callback,NULL);
 	if (!EVP_PKEY_assign_RSA(pk,rsa))
 		goto err;
 
@@ -1140,8 +1283,12 @@ int add_ext_req(STACK_OF(X509_REQUEST) *sk, int nid, char *value) {
 
 }
 
-/* Callback function used by OpenSSL */
-static void callback(int p, int n, void *arg) {
+
+
+/* OpenSSL special functions */
+
+/* openssl_callback function used by OpenSSL */
+static void openssl_callback(int p, int n, void *arg) {
 	char c='B';
 
 	if (p == 0) c='.';
@@ -1151,13 +1298,137 @@ static void callback(int p, int n, void *arg) {
 	fputc(c,stderr);
 }
 
-
-
-/* OpenSSL special functions */
-
 /* Seeding the PRNG */
 int seed_prng(int bytes) {
 	if(!RAND_load_file("/dev/urandom", bytes))
 		return 0;
 	return 1;
 }
+
+/* Create AES Keys and contexts */
+
+/* Generate Context for Encryption with Master Key */
+void init_master_ctx(EVP_CIPHER_CTX *master) {
+
+	unsigned char *aes_master_key = NULL;
+	unsigned char *aes_master_iv = NULL;
+
+	select_random_key(&aes_master_key, AES_KEY_SIZE);
+	select_random_iv(&aes_master_iv, AES_IV_SIZE);
+
+	EVP_EncryptInit(master, EVP_aes_128_cbc(), aes_master_key, aes_master_iv);
+}
+
+/* Random key for input to the AES key generation, i.e. insted of user password */
+void select_random_key(unsigned char **k, int b) {
+	int i;
+	unsigned char *key;
+
+	if(*k == NULL || k == NULL) {
+		key = malloc(b);
+
+	} else {
+		key = *k;
+	}
+
+
+	if(!RAND_bytes(key, b)) {
+		printf("Master Key Generation Failed!\n");
+		exit(0);
+	}
+	printf("Generated Master Key: ");
+
+	for(i=0;i<b-1;i++) {
+		printf("%02X:", key[i]);
+	}
+	printf("%02X\n", key[b-1]);
+
+	*k = key;
+
+}
+
+void select_random_iv(unsigned char **iv, int b) {
+	int i;
+
+	if(*iv == NULL || iv == NULL) {
+		*iv = malloc(AES_IV_SIZE);
+	}
+
+	if(!RAND_pseudo_bytes(*iv,b)){
+		printf("IV Generation Failed\n");
+		exit(0);
+	}
+}
+
+
+/*
+ * Encrypt *len bytes of data
+ * All data going in & out is considered binary (unsigned char[])
+ */
+unsigned char *aes_encrypt(EVP_CIPHER_CTX *e, unsigned char *plaintext, int *len)
+{
+  /* max ciphertext len for a n bytes of plaintext is n + AES_BLOCK_SIZE -1 bytes */
+  int c_len = *len + AES_BLOCK_SIZE, f_len = 0;
+  unsigned char *ciphertext = malloc(c_len);
+
+  /* allows reusing of 'e' for multiple encryption cycles */
+//  EVP_EncryptInit_ex(e, NULL, NULL, NULL, NULL);
+
+  /* update ciphertext, c_len is filled with the length of ciphertext generated,
+    *len is the size of plaintext in bytes */
+  EVP_EncryptUpdate(e, ciphertext, &c_len, plaintext, *len);
+
+  /* update ciphertext with the final remaining bytes */
+  EVP_EncryptFinal(e, ciphertext+c_len, &f_len);
+
+  *len = c_len + f_len;
+  return ciphertext;
+}
+
+/*
+ * Decrypt *len bytes of ciphertext
+ */
+unsigned char *aes_decrypt(EVP_CIPHER_CTX *e, unsigned char *ciphertext, int *len)
+{
+  /* plaintext will always be equal to or lesser than length of ciphertext*/
+  int p_len = *len, f_len = 0;
+  unsigned char *plaintext = malloc(p_len);
+
+  EVP_DecryptInit_ex(e, NULL, NULL, NULL, NULL);
+  EVP_DecryptUpdate(e, plaintext, &p_len, ciphertext, *len);
+  EVP_DecryptFinal_ex(e, plaintext+p_len, &f_len);
+
+  *len = p_len + f_len;
+  return plaintext;
+}
+
+/* Generate new key (incl. IV), from master key */
+unsigned char *generate_new_key(EVP_CIPHER_CTX *aes_master, int key_count) {
+
+	unsigned char *ret;
+	int i, tmp, ol;
+
+	ol = 0;
+	ret = malloc(EVP_CIPHER_CTX_block_size(aes_master));
+
+	/* Create plaintext from key_count - each new key will be cipher of i=1,2,3... */
+	unsigned char *plaintext = malloc(sizeof(key_count));
+	memset(plaintext, 0, sizeof(plaintext));
+	*plaintext = (unsigned char)key_count;
+	int len = strlen((char *)plaintext)+1;
+
+	EVP_EncryptUpdate(aes_master, &ret[0], &tmp, plaintext, len);
+	ol += tmp;
+	EVP_EncryptFinal(aes_master, &ret[ol], &tmp);
+
+	printf("Generated New Current Key #%d: ",key_count);
+
+	for(i=0;i<tmp-1;i++) {
+		printf("%02X:",ret[i]);
+	}
+	printf("%02X\n", ret[tmp-1]);
+
+	return ret;
+
+}
+

@@ -797,9 +797,12 @@ int8_t batman(void)
 
 
 	/*Initialize AM variables */
+	my_state = READY;
 	uint8_t neigh_counter = 0;
 	num_trusted_neighbors = 0;
-	memset(signature_extract, 0, sizeof(signature_extract));
+	auth_seq_num = 0;
+	unsigned char *empty_check = malloc(2);
+	memset(empty_check, 0, 2);
 
 
 	list_for_each(list_pos, &if_list) {
@@ -913,20 +916,13 @@ int8_t batman(void)
 			}
 
 
-//			/* Initiate AM thread */
-//			am_thread_init(batman_if->dev, batman_if->addr, (char *)&prev_sender_str);
+			/* Begin Authentication Module Extension */
+
 			/*
 			 * If the daemon is not authenticated, or it receives an authentication token which it does not recognize,
 			 * the authentication procedure in the Authentication Module is called. No packets received when authenticating
 			 * will be processed.
 			 */
-			/*if((( bat_packet->auth_token == 0 ) || (bat_packet->auth_token != my_auth_token )) && ((my_role == UNAUTHENTICATED) || (my_role == MASTER))) {
-				char my_addr[16];
-				addr_to_string(batman_if->addr.sin_addr.s_addr, my_addr, sizeof (my_addr));
-				authenticate_thread_init(batman_if->dev, bat_packet->auth_token, (char *)&prev_sender_str, (char *)&my_addr);
-				goto send_packets;
-			}*/
-
 			if(num_trusted_neighbors) {
 				while(neigh_counter < num_trusted_neighbors) {
 					if(trusted_neighbors[neigh_counter] == neigh) {
@@ -936,15 +932,23 @@ int8_t batman(void)
 					neigh_counter++;
 				}
 			}
-
-			if(neigh_counter < UINT8_MAX) {
-				if(my_role == SP && !new_neighbor) {
+			if(neigh_counter < UINT8_MAX && my_state ==  READY) {
+				if(my_role == SP) {
 					new_neighbor = neigh;
 				}
 
+				if(my_role == AUTHENTICATED) {
+					/* Check to see whether the other node is AUTHENTICATED */
+					if(memcmp(&(bat_packet->auth), empty_check, 2) != 0)
+						new_neighbor = neigh;
+				}
+
+				neigh_counter = 0;
 				goto send_packets;
 			}
+			neigh_counter = 0;
 
+			/* End Authentication Module Extension */
 
 
 			if (bat_packet->gwflags != 0)

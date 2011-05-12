@@ -74,10 +74,15 @@ void schedule_own_packet(struct batman_if *batman_if)
 
 
 	/* Begin Authentication Module Extension */
-
 	/* Add Signature Extract to OGM */
-	memcpy(((struct bat_packet *)forw_node_new->pack_buff)->sig, &signature_extract, 2);
+	if(auth_value != NULL) {
+		memcpy(((struct bat_packet *)forw_node_new->pack_buff)->auth, auth_value+2*auth_seq_num, 2);
+		((struct bat_packet *)forw_node_new->pack_buff)->auth_seqno = auth_seq_num;
 
+		printf("[%03d] %02X%02X\n", auth_seq_num, (unsigned char*)auth_value[2*auth_seq_num], (unsigned char*)auth_value[2*auth_seq_num+1]);
+
+		auth_seq_num ++;
+	}
 	/* End Authentication Module Extension */
 
 	prev_list_head = (struct list_head *)&forw_list;
@@ -261,6 +266,18 @@ void schedule_forward_packet(struct orig_node *orig_node, struct bat_packet *in,
 		bat_packet->flags |= DIRECTLINK;
 	else
 		bat_packet->flags &= ~DIRECTLINK;
+
+
+	/* Begin Authentication Module Extension */
+	/* Add Signature Extract to OGM */
+	if(auth_value != NULL) {
+		memcpy(bat_packet->auth, auth_value+2*auth_seq_num, 2);
+		bat_packet->auth_seqno = auth_seq_num;
+
+		printf("[%03d] %02X%02X\n", auth_seq_num, (unsigned char*)auth_value[2*auth_seq_num], (unsigned char*)auth_value[2*auth_seq_num+1]);
+		auth_seq_num ++;
+	}
+	/* End Authentication Module Extension */
 
 
 	/* if the packet was not aggregated */
