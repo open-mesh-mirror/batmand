@@ -247,13 +247,6 @@ int tmpx = 1;
 						printf("Received PC Issue!\n");
 
 						if(receive_pc_issue(am_payload_ptr)) {
-//							printf("\n\nI w0Z heR3!!\n\n\n");
-
-
-
-
-
-
 							my_state = READY;
 							my_role = AUTHENTICATED;
 							trusted_neighbors[num_trusted_neighbors] = (uint32_t)((sockaddr_in*)((sockaddr *)&recv_addr))->sin_addr.s_addr;
@@ -264,8 +257,15 @@ int tmpx = 1;
 					break;
 
 				case REQ_NEIGH_PC:
-					/* Verify PC */
-					receive_pc_req_from_new_neig(am_payload_ptr);
+
+					char *recv_addr_string = malloc(16);
+					recv_addr_string = inet_ntoa(((sockaddr_in*)((sockaddr *)&recv_addr))->sin_addr);
+
+					/* Receive Neighbors PC */
+					receive_pc_req_from_new_neig(recv_addr_string, am_payload_ptr);
+
+					/* Verify PC Signature and Rights (ProxyCertInfo) */
+
 					/* Send own PC */
 
 					/* Send Signature */
@@ -566,7 +566,6 @@ void send_pc_issue(sockaddr_in *sin_dest) {
 	packet_len += fread(ptr, 1, PEM_BUFSIZE, fp);
 	fclose(fp);
 
-//	send_udp_packet((unsigned char *)buf, packet_len, sin_dest, am_send_socket, NULL);
 	sendto(am_send_socket, buf, packet_len, 0, (struct sockaddr *)sin_dest, sizeof(struct sockaddr_in));
 
 	free(am_header);
@@ -677,6 +676,39 @@ void send_pc_request_to_new_neig() {
 	free(buf);
 }
 
+/* Send my PC to new neighbor */
+void send_my_pc_to_neigh(sockaddr_in *sin_dest) {
+
+	char *buf;
+	am_packet *am_header;
+	char *ptr;
+	int32_t packet_len;
+	FILE *fp;
+
+	am_header = (am_packet *) malloc(sizeof(am_packet));
+	am_header->id = id;
+	am_header->type = PC_ISSUE;
+
+	buf = malloc(MAXBUFLEN);
+	memset(buf, 0, sizeof(buf));
+	memcpy(buf, am_header, sizeof(am_packet));
+
+	ptr = buf;
+	ptr += sizeof(am_packet);
+
+	packet_len = sizeof(am_packet);
+	if(!(fp = fopen(ISSUED_CERT, "r")))
+			fprintf(stderr, "Error opening file %s for reading!\n",ISSUED_CERT);
+
+	packet_len += fread(ptr, 1, PEM_BUFSIZE, fp);
+	fclose(fp);
+
+	sendto(am_send_socket, buf, packet_len, 0, (struct sockaddr *)sin_dest, sizeof(struct sockaddr_in));
+
+	free(am_header);
+	free(buf);
+}
+
 
 
 
@@ -719,7 +751,7 @@ int receive_routing_auth_packet(char *ptr) {
 }
 
 /* Receive PC request along with the PC of a new neighbor */
-int receive_pc_req_from_new_neig(char *ptr) {
+int receive_pc_req_from_new_neig(char* addr, char *ptr) {
 
 	char *filename;
 	FILE *fp;
@@ -728,14 +760,17 @@ int receive_pc_req_from_new_neig(char *ptr) {
 	memset(filename, 0, sizeof(filename));
 	sprintf(filename, "%s", RECV_CERT);
 
-	//BYTT ut addr med addressen mottatt fra pakken
-	//IKKE bruk new_neighbor til dette, i tilfelle det er flere nye naboer og du har feil verdi i dette feltet...
 	strncat(filename, addr, sizeof(filename)-strlen(filename)-1);
 
 	if(!(fp = fopen(filename, "w"))) {
 		fprintf(stderr, "Error opening file %s for writing!\n", filename);
 		return 0;
 	}
+	fwrite(ptr, 1, strlen(ptr), fp);
+
+	fclose(fp);
+	free(filename);
+	return 1;
 }
 
 /* Receive PC Request */
