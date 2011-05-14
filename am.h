@@ -44,191 +44,120 @@
 #include <openssl/asn1t.h>
 #include <openssl/asn1_mac.h>
 
-#define IF_NAMESIZE	16
-#define AM_PORT 64305
 
 
-typedef enum role_type_en{
-	UNAUTHENTICATED,
-	AUTHENTICATED,
-	MASTER,
-	SP
-} role_type;
-
-typedef enum am_type_en{
-	NO_AM_DATA,
-	NEW_SIGNATURE,
-	AUTHENTICATED_LIST,
-	AL_UPDATE,
-	INVITE,
-	PC_REQ,
-	PC_ISSUE,
-	REQ_NEIGH_PC,
-	REQ_NEIGH_SIG
-} am_type;
 
 
+
+//typedef struct {
+//	ASN1_OBJECT *policyLanguage;
+//	ASN1_OCTET_STRING *policy;
+//} ProxyPolicy;
+//
+//typedef struct {
+//	ASN1_INTEGER *pCPathLenConstraint;
+//	ProxyPolicy *proxyPolicy;
+//} ProxyCertInfoExtension;
+//
+//typedef struct PROXYPOLICY_st
+//{
+//	ASN1_OBJECT *policy_language;
+//	ASN1_OCTET_STRING *policy;
+//} PROXYPOLICY;
+//
+//
+//typedef struct PROXYCERTINFO_st
+//{
+//	ASN1_INTEGER *path_length;       /* [ OPTIONAL ] */
+//	PROXYPOLICY *policy;
+//} PROXYCERTINFO;
+//
+//
+//#define ASN1_F_PROXYPOLICY_NEW          450
+//#define PROXYCERTINFO_OID               "1.3.6.1.5.5.7.1.14" //tester
+//#define PROXYCERTINFO_OLD_OID           "1.3.6.1.4.1.3536.1.222"
+//#define LIMITED_PROXY_OID               "1.3.6.1.4.1.3536.1.1.1.9"
+//#define LIMITED_PROXY_SN                "LIMITED_PROXY"
+//#define LIMITED_PROXY_LN                "GSI limited proxy"
+
+
+
+
+
+
+
+
+
+
+
+/*
+ * TEMP
+ */
+void dump_memory(void* data, size_t len);
+
+
+
+/*
+ * MAYBE
+ */
+typedef struct invite_pc_packet_st {
+	uint8_t key_algorithm;
+	uint16_t key_size;
+} __attribute__((packed)) invite_pc_packet;
 
 typedef enum key_algorithm_en{
 	ECC_key = 1,
 	RSA_key = 2
 } key_algorithm;
 
-typedef struct am_packet_st {
-	uint16_t id;
-	uint8_t type;
-} __attribute__((packed)) am_packet;
-
-
-typedef struct invite_pc_packet_st {
-	uint8_t key_algorithm;
-	uint16_t key_size;
-} __attribute__((packed)) invite_pc_packet;
-
-typedef struct pc_req_packet_st {
-	uint16_t length;
-	X509_REQ req;
-} __attribute__((packed)) pc_req_packet;
-
-
-
-
-
-char *if_device;
-char *addr_prev_sender;
-
-
-
-void setup_am_socks();
-void setup_am_recv_sock();
-void setup_am_send_sock();
-void destroy_am_socks();
-
-am_type receive_am_header();
-
-void receive_challenge();
-void receive_challenge_response();
-void receive_response();
-
-void send_challenge();
-void send_challenge_response();
-void send_response();
-
-
-
-void receive_pc_invite();
-
-
-
-
-BIO *bio_err;
-X509_REQ *req;
-EVP_PKEY *pkey;
-
-#define CRYPTO_DIR	"./tmp_crypto/"
-#define MY_KEY		CRYPTO_DIR "my_private_key"
-#define MY_CERT		CRYPTO_DIR "my_pc"
-#define MY_REQ 		CRYPTO_DIR "my_pc_req"
-#define MY_RAND		CRYPTO_DIR "my_rand"
-#define MY_SIG		CRYPTO_DIR "my_sig"
-#define RECV_REQ	CRYPTO_DIR "recv_pc_req_"
-#define RECV_CERT	CRYPTO_DIR "recv_pc_"
-#define ISSUED_CERT	CRYPTO_DIR "issued_pc"
-
-void init_am();
-
-
-
-
-
-
-
-int add_ext(STACK_OF(X509_REQUEST) *sk, int nid, char *value);
-
-/*
-typedef struct {
-	ASN1_OBJECT *policyLanguage;
-	ASN1_OCTET_STRING *policy;
-} ProxyPolicy;
-
-typedef struct {
-	ASN1_INTEGER *pCPathLenConstraint;
-	ProxyPolicy *proxyPolicy;
-} ProxyCertInfoExtension;
-*/
-typedef struct PROXYPOLICY_st
-{
-	ASN1_OBJECT *policy_language;
-	ASN1_OCTET_STRING *policy;
-} PROXYPOLICY;
-
-
-typedef struct PROXYCERTINFO_st
-{
-	ASN1_INTEGER *path_length;       /* [ OPTIONAL ] */
-	PROXYPOLICY *policy;
-} PROXYCERTINFO;
-
-
-
-/*
-#define ASN1_F_PROXYPOLICY_NEW          450
-#define PROXYCERTINFO_OID               "1.3.6.1.5.5.7.1.14" //tester
-#define PROXYCERTINFO_OLD_OID           "1.3.6.1.4.1.3536.1.222"
-#define LIMITED_PROXY_OID               "1.3.6.1.4.1.3536.1.1.1.9"
-#define LIMITED_PROXY_SN                "LIMITED_PROXY"
-#define LIMITED_PROXY_LN                "GSI limited proxy"
-*/
-
-
-//Temp variables for simple auth
-extern uint8_t is_authenticated;	// O eller 1
-extern uint8_t my_challenge;		// My Challenge Value, set to 0 if no challenge to send
-extern uint8_t my_response;			// My Response Value, set to 0 if no response to send
-
-extern uint8_t tmp_response;		// Temporary response value, used in calculation
-extern uint8_t generated_challenge;	// My last generated Challenge Value, used to verify received response in Request Message
-extern uint8_t generated_request;	// My last generated Request (challenge in a Request message), used to verify received Response
-extern uint8_t generated_auth;		// My generated Authentication Value to be used if authentication completes
-extern uint8_t rcvd_challenge;		// Received Challenge Value, 0 if no challenge
-extern uint8_t rcvd_response;		// Received Response Value, 0 if no response
-extern uint16_t rcvd_auth_token;		// Received Authentication Token, 0 if not authenticated, or if not end of handshake
-extern uint8_t expecting_token;		// Expected Value of received authentication token
-extern uint32_t	random_wait_time;	// Random backoff time, tmp_wait + curr_time
-extern uint32_t tmp_wait;			// Random backoff time value
-
-
-
-void dump_memory(void* data, size_t len);
 
 
 /*
  *
- * New ones, in right order
+ * TO KEEP!!!
  *
  */
 
 /* Definitions */
-#define MAXBUFLEN 1500
-#define SUBJECT_NAME_SIZE 16
-#define AES_BLOCK_SIZE 16
-#define AES_KEY_SIZE 16
-#define AES_IV_SIZE 16
-#define RAND_LEN (AES_BLOCK_SIZE*64)-1
+#define IF_NAMESIZE			16
+#define AM_PORT 			64305
+#define MAXBUFLEN 			1500
+#define SUBJECT_NAME_SIZE 	16
+#define AES_BLOCK_SIZE 		16
+#define AES_KEY_SIZE 		16
+#define AES_IV_SIZE 		16
+#define RAND_LEN 			(AES_BLOCK_SIZE*64)-1
+
+#define CRYPTO_DIR			"./tmp_crypto/"
+#define MY_KEY				CRYPTO_DIR "my_private_key"
+#define MY_CERT				CRYPTO_DIR "my_pc"
+#define MY_REQ 				CRYPTO_DIR "my_pc_req"
+#define MY_RAND				CRYPTO_DIR "my_rand"
+#define MY_SIG				CRYPTO_DIR "my_sig"
+#define RECV_REQ			CRYPTO_DIR "recv_pc_req_"
+#define RECV_CERT			CRYPTO_DIR "recv_pc_"
+#define ISSUED_CERT			CRYPTO_DIR "issued_pc"
 
 /* Naming standard structs */
 typedef struct addrinfo addrinfo;
 typedef struct sockaddr_in sockaddr_in;
 typedef struct sockaddr_storage sockaddr_storage;
 typedef struct sockaddr sockaddr;
+typedef struct in_addr in_addr;
 typedef struct timeval timeval;
 
 /* AM Structs */
+typedef struct am_packet_st {
+	uint16_t id;
+	uint8_t type;
+} __attribute__((packed)) am_packet;
+
 typedef struct routing_auth_packet_st {
 	unsigned char rand[RAND_LEN];
 	unsigned char key[AES_KEY_SIZE];
 	unsigned char iv[AES_IV_SIZE];
 }__attribute__((packed)) routing_auth_packet;
+
 
 
 /* AM Enums */
@@ -238,8 +167,33 @@ typedef enum am_state_en {
 	WAIT_FOR_REQ,
 	SEND_REQ,
 	WAIT_FOR_PC,
-	SEND_PC
+	SEND_PC,
+	SENDING_NEW_SIGS,
+	SENDING_SIG
 } am_state;
+
+typedef enum am_type_en{
+	SIGNATURE,
+	AL_FULL,
+	AL_ROW,
+	AUTH_INVITE,
+	AUTH_REQ,
+	AUTH_ISSUE,
+	AUTH_ACK,
+	NEIGH_PC,
+	NEIGH_SIGN,
+	NEIGH_PC_REQ,
+	NEIGH_SIG_REQ
+} am_type;
+
+typedef enum role_type_en{
+	UNAUTHENTICATED,
+	AUTHENTICATED,
+	MASTER,
+	SP
+} role_type;
+
+
 
 
 /* Functions */
@@ -262,6 +216,8 @@ int selfsign(X509 **x509p, EVP_PKEY **pkeyp, unsigned char *subject_name);
 int mkreq(X509_REQ **x509p, EVP_PKEY **pkeyp, unsigned char *subject_name);
 int mkcert(X509_REQ **reqp, X509 **pc1p, X509 **pc0p);
 
+int add_ext(STACK_OF(X509_REQUEST) *sk, int nid, char *value);
+
 int seed_prng(int bytes);
 
 void send_signature();
@@ -269,7 +225,9 @@ void send_signature();
 void send_pc_invite(sockaddr_in *sin_dest);
 void send_pc_req(sockaddr_in *sin_dest);
 void send_pc_issue(sockaddr_in *sin_dest);
-void send_routing_auth_packet(EVP_CIPHER_CTX *master, int *key_count);
+
+void broadcast_signature_packet(EVP_CIPHER_CTX *master, int *key_count, routing_auth_packet **payload);
+void send_signature_packet();
 
 am_type extract_am_header(char *buf, char **ptr);
 

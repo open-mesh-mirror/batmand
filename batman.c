@@ -926,7 +926,7 @@ int8_t batman(void)
 			if(num_trusted_neighbors) {
 				while(neigh_counter < num_trusted_neighbors) {
 					if(trusted_neighbors[neigh_counter] == neigh) {
-						neigh_counter = UINT8_MAX; //Max value reserved, so max allowed neighbors is UINT8_MAX-1 (254)
+						neigh_counter = UINT8_MAX; //Max value reserved, so max allowed neighbors is UINT8_MAX-1 (254) (Actually 100 now)
 						break;
 					}
 					neigh_counter++;
