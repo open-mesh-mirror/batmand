@@ -839,7 +839,7 @@ int8_t batman(void)
 
 
 	while (!is_aborted()) {
-
+		printf("STATE = %d\n", my_state);
 		debug_output( 4, " \n" );
 		/* harden select_timeout against sudden time change (e.g. ntpdate) */
 		curr_time = get_time_msec();
@@ -923,6 +923,7 @@ int8_t batman(void)
 			 * the authentication procedure in the Authentication Module is called. No packets received when authenticating
 			 * will be processed.
 			 */
+
 			if(num_trusted_neighbors) {
 				while(neigh_counter < num_trusted_neighbors) {
 					if(trusted_neighbors[neigh_counter] == neigh) {
@@ -932,6 +933,8 @@ int8_t batman(void)
 					neigh_counter++;
 				}
 			}
+
+
 			if(neigh_counter < UINT8_MAX && my_state ==  READY) {
 				if(my_role == SP) {
 					new_neighbor = neigh;

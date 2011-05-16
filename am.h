@@ -93,7 +93,7 @@
 /*
  * TEMP
  */
-void dump_memory(void* data, size_t len);
+void tool_dump_memory(unsigned char *data, size_t len);
 
 
 
@@ -123,6 +123,7 @@ typedef enum key_algorithm_en{
 #define AM_PORT 			64305
 #define MAXBUFLEN 			1500
 #define SUBJECT_NAME_SIZE 	16
+#define FULL_SUB_NM_SZ		3*SUBJECT_NAME_SIZE
 #define AES_BLOCK_SIZE 		16
 #define AES_KEY_SIZE 		16
 #define AES_IV_SIZE 		16
@@ -147,6 +148,20 @@ typedef struct in_addr in_addr;
 typedef struct timeval timeval;
 
 /* AM Structs */
+typedef struct trusted_node_st {
+	uint16_t 		id;			//unique
+	uint32_t		addr;		//unique ip addr
+	uint8_t			role;		//SP, AUTH or whatever (might use proxypolicy rules)
+	unsigned char	*name;		//Unique PC subject name
+	EVP_PKEY 		*pub_key;	//Public Key of node
+
+} trusted_node;
+
+typedef struct trusted_neigh_st {
+	uint8_t 		id;				//unique
+	unsigned char	*mac_value;		//Current MAC value used for routing auth
+} trusted_neigh;
+
 typedef struct am_packet_st {
 	uint16_t id;
 	uint8_t type;
@@ -169,7 +184,9 @@ typedef enum am_state_en {
 	WAIT_FOR_PC,
 	SEND_PC,
 	SENDING_NEW_SIGS,
-	SENDING_SIG
+	SENDING_SIG,
+	WAIT_FOR_NEIGH_SIG,
+	WAIT_FOR_NEIGH_PC
 } am_state;
 
 typedef enum am_type_en{
@@ -200,53 +217,58 @@ typedef enum role_type_en{
 void am_thread_init(char *dev, sockaddr_in addr, sockaddr_in broad);
 void *am_main();
 
-void setup_am_socks(int32_t *recv, int32_t *send);
-int setup_am_recv_socks(int32_t *recv, addrinfo *res);
-int setup_am_send_socks(int32_t *send);
-void destroy_am_socks(int32_t *send, int32_t *recv, addrinfo *res);
+void socks_am_setup(int32_t *recv, int32_t *send);
+int socks_recv_setup(int32_t *recv, addrinfo *res);
+int socks_send_setup(int32_t *send);
+void socks_am_destroy(int32_t *send, int32_t *recv, addrinfo *res);
 
-static void openssl_callback(int p, int n, void *arg);
+static void openssl_tool_callback(int p, int n, void *arg);
 
 void create_signature();
-int create_proxy_cert_0(EVP_PKEY *pkey, unsigned char *subject_name);
-int create_proxy_cert_req(EVP_PKEY *pkey, unsigned char *subject_name);
-int create_proxy_cert_1(char *addr);
+int openssl_cert_create_pc0(EVP_PKEY **pkey, unsigned char **subject_name);
+int openssl_cert_create_req(EVP_PKEY *pkey, unsigned char *subject_name);
+int openssl_cert_create_pc1(EVP_PKEY **pkey, char *addr, unsigned char **subject_name);
 
-int selfsign(X509 **x509p, EVP_PKEY **pkeyp, unsigned char *subject_name);
-int mkreq(X509_REQ **x509p, EVP_PKEY **pkeyp, unsigned char *subject_name);
-int mkcert(X509_REQ **reqp, X509 **pc1p, X509 **pc0p);
+int openssl_cert_selfsign(X509 **x509p, EVP_PKEY **pkeyp, unsigned char **subject_name);
+int openssl_cert_mkreq(X509_REQ **x509p, EVP_PKEY **pkeyp, unsigned char *subject_name);
+int openssl_cert_mkcert(EVP_PKEY **pkey, X509_REQ **reqp, X509 **pc1p, X509 **pc0p, unsigned char **subject_name);
 
 int add_ext(STACK_OF(X509_REQUEST) *sk, int nid, char *value);
 
-int seed_prng(int bytes);
+int openssl_tool_seed_prng(int bytes);
 
 void send_signature();
 
-void send_pc_invite(sockaddr_in *sin_dest);
-void send_pc_req(sockaddr_in *sin_dest);
-void send_pc_issue(sockaddr_in *sin_dest);
+void auth_invite_send(sockaddr_in *sin_dest);
+void auth_request_send(sockaddr_in *sin_dest);
+void auth_issue_send(sockaddr_in *sin_dest);
 
-void broadcast_signature_packet(EVP_CIPHER_CTX *master, int *key_count, routing_auth_packet **payload);
-void send_signature_packet();
+void all_sign_send(EVP_CIPHER_CTX *master, int *key_count, routing_auth_packet **payload);
+void neigh_sign_send();
+void neigh_req_pc_send();
+void neigh_pc_send(sockaddr_in *sin_dest);
 
-am_type extract_am_header(char *buf, char **ptr);
+am_type am_header_extract(char *buf, char **ptr, int *id);
 
-int receive_pc_req(char *addr, char *ptr);
-int receive_pc_issue(char *ptr);
-int receive_routing_auth_packet(char *ptr);
+int auth_request_recv(char *addr, char *ptr);
+int auth_issue_recv(char *ptr);
+int neigh_sign_recv(char *ptr);
+int neigh_req_pc_recv(in_addr addr, char *ptr);
 
 
-unsigned char *generate_new_key(EVP_CIPHER_CTX *aes_master, int key_count);
-void generate_new_rand(unsigned char **rand, int len);
+unsigned char *openssl_key_generate(EVP_CIPHER_CTX *aes_master, int key_count);
+void openssl_tool_gen_rand(unsigned char **rand, int len);
 
-void select_random_key(unsigned char **key, int b);
-void select_random_iv(unsigned char **iv, int b);
+void openssl_key_master_select(unsigned char **key, int b);
+void openssl_key_iv_select(unsigned char **iv, int b);
 int aes_init(unsigned char *key_data, int key_data_len, EVP_CIPHER_CTX *e_ctx, EVP_CIPHER_CTX *d_ctx);
 
-void init_master_ctx(EVP_CIPHER_CTX *master);
-unsigned char *aes_encrypt(EVP_CIPHER_CTX *e, unsigned char *plaintext, int *len);
+void openssl_key_master_ctx(EVP_CIPHER_CTX *master);
+unsigned char *openssl_aes_encrypt(EVP_CIPHER_CTX *e, unsigned char *plaintext, int *len);
 
+void al_add(uint32_t addr, uint16_t id, role_type role, unsigned char *subject_name, EVP_PKEY *key);
 
+EVP_PKEY *openssl_key_copy(EVP_PKEY *key);
 
 
 /* Necessary external variables */
