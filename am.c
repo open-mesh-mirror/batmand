@@ -239,17 +239,10 @@ void *am_main() {
 								auth_issue_send(dst);
 								trusted_neighbors[num_trusted_neighbors] = dst->sin_addr.s_addr;
 
+								num_trusted_neighbors++;
+
 								al_add(dst->sin_addr.s_addr, rcvd_id, AUTHENTICATED, subject_name, tmp_pub);
 
-								printf("\nICH BIN HIER!!!\n\n");
-
-//								authenticated_list[num_trusted_neighbors+1] = malloc(sizeof(trusted_node));
-//								authenticated_list[num_trusted_neighbors+1]->addr = dst->sin_addr.s_addr;
-//								authenticated_list[num_trusted_neighbors+1]->id = rcvd_id;
-//								authenticated_list[num_trusted_neighbors+1]->role = AUTHENTICATED;
-//								memcpy(&(authenticated_list[0]->name), subject_name, FULL_SUB_NM_SZ);
-
-								num_trusted_neighbors++;
 								new_neighbor = 0;
 
 								sleep(3);
@@ -287,12 +280,17 @@ void *am_main() {
 					break;
 
 				case NEIGH_PC_REQ:
+				{
+					in_addr neigh_addr;
+
+					neigh_addr = ((sockaddr_in*)((sockaddr *)&recv_addr))->sin_addr;
 
 					/* Receive Neighbors PC */
-					neigh_req_pc_recv(((sockaddr_in*)((sockaddr *)&recv_addr))->sin_addr, am_payload_ptr);
+					neigh_req_pc_recv(neigh_addr, am_payload_ptr);
 
 					//TODO: Lag en funk for å lese mottatt PC og hente ut subjectname og pub...
-					al_add(((sockaddr_in*)((sockaddr *)&recv_addr))->sin_addr.s_addr, rcvd_id, AUTHENTICATED, subject_name, tmp_pub);
+					openssl_cert_read(neigh_addr, &subject_name, &tmp_pub);
+					al_add(neigh_addr.s_addr, rcvd_id, AUTHENTICATED, subject_name, tmp_pub);
 
 					/* Verify PC Signature and Rights (ProxyCertInfo) */
 					//TODO: Verify signature on PC and check access rights policy
@@ -303,6 +301,7 @@ void *am_main() {
 					/* Send Signature */
 
 					break;
+				}
 
 				default:
 					printf("Received unknown AM Type %d, exiting with condition 1\n",am_type_rcvd);
@@ -536,6 +535,53 @@ int openssl_cert_create_pc1(EVP_PKEY **pkey, char *addr, unsigned char **subject
 	BIO_free(bio_err);
 	return(0);
 
+}
+
+int openssl_cert_read(in_addr addr, unsigned char **s, EVP_PKEY **p) {
+	char *filename, *recv_addr_string;
+	unsigned char *subject_name;
+	EVP_PKEY *pub_key;
+	X509 *cert;
+	FILE *fp;
+
+	if(*s == NULL || s == NULL) {
+		subject_name = malloc(FULL_SUB_NM_SZ);
+	} else {
+		subject_name = *s;
+	}
+
+	if(*p == NULL || p == NULL) {
+		pub_key = EVP_PKEY_new();
+	} else {
+		pub_key = *p;
+	}
+
+	filename = malloc(255);
+	memset(filename, 0, sizeof(filename));
+	sprintf(filename, "%s", RECV_CERT);
+
+	recv_addr_string = malloc(16);
+	memcpy(recv_addr_string, inet_ntoa(addr), sizeof(recv_addr_string));
+	strncat(filename, recv_addr_string, sizeof(filename)-strlen(filename)-1);
+
+	if(!(fp = fopen(filename, "r"))) {
+		fprintf(stderr, "Error opening file %s for writing!\n", filename);
+		return 0;
+	}
+	if(!(cert = PEM_read_X509(fp, NULL, NULL, NULL)))
+			fprintf(stderr, "Error while reading request from file %s", filename);
+	fclose(fp);
+
+	pub_key = X509_get_pubkey(cert);
+	X509_NAME_oneline(X509_get_subject_name(cert),(char *)subject_name, FULL_SUB_NM_SZ);
+
+	free(recv_addr_string);
+	free(filename);
+
+	*p = pub_key;
+	*s = subject_name;
+
+	return 1;
 }
 
 
