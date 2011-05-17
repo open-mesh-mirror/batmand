@@ -292,6 +292,7 @@ void *am_main() {
 					neigh_req_pc_recv(((sockaddr_in*)((sockaddr *)&recv_addr))->sin_addr, am_payload_ptr);
 
 					//TODO: Lag en funk for å lese mottatt PC og hente ut subjectname og pub...
+					openssl_cert_read(&subject_name, &tmp_pub);
 					al_add(((sockaddr_in*)((sockaddr *)&recv_addr))->sin_addr.s_addr, rcvd_id, AUTHENTICATED, subject_name, tmp_pub);
 
 					/* Verify PC Signature and Rights (ProxyCertInfo) */
@@ -536,6 +537,53 @@ int openssl_cert_create_pc1(EVP_PKEY **pkey, char *addr, unsigned char **subject
 	BIO_free(bio_err);
 	return(0);
 
+}
+
+int openssl_cert_read(in_addr addr, unsigned char **s, EVP_PKEY **p) {
+	char *filename, *recv_addr_string;
+	unsigned char *subject_name;
+	EVP_PKEY *pub_key;
+	X509 *cert;
+	FILE *fp;
+
+	if(*s == NULL || s == NULL) {
+		subject_name = malloc(FULL_SUB_NM_SZ);
+	} else {
+		subject_name = *s;
+	}
+
+	if(*p == NULL || p == NULL) {
+		pub_key = EVP_PKEY_new();
+	} else {
+		pub_key = *p;
+	}
+
+	filename = malloc(255);
+	memset(filename, 0, sizeof(filename));
+	sprintf(filename, "%s", RECV_CERT);
+
+	recv_addr_string = malloc(16);
+	memcpy(recv_addr_string, inet_ntoa(addr), sizeof(recv_addr_string));
+	strncat(filename, recv_addr_string, sizeof(filename)-strlen(filename)-1);
+
+	if(!(fp = fopen(filename, "r"))) {
+		fprintf(stderr, "Error opening file %s for writing!\n", filename);
+		return 0;
+	}
+	if(!(cert = PEM_read_X509(fp, NULL, NULL, NULL)))
+			fprintf(stderr, "Error while reading request from file %s", filename);
+	fclose(fp);
+
+	pub_key = X509_get_pubkey(cert);
+	X509_NAME_oneline(X509_get_subject_name(cert),(char *)*subject_name, FULL_SUB_NM_SZ);
+
+	free(recv_addr_string);
+	free(filename);
+
+	*p = pub_key;
+	*s = subject_name;
+
+	return 1;
 }
 
 
