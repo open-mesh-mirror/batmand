@@ -286,7 +286,7 @@ void *am_main() {
 					neigh_addr = ((sockaddr_in*)((sockaddr *)&recv_addr))->sin_addr;
 
 					/* Receive Neighbors PC */
-					neigh_req_pc_recv(neigh_addr, am_payload_ptr);
+					neigh_pc_recv(neigh_addr, am_payload_ptr);
 
 					openssl_cert_read(neigh_addr, &subject_name, &tmp_pub);
 					al_add(neigh_addr.s_addr, rcvd_id, AUTHENTICATED, subject_name, tmp_pub);
@@ -301,6 +301,16 @@ void *am_main() {
 
 					break;
 				}
+
+				case NEIGH_PC:
+
+					if(my_state == WAIT_FOR_NEIGH_PC) {
+						/* Receive Neighbors PC */
+						neigh_pc_recv(neigh_addr, am_payload_ptr);
+
+						openssl_cert_read(neigh_addr, &subject_name, &tmp_pub);
+						al_add(neigh_addr.s_addr, rcvd_id, AUTHENTICATED, subject_name, tmp_pub);
+					}
 
 				default:
 					printf("Received unknown AM Type %d, exiting with condition 1\n",am_type_rcvd);
@@ -911,9 +921,9 @@ int neigh_sign_recv(char *ptr) {
 }
 
 /* Receive PC request along with the PC of a new neighbor */
-int neigh_req_pc_recv(in_addr addr, char *ptr) {
+int neigh_pc_recv(in_addr addr, char *ptr) {
 
-	printf("Receive PC and request for my PC from a new neighbor\n");
+	printf("Received PC from a new neighbor\n");
 	char *filename, *recv_addr_string;
 	FILE *fp;
 

@@ -253,7 +253,7 @@ am_type am_header_extract(char *buf, char **ptr, int *id);
 int auth_request_recv(char *addr, char *ptr);
 int auth_issue_recv(char *ptr);
 int neigh_sign_recv(char *ptr);
-int neigh_req_pc_recv(in_addr addr, char *ptr);
+int neigh_pc_recv(in_addr addr, char *ptr);
 
 
 unsigned char *openssl_key_generate(EVP_CIPHER_CTX *aes_master, int key_count);
