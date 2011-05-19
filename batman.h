@@ -215,7 +215,7 @@ struct bat_packet
 	uint8_t tq;
 	uint8_t hna_len;
 	unsigned char auth[2];
-	uint8_t auth_seqno;
+	uint16_t auth_seqno;
 } __attribute__((packed));
 
 struct orig_node                 /* structure for orig_list maintaining nodes of mesh */

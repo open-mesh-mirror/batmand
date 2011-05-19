@@ -799,7 +799,7 @@ int8_t batman(void)
 	/*Initialize AM variables */
 	my_state = READY;
 	uint8_t neigh_counter = 0;
-	num_trusted_neighbors = 0;
+	num_trusted_neigh = 0;
 	auth_seq_num = 0;
 	unsigned char *empty_check = malloc(2);
 	memset(empty_check, 0, 2);
@@ -837,9 +837,12 @@ int8_t batman(void)
 	/* Initiate AM thread */
 	am_thread_init(batman_if->dev, batman_if->addr, batman_if->broad);
 
-
+	am_state tmp_prev_state = READY;
 	while (!is_aborted()) {
-		printf("STATE = %d\n", my_state);
+		if(my_state != tmp_prev_state) {
+			printf("STATE = %d\n", my_state);
+			tmp_prev_state = my_state;
+		}
 		debug_output( 4, " \n" );
 		/* harden select_timeout against sudden time change (e.g. ntpdate) */
 		curr_time = get_time_msec();
@@ -916,7 +919,7 @@ int8_t batman(void)
 			}
 
 
-			/* Begin Authentication Module Extension */
+			/******************** Begin Authentication Module Extension ********************/
 
 			/*
 			 * If the daemon is not authenticated, or it receives an authentication token which it does not recognize,
@@ -924,18 +927,16 @@ int8_t batman(void)
 			 * will be processed.
 			 */
 
-			if(num_trusted_neighbors) {
-				while(neigh_counter < num_trusted_neighbors) {
-					if(trusted_neighbors[neigh_counter] == neigh) {
-						neigh_counter = UINT8_MAX; //Max value reserved, so max allowed neighbors is UINT8_MAX-1 (254) (Actually 100 now)
+			if(num_trusted_neigh) {
+				for(neigh_counter = 0; neigh_counter < num_trusted_neigh; neigh_counter++) {
+					if(neigh_list[neigh_counter]->addr == neigh) {
 						break;
 					}
-					neigh_counter++;
 				}
 			}
 
+			if(neigh_counter == num_trusted_neigh && my_state ==  READY) {
 
-			if(neigh_counter < UINT8_MAX && my_state ==  READY) {
 				if(my_role == SP) {
 					new_neighbor = neigh;
 				}
@@ -946,12 +947,18 @@ int8_t batman(void)
 						new_neighbor = neigh;
 				}
 
-				neigh_counter = 0;
 				goto send_packets;
 			}
-			neigh_counter = 0;
 
-			/* End Authentication Module Extension */
+			if(neigh_list[neigh_counter]->mac == NULL)
+				goto send_packets;
+
+			if(memcmp(neigh_list[neigh_counter]->mac+(bat_packet->auth_seqno*2), bat_packet->auth, 2) != 0) {
+				printf("MAC Extract did not match!\n");
+				goto send_packets;
+			}
+
+			/********************* End Authentication Module Extension *********************/
 
 
 			if (bat_packet->gwflags != 0)
@@ -1098,6 +1105,10 @@ send_packets:
 
 	set_send_redirects( if_send_redirects_all_old, "all" );
 	set_send_redirects( if_send_redirects_default_old, "default" );
+
+	/* AM */
+	am_thread_kill();
+	free(empty_check);
 
 	return 0;
 }

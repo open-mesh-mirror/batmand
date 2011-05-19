@@ -100,10 +100,6 @@ void tool_dump_memory(unsigned char *data, size_t len);
 /*
  * MAYBE
  */
-typedef struct invite_pc_packet_st {
-	uint8_t key_algorithm;
-	uint16_t key_size;
-} __attribute__((packed)) invite_pc_packet;
 
 typedef enum key_algorithm_en{
 	ECC_key = 1,
@@ -138,6 +134,7 @@ typedef enum key_algorithm_en{
 #define RECV_REQ			CRYPTO_DIR "recv_pc_req_"
 #define RECV_CERT			CRYPTO_DIR "recv_pc_"
 #define ISSUED_CERT			CRYPTO_DIR "issued_pc"
+#define SP_CERT				CRYPTO_DIR "sp_pc"
 
 /* Naming standard structs */
 typedef struct addrinfo addrinfo;
@@ -158,8 +155,10 @@ typedef struct trusted_node_st {
 } trusted_node;
 
 typedef struct trusted_neigh_st {
-	uint8_t 		id;				//unique
-	unsigned char	*mac_value;		//Current MAC value used for routing auth
+	uint16_t 		id;			//unique
+	uint32_t		addr;		//unique ip addr
+	unsigned char	*mac;		//Message Authentication Code (current)
+
 } trusted_neigh;
 
 typedef struct am_packet_st {
@@ -215,12 +214,13 @@ typedef enum role_type_en{
 
 /* Functions */
 void am_thread_init(char *dev, sockaddr_in addr, sockaddr_in broad);
+void am_thread_kill();
 void *am_main();
 
 void socks_am_setup(int32_t *recv, int32_t *send);
 int socks_recv_setup(int32_t *recv, addrinfo *res);
 int socks_send_setup(int32_t *send);
-void socks_am_destroy(int32_t *send, int32_t *recv, addrinfo *res);
+void socks_am_destroy(int32_t *send, int32_t *recv);
 
 static void openssl_tool_callback(int p, int n, void *arg);
 
@@ -252,7 +252,9 @@ am_type am_header_extract(char *buf, char **ptr, int *id);
 
 int auth_request_recv(char *addr, char *ptr);
 int auth_issue_recv(char *ptr);
-int neigh_sign_recv(char *ptr);
+int auth_invite_recv();
+
+int neigh_sign_recv(uint32_t addr, uint16_t id, char *ptr);
 int neigh_pc_recv(in_addr addr, char *ptr);
 
 
@@ -267,6 +269,7 @@ void openssl_key_master_ctx(EVP_CIPHER_CTX *master);
 unsigned char *openssl_aes_encrypt(EVP_CIPHER_CTX *e, unsigned char *plaintext, int *len);
 
 void al_add(uint32_t addr, uint16_t id, role_type role, unsigned char *subject_name, EVP_PKEY *key);
+void neigh_add(uint32_t addr, uint16_t id, unsigned char *mac_value);
 
 EVP_PKEY *openssl_key_copy(EVP_PKEY *key);
 int openssl_cert_read(in_addr addr, unsigned char **s, EVP_PKEY **p);
@@ -280,6 +283,11 @@ extern uint32_t new_neighbor;
 extern uint32_t trusted_neighbors[100];
 extern uint8_t num_trusted_neighbors;
 extern unsigned char *auth_value;
-extern uint8_t auth_seq_num;
+extern uint16_t auth_seq_num;
+extern pthread_mutex_t auth_lock;
+extern int num_auth_nodes;
+extern int num_trusted_neigh;
+
+extern trusted_neigh *neigh_list[100];
 
 #endif

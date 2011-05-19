@@ -34,12 +34,15 @@ role_type my_role;
 am_state my_state;
 pthread_t am_main_thread;
 uint32_t new_neighbor;
-uint32_t trusted_neighbors[100];
-uint8_t num_trusted_neighbors;
+//uint32_t trusted_neighbors[100];
 unsigned char *auth_value;
-uint8_t auth_seq_num;
+uint16_t auth_seq_num;
 
 trusted_node *authenticated_list[100];
+trusted_neigh *neigh_list[100];
+int num_auth_nodes, num_trusted_neigh;
+
+pthread_mutex_t auth_lock = PTHREAD_MUTEX_INITIALIZER;
 
 
 
@@ -68,14 +71,24 @@ void am_thread_init(char *dev, sockaddr_in addr, sockaddr_in broad) {
 	pthread_create(&am_main_thread, NULL, am_main, NULL);
 }
 
-/*void *get_in_addr(struct sockaddr *sa)
-{
-    if (sa->sa_family == AF_INET) {
-        return &(((struct sockaddr_in*)sa)->sin_addr);
-    }
+void am_thread_kill() {
+	pthread_kill(&am_main_thread);
+	int i;
+	for(i=0; i<num_auth_nodes; i++) {
+		free(authenticated_list[i]->name);
+		free(authenticated_list[i]->pub_key);
+		free(authenticated_list[i]);
+	}
+	for(i=0; i<num_trusted_neigh; i++) {
+		free(neigh_list[i]->mac);
+		free(neigh_list[i]);
+	}
+	free(interface);
+	free(auth_value);
+	socks_am_destroy(&am_send_socket, &am_recv_socket);
 
-    return &(((struct sockaddr_in6*)sa)->sin6_addr);
-}*/
+}
+
 
 /* AM main thread */
 void *am_main() {
@@ -134,7 +147,8 @@ void *am_main() {
 	/* Generate Master Key and bind it to AES context*/
 	openssl_key_master_ctx(&aes_master);
 
-	num_trusted_neighbors = 0;
+	num_trusted_neigh = 0;
+	num_auth_nodes = 0;
 	if(my_role == SP) {
 
 		/* If you are the SP, create a PC0 */
@@ -154,7 +168,6 @@ void *am_main() {
 	else {
 		openssl_cert_create_req(pkey, subject_name);
 	}
-
 
 
 	data_rcvd = 0;
@@ -187,12 +200,14 @@ void *am_main() {
 
 				case SIGNATURE:
 					/* Allowed in all states */
-					neigh_sign_recv(am_payload_ptr);
+					neigh_sign_recv(neigh_addr.s_addr, rcvd_id, am_payload_ptr);
 					break;
 
 				case NEIGH_SIGN:
 					/* Allowed in all states */
-					neigh_sign_recv(am_payload_ptr);
+					neigh_sign_recv(neigh_addr.s_addr, rcvd_id, am_payload_ptr);
+					if(my_state == WAIT_FOR_NEIGH_SIG)
+						my_state = READY;
 					break;
 
 				case AL_FULL:
@@ -212,14 +227,18 @@ void *am_main() {
 				case AUTH_INVITE:
 					/* Must be unauthenticated */
 					if(my_role == UNAUTHENTICATED && my_state == READY) {
-						my_state = SEND_REQ;
-						dst = (sockaddr_in *) malloc(sizeof(sockaddr_in));
-						dst->sin_addr = ((sockaddr_in*)((sockaddr *)&recv_addr))->sin_addr;
-						dst->sin_family = AF_INET;
-						dst->sin_port = htons(AM_PORT);
-						auth_request_send(dst);
-						my_state = WAIT_FOR_PC; //TODO: actually check whether the auth_request_send succeeded...
-						free(dst);
+
+						if(auth_invite_recv(am_payload_ptr)) {
+							my_state = SEND_REQ;
+							dst = (sockaddr_in *) malloc(sizeof(sockaddr_in));
+							dst->sin_addr = ((sockaddr_in*)((sockaddr *)&recv_addr))->sin_addr;
+							dst->sin_family = AF_INET;
+							dst->sin_port = htons(AM_PORT);
+							auth_request_send(dst);
+							my_state = WAIT_FOR_PC; //TODO: actually check whether the auth_request_send succeeded...
+							free(dst);
+						}
+
 					}
 
 					break;
@@ -240,19 +259,18 @@ void *am_main() {
 								dst->sin_port = htons(AM_PORT);
 								openssl_cert_create_pc1(&tmp_pub, recv_addr_string, &subject_name);
 								auth_issue_send(dst);
-								trusted_neighbors[num_trusted_neighbors] = dst->sin_addr.s_addr;
 
-								num_trusted_neighbors++;
+								neigh_add(dst->sin_addr.s_addr, rcvd_id, NULL);
 
 								al_add(dst->sin_addr.s_addr, rcvd_id, AUTHENTICATED, subject_name, tmp_pub);
 
-								new_neighbor = 0;
-
-								sleep(3);
-								if(num_trusted_neighbors == 1) {
-									all_sign_send(&aes_master, &key_count, &auth_pkt);
-								} else {
-									neigh_sign_send(dst, auth_pkt);
+								if(pthread_mutex_trylock(&auth_lock) == 0) {
+									if(num_trusted_neigh == 1) {
+										all_sign_send(&aes_master, &key_count, &auth_pkt);
+									} else {
+										neigh_sign_send(dst, auth_pkt);
+									}
+									pthread_mutex_unlock(&auth_lock);
 								}
 
 								free(dst);
@@ -264,6 +282,7 @@ void *am_main() {
 						}
 					}
 
+					new_neighbor = 0;
 					my_state = READY;
 
 					break;
@@ -275,8 +294,18 @@ void *am_main() {
 						if(auth_issue_recv(am_payload_ptr)) {
 							my_state = READY;
 							my_role = AUTHENTICATED;
-							trusted_neighbors[num_trusted_neighbors] = (uint32_t)((sockaddr_in*)((sockaddr *)&recv_addr))->sin_addr.s_addr;
-							num_trusted_neighbors++;
+
+							in_addr emptyaddr;
+							emptyaddr.s_addr = 0;
+							openssl_cert_read(emptyaddr , &subject_name, &tmp_pub);
+							neigh_add(neigh_addr.s_addr, rcvd_id, NULL);
+							al_add(neigh_addr.s_addr, rcvd_id, SP, subject_name, tmp_pub);
+
+
+							if(pthread_mutex_trylock(&auth_lock) == 0) {
+								all_sign_send(&aes_master, &key_count, &auth_pkt);
+								pthread_mutex_unlock(&auth_lock);
+							}
 						}
 					}
 
@@ -287,16 +316,27 @@ void *am_main() {
 					/* Receive Neighbors PC */
 					neigh_pc_recv(neigh_addr, am_payload_ptr);
 
-					openssl_cert_read(neigh_addr, &subject_name, &tmp_pub);
+					if(!openssl_cert_read(neigh_addr, &subject_name, &tmp_pub))
+						break;
+
 					al_add(neigh_addr.s_addr, rcvd_id, AUTHENTICATED, subject_name, tmp_pub);
 
 					/* Verify PC Signature and Rights (ProxyCertInfo) */
 					//TODO: Verify signature on PC and check access rights policy
 
 					/* Send own PC */
-					neigh_pc_send((sockaddr_in *)&recv_addr);
+					dst = (sockaddr_in *) malloc(sizeof(sockaddr_in));
+					dst->sin_addr = ((sockaddr_in*)((sockaddr *)&recv_addr))->sin_addr;
+					dst->sin_family = AF_INET;
+					dst->sin_port = htons(AM_PORT);
+					neigh_pc_send(dst);
 
 					/* Send Signature */
+					neigh_sign_send(dst, auth_pkt);
+
+					my_state = WAIT_FOR_NEIGH_SIG;
+
+					free(dst);
 
 					break;
 
@@ -305,10 +345,21 @@ void *am_main() {
 					if(my_state == WAIT_FOR_NEIGH_PC) {
 						/* Receive Neighbors PC */
 						neigh_pc_recv(neigh_addr, am_payload_ptr);
-
 						openssl_cert_read(neigh_addr, &subject_name, &tmp_pub);
+						neigh_add(neigh_addr.s_addr, rcvd_id, NULL);
 						al_add(neigh_addr.s_addr, rcvd_id, AUTHENTICATED, subject_name, tmp_pub);
+
+						dst = (sockaddr_in *) malloc(sizeof(sockaddr_in));
+						dst->sin_addr = ((sockaddr_in*)((sockaddr *)&recv_addr))->sin_addr;
+						dst->sin_family = AF_INET;
+						dst->sin_port = htons(AM_PORT);
+
+						neigh_sign_send(dst, auth_pkt);
+
+						free(dst);
+						my_state = READY;
 					}
+					break;
 
 				default:
 					printf("Received unknown AM Type %d, exiting with condition 1\n",am_type_rcvd);
@@ -335,44 +386,95 @@ void *am_main() {
 			if(my_role == AUTHENTICATED) {
 				/* Only one can initiate the neighbor's pc request or else collision */
 				if(my_addr.sin_addr.s_addr < new_neighbor) {
-					neigh_req_pc_send();
 					my_state = WAIT_FOR_NEIGH_PC;
+					neigh_req_pc_send();
 				}
 			}
 		}
 	}
+	pthread_exit(NULL);
 }
 
 
 /* Add node to Authenticated List */
 void al_add(uint32_t addr, uint16_t id, role_type role, unsigned char *subject_name, EVP_PKEY *key) {
-	authenticated_list[num_trusted_neighbors] = malloc(sizeof(trusted_node));
-	authenticated_list[num_trusted_neighbors]->addr = addr;
-	authenticated_list[num_trusted_neighbors]->id = id;
-	authenticated_list[num_trusted_neighbors]->role = role;
-	authenticated_list[num_trusted_neighbors]->name = malloc(FULL_SUB_NM_SZ);
-	memcpy(authenticated_list[num_trusted_neighbors]->name, subject_name, FULL_SUB_NM_SZ);
-	authenticated_list[num_trusted_neighbors]->pub_key = openssl_key_copy(key);
+
+	authenticated_list[num_auth_nodes] = malloc(sizeof(trusted_node));
+	authenticated_list[num_auth_nodes]->addr = addr;
+	authenticated_list[num_auth_nodes]->id = id;
+	authenticated_list[num_auth_nodes]->role = role;
+	authenticated_list[num_auth_nodes]->name = malloc(FULL_SUB_NM_SZ);
+	memcpy(authenticated_list[num_auth_nodes]->name, subject_name, FULL_SUB_NM_SZ);
+	authenticated_list[num_auth_nodes]->pub_key = openssl_key_copy(key);
 
 	printf("\nAdded new node to AL:\n");
-	printf("ID           : %d\n", authenticated_list[num_trusted_neighbors]->id);
+	printf("ID           : %d\n", authenticated_list[num_auth_nodes]->id);
 
 	char addr_char[16];
-	addr_to_string(authenticated_list[num_trusted_neighbors]->addr, &addr_char, sizeof (addr_char));
+
+	addr_to_string(authenticated_list[num_auth_nodes]->addr, &addr_char, sizeof (addr_char));
 
 	printf("IP ADDRESS   : %s\n", addr_char);
-	if(authenticated_list[num_trusted_neighbors]->role == 3) {
+	if(authenticated_list[num_auth_nodes]->role == 3) {
 		printf("ROLE         : Service Proxy Node\n");
 	} else {
 		printf("ROLE         : Authenticated Node\n");
 	}
-	printf("Subject Name : %s\n", authenticated_list[num_trusted_neighbors]->name);
+	printf("Subject Name : %s\n", authenticated_list[num_auth_nodes]->name);
 	printf("Public Key   :\n");
-	PEM_write_PUBKEY(stdout,authenticated_list[num_trusted_neighbors]->pub_key);
+	PEM_write_PUBKEY(stdout,authenticated_list[num_auth_nodes]->pub_key);
 	printf("\n");
 
 	if(id != my_id) {
 		EVP_PKEY_free(key);
+	}
+
+	num_auth_nodes++;
+
+}
+
+/* Add node to trusted neighbor list */
+void neigh_add(uint32_t addr, uint16_t id, unsigned char *mac_value) {
+
+	int i;
+	for(i=0; i<num_trusted_neigh; i++) {
+		if(id == neigh_list[i]->id) {
+
+			if(addr == neigh_list[i]->addr) {
+
+				if(neigh_list[i]->mac != NULL)
+					free(neigh_list[i]->mac);
+
+				neigh_list[i]->mac = mac_value;
+
+			} else {
+
+				printf("New address does not match previously stored address, removing node from list\n");
+
+				if(neigh_list[i]->mac != NULL)
+					free(neigh_list[i]->mac);
+
+				free(neigh_list[i]);
+
+				if (mac_value != NULL)
+					free(mac_value);
+
+				num_trusted_neigh--;
+
+			}
+
+			break;
+		}
+	}
+
+	if(i==num_trusted_neigh) {
+
+		neigh_list[num_trusted_neigh] = malloc(sizeof(trusted_neigh));
+		neigh_list[num_trusted_neigh]->addr = addr;
+		neigh_list[num_trusted_neigh]->id = id;
+		neigh_list[num_trusted_neigh]->mac = mac_value;
+		num_trusted_neigh++;
+
 	}
 
 }
@@ -563,27 +665,50 @@ int openssl_cert_read(in_addr addr, unsigned char **s, EVP_PKEY **p) {
 		pub_key = *p;
 	}
 
-	filename = malloc(255);
-	memset(filename, 0, sizeof(filename));
-	sprintf(filename, "%s", RECV_CERT);
 
-	recv_addr_string = malloc(16);
-	memcpy(recv_addr_string, inet_ntoa(addr), sizeof(recv_addr_string));
-	strncat(filename, recv_addr_string, sizeof(filename)-strlen(filename)-1);
+	if(addr.s_addr == 0) {
 
-	if(!(fp = fopen(filename, "r"))) {
-		fprintf(stderr, "Error opening file %s for writing!\n", filename);
-		return 0;
+		if(!(fp = fopen(SP_CERT, "r"))) {
+			fprintf(stderr, "Error opening file %s for reading!\n", SP_CERT);
+			return 0;
+		}
+
+	} else {
+
+		filename = malloc(255);
+		memset(filename, 0, sizeof(filename));
+		sprintf(filename, "%s", RECV_CERT);
+		recv_addr_string = inet_ntoa(addr);
+		strncat(filename, recv_addr_string, sizeof(filename)-strlen(filename)-1);
+
+		if(!(fp = fopen(filename, "r"))) {
+			fprintf(stderr, "Error opening file %s for reading!\n", filename);
+			return 0;
+		}
+
+		free(filename);
+
 	}
+
+
+
 	if(!(cert = PEM_read_X509(fp, NULL, NULL, NULL)))
-			fprintf(stderr, "Error while reading request from file %s", filename);
+			fprintf(stderr, "Error while reading certificate from file\n");
 	fclose(fp);
+
+	if(addr.s_addr != 0) {
+		if(!X509_verify(cert, authenticated_list[0]->pub_key)) {
+			printf("Could not verify certificate\n");
+			return 0;
+		}
+	}
+
 
 	pub_key = X509_get_pubkey(cert);
 	X509_NAME_oneline(X509_get_subject_name(cert),(char *)subject_name, FULL_SUB_NM_SZ);
 
-	free(recv_addr_string);
-	free(filename);
+//	free(recv_addr_string);
+
 
 	*p = pub_key;
 	*s = subject_name;
@@ -600,28 +725,27 @@ void auth_invite_send(sockaddr_in *sin_dest) {
 	char *buf;
 	char *ptr;
 	am_packet *header;
-	invite_pc_packet *payload;
 	int packet_len;
+	FILE *fp;
 
 	header = (am_packet *) malloc(sizeof(am_packet));
 	header->id = my_id;
 	header->type = AUTH_INVITE;
 
-	payload = (invite_pc_packet *) malloc(sizeof(invite_pc_packet));
-	payload->key_algorithm = RSA_key;
-	payload->key_size = 2048;
-
 	buf = malloc(MAXBUFLEN);
 	memset(buf, 0, sizeof(buf));
 	memcpy(buf, header, sizeof(am_packet));
+
 	ptr = buf;
 	ptr += sizeof(am_packet);
-	memcpy(ptr, payload, sizeof(invite_pc_packet));
 
 	packet_len = sizeof(am_packet);
-	packet_len += sizeof(invite_pc_packet);
+	if(!(fp = fopen(MY_CERT, "r")))
+			fprintf(stderr, "Error opening file %s for reading!\n",MY_CERT);
 
-//	send_udp_packet((unsigned char *)buf, packet_len, sin_dest, am_send_socket, NULL);
+	packet_len += fread(ptr, 1, PEM_BUFSIZE, fp);
+	fclose(fp);
+
 	sendto(am_send_socket, buf, packet_len, 0, (struct sockaddr *)sin_dest, sizeof(struct sockaddr_in));
 
 	free(buf);
@@ -729,6 +853,7 @@ void neigh_req_pc_send() {
 
 	sendto(am_send_socket, buf, packet_len, 0, (sockaddr *)neigh_addr, sizeof(sockaddr_in));
 
+	new_neighbor = 0;
 	free(neigh_addr);
 	free(am_header);
 	free(buf);
@@ -773,9 +898,11 @@ void neigh_pc_send(sockaddr_in *sin_dest) {
 void all_sign_send(EVP_CIPHER_CTX *master, int *key_count, routing_auth_packet **payloadp) {
 
 	printf("Sending SIGNATURE message to all neighbors\n");
+
 	my_state = SENDING_NEW_SIGS;
+
 	char *buf, *ptr;
-	unsigned char *current_key, *current_iv, *current_rand = NULL;
+	unsigned char *current_key = NULL, *current_iv = NULL, *current_rand = NULL;
 	int i;
 	am_packet *header;
 	int value_len = RAND_LEN;
@@ -794,6 +921,7 @@ void all_sign_send(EVP_CIPHER_CTX *master, int *key_count, routing_auth_packet *
 	current_key = openssl_key_generate(master, *key_count);
 	openssl_key_iv_select(&current_iv, AES_IV_SIZE);
 
+
 	/* Generate New RAND */
 	openssl_tool_gen_rand(&current_rand, RAND_LEN);
 
@@ -804,7 +932,6 @@ void all_sign_send(EVP_CIPHER_CTX *master, int *key_count, routing_auth_packet *
 	header = (am_packet *) malloc(sizeof(am_packet));
 	header->id = my_id;
 	header->type = SIGNATURE;
-
 
 	memcpy((unsigned char *)&(payload->key), current_key, AES_KEY_SIZE);
 	memcpy((unsigned char *)&(payload->iv), current_iv, AES_IV_SIZE);
@@ -823,8 +950,8 @@ void all_sign_send(EVP_CIPHER_CTX *master, int *key_count, routing_auth_packet *
 	sockaddr_in *tmp_dest = malloc(sizeof(sockaddr_in));
 	tmp_dest->sin_family = AF_INET;
 	tmp_dest->sin_port = htons(AM_PORT);
-	for(i=0; i<num_trusted_neighbors; i++) {
-		tmp_dest->sin_addr.s_addr = trusted_neighbors[i];
+	for(i=0; i<num_trusted_neigh; i++) {
+		tmp_dest->sin_addr.s_addr = neigh_list[i]->addr;
 		sendto(am_send_socket, buf, packet_len, 0, (sockaddr *)tmp_dest, sizeof(sockaddr_in));
 	}
 	free(tmp_dest);
@@ -835,6 +962,9 @@ void all_sign_send(EVP_CIPHER_CTX *master, int *key_count, routing_auth_packet *
 	EVP_CIPHER_CTX current_ctx;
 	EVP_EncryptInit(&current_ctx, EVP_aes_128_cbc(), current_key, current_iv);
 	auth_value = openssl_aes_encrypt(&current_ctx, current_rand, &value_len);
+
+	free(current_iv);
+	free(current_key);
 
 	my_state = READY;
 	*payloadp = payload;
@@ -850,7 +980,6 @@ void neigh_sign_send(sockaddr_in *addr, routing_auth_packet *payload) {
 
 	my_state = SENDING_SIG;
 	//TODO: Check if I need sleep here..
-	sleep(2);
 
 	header = (am_packet *) malloc(sizeof(am_packet));
 	header->id = my_id;
@@ -891,28 +1020,35 @@ am_type am_header_extract(char *buf, char **ptr, int *id) {
 }
 
 /* Receive Invite */
-void auth_invite_recv() {
+int auth_invite_recv(char *ptr) {
 
 	printf("Received INVITE message\n");
-	//TODO: What to do with this?
-//	recv_invite = tmpPtr;
-//	recv_invite = (invite_pc_packet *)recv_invite;
-//	requested_key_algorithm = recv_invite->key_algorithm;
-//	requested_key_size = recv_invite->key_size;
+
+	FILE *fp;
+
+	if(!(fp = fopen(SP_CERT, "w"))) {
+		fprintf(stderr, "Error opening file %s for writing!\n", SP_CERT);
+		return 0;
+	}
+
+	fwrite(ptr, 1, strlen(ptr), fp);
+	fclose(fp);
+	return 1;
 }
 
 /* Receive Routing Auth Packet */
-int neigh_sign_recv(char *ptr) {
+int neigh_sign_recv(uint32_t addr, uint16_t id, char *ptr) {
 
 	printf("Receive SIGN message from neighbor\n");
 	routing_auth_packet *payload = (routing_auth_packet *)ptr;
 
 	EVP_CIPHER_CTX received_ctx;
 	EVP_EncryptInit(&received_ctx, EVP_aes_128_cbc(), (unsigned char *)&(payload->key), (unsigned char *)&(payload->iv));
-	unsigned char *value;
-	int value_len = RAND_LEN;
-	value = openssl_aes_encrypt(&received_ctx, (unsigned char *)&(payload->rand), &value_len);
-	tool_dump_memory(value, value_len);
+	unsigned char *mac_value;
+	int mac_value_len = RAND_LEN;
+	mac_value = openssl_aes_encrypt(&received_ctx, (unsigned char *)&(payload->rand), &mac_value_len);
+
+	neigh_add(addr, id, mac_value);
 
 	return 1;
 
@@ -929,8 +1065,9 @@ int neigh_pc_recv(in_addr addr, char *ptr) {
 	memset(filename, 0, sizeof(filename));
 	sprintf(filename, "%s", RECV_CERT);
 
-	recv_addr_string = malloc(16);
-	memcpy(recv_addr_string, inet_ntoa(addr), sizeof(recv_addr_string));
+//	recv_addr_string = malloc(16);
+	recv_addr_string = inet_ntoa(addr);
+//	memcpy(recv_addr_string, inet_ntoa(addr), sizeof(recv_addr_string));
 	strncat(filename, recv_addr_string, sizeof(filename)-strlen(filename)-1);
 
 	if(!(fp = fopen(filename, "w"))) {
@@ -940,7 +1077,7 @@ int neigh_pc_recv(in_addr addr, char *ptr) {
 	fwrite(ptr, 1, strlen(ptr), fp);
 
 	fclose(fp);
-	free(recv_addr_string);
+//	free(recv_addr_string);
 	free(filename);
 	return 1;
 }
@@ -1010,11 +1147,13 @@ void socks_am_setup(int32_t *recvsock, int32_t *sendsock) {
 
 	getaddrinfo(NULL, port, &hints, &res);
 
+	free(port);
+
 	/* Setup Receive and Send Sockets */
-	if(!socks_recv_setup(recvsock, res))
-		socks_am_destroy(sendsock, recvsock, res);
-	if(!socks_send_setup(sendsock))
-		socks_am_destroy(sendsock, recvsock, res);
+	if(!socks_recv_setup(recvsock, res) || !socks_send_setup(sendsock))
+		socks_am_destroy(sendsock, recvsock);
+
+	free(res);
 }
 
 int socks_recv_setup(int32_t *recvsock, addrinfo *res) {
@@ -1064,7 +1203,7 @@ int socks_send_setup(int32_t *sendsock) {
 	return 1;
 }
 
-void socks_am_destroy(int32_t *send, int32_t *recv, addrinfo *res) {
+void socks_am_destroy(int32_t *send, int32_t *recv) {
 
 	printf("WARNING: Destroying AM Sockets!\n");
 	if (*recv != 0)
@@ -1073,8 +1212,6 @@ void socks_am_destroy(int32_t *send, int32_t *recv, addrinfo *res) {
 		close(*send);
 	*recv = 0;
 	*send = 0;
-
-	freeaddrinfo(res);
 }
 
 
@@ -1527,6 +1664,9 @@ void openssl_key_master_ctx(EVP_CIPHER_CTX *master) {
 	openssl_key_iv_select(&aes_master_iv, AES_IV_SIZE);
 
 	EVP_EncryptInit(master, EVP_aes_128_cbc(), aes_master_key, aes_master_iv);
+
+	free(aes_master_iv);
+	free(aes_master_key);
 }
 
 /* Random key for input to the AES key generation, i.e. insted of user password */
@@ -1557,16 +1697,22 @@ void openssl_key_master_select(unsigned char **k, int b) {
 
 }
 
-void openssl_key_iv_select(unsigned char **iv, int b) {
+void openssl_key_iv_select(unsigned char **i, int b) {
 
-	if(*iv == NULL || iv == NULL) {
-		*iv = malloc(AES_IV_SIZE);
+	unsigned char *iv;
+
+	if(*i == NULL || i == NULL) {
+		iv = malloc(AES_IV_SIZE);
+	} else {
+		iv = *i;
 	}
 
-	if(!RAND_pseudo_bytes(*iv,b)){
+	if(!RAND_pseudo_bytes(iv,b)){
 		printf("IV Generation Failed\n");
 		exit(0);
 	}
+
+	*i = iv;
 }
 
 /* Copy key (EVP_PKEY) object */

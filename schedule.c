@@ -75,13 +75,16 @@ void schedule_own_packet(struct batman_if *batman_if)
 
 	/* Begin Authentication Module Extension */
 	/* Add Signature Extract to OGM */
-	if(auth_value != NULL) {
-		memcpy(((struct bat_packet *)forw_node_new->pack_buff)->auth, auth_value+2*auth_seq_num, 2);
-		((struct bat_packet *)forw_node_new->pack_buff)->auth_seqno = auth_seq_num;
+	if(pthread_mutex_trylock(&auth_lock) == 0) {
+		if(auth_value != NULL) {
+			memcpy(((struct bat_packet *)forw_node_new->pack_buff)->auth, auth_value+2*auth_seq_num, 2);
+			((struct bat_packet *)forw_node_new->pack_buff)->auth_seqno = auth_seq_num;
 
-		printf("[%03d] %02X%02X\n", auth_seq_num, (unsigned char*)auth_value[2*auth_seq_num], (unsigned char*)auth_value[2*auth_seq_num+1]);
+//			printf("[%03d] %02X%02X\n", auth_seq_num, (unsigned char*)auth_value[2*auth_seq_num], (unsigned char*)auth_value[2*auth_seq_num+1]);
 
-		auth_seq_num ++;
+			auth_seq_num ++;
+		}
+		pthread_mutex_unlock(&auth_lock);
 	}
 	/* End Authentication Module Extension */
 
@@ -270,13 +273,17 @@ void schedule_forward_packet(struct orig_node *orig_node, struct bat_packet *in,
 
 	/* Begin Authentication Module Extension */
 	/* Add Signature Extract to OGM */
-	if(auth_value != NULL) {
-		memcpy(bat_packet->auth, auth_value+2*auth_seq_num, 2);
-		bat_packet->auth_seqno = auth_seq_num;
+	if(pthread_mutex_trylock(&auth_lock) == 0) {
+		if(auth_value != NULL) {
+			memcpy(bat_packet->auth, auth_value+2*auth_seq_num, 2);
+			bat_packet->auth_seqno = auth_seq_num;
 
-		printf("[%03d] %02X%02X\n", auth_seq_num, (unsigned char*)auth_value[2*auth_seq_num], (unsigned char*)auth_value[2*auth_seq_num+1]);
-		auth_seq_num ++;
+//			printf("[%03d] %02X%02X\n", auth_seq_num, (unsigned char*)auth_value[2*auth_seq_num], (unsigned char*)auth_value[2*auth_seq_num+1]);
+			auth_seq_num ++;
+		}
+		pthread_mutex_unlock(&auth_lock);
 	}
+
 	/* End Authentication Module Extension */
 
 
