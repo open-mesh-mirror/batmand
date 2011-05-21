@@ -18,24 +18,8 @@
 # 02110-1301, USA
 #
 
-ifneq ($(findstring $(MAKEFLAGS),s),s)
-ifndef V
-	Q_CC = @echo '   ' CC $@;
-	Q_LD = @echo '   ' LD $@;
-	export Q_CC
-	export Q_LD
-endif
-endif
-
-# activate this variable to deactivate policy routing for backward compatibility
-#NO_POLICY_ROUTING = -DNO_POLICY_ROUTING
-
-CC ?=		gcc
-CFLAGS +=	-pedantic -Wall -W -std=gnu99
-EXTRA_CFLAGS =	-DDEBUG_MALLOC -DMEMORY_USAGE -DPROFILE_DATA $(NO_POLICY_ROUTING) -DREVISION_VERSION=$(REVISION_VERSION)
-LDFLAGS +=	-lpthread
-
-SBINDIR =	$(INSTALL_PREFIX)/usr/sbin
+# batmand build
+BINARY_NAME = batmand
 
 UNAME =		$(shell uname)
 POSIX_OBJ =	posix/init.o posix/posix.o posix/tunnel.o posix/unix_socket.o
@@ -64,24 +48,45 @@ OS_OBJ =	$(BSD_OBJ) $(POSIX_OBJ)
 endif
 
 OBJ = batman.o originator.o schedule.o list-batman.o allocate.o bitarray.o hash.o profile.o ring_buffer.o hna.o $(OS_OBJ)
-DEP = $(OBJ:.o=.d)
 
-BINARY_NAME =	batmand
+# activate this variable to deactivate policy routing for backward compatibility
+#NO_POLICY_ROUTING = -DNO_POLICY_ROUTING
 
-REVISION= $(shell      if [ -d .git ]; then \
-                               echo $$(git describe --always --dirty 2> /dev/null || echo "[unknown]"); \
-                        fi)
+# batmand flags and options
+CFLAGS +=	-pedantic -Wall -W -std=gnu99
+EXTRA_CFLAGS =	-DDEBUG_MALLOC -DMEMORY_USAGE -DPROFILE_DATA $(NO_POLICY_ROUTING) -DREVISION_VERSION=$(REVISION_VERSION)
+LDFLAGS +=	-lpthread
+
+# disable verbose output
+ifneq ($(findstring $(MAKEFLAGS),s),s)
+ifndef V
+	Q_CC = @echo '   ' CC $@;
+	Q_LD = @echo '   ' LD $@;
+	export Q_CC
+	export Q_LD
+endif
+endif
+
+# standard build tools
+CC ?=		gcc
+
+# standard install paths
+SBINDIR =	$(INSTALL_PREFIX)/usr/sbin
+
+# try to generate revision
+REVISION = $(shell if [ -d .git ]; then echo $$(git describe --always --dirty 2> /dev/null || echo "[unknown]"); fi)
 REVISION_VERSION =\"\ $(REVISION)\"
 
-
+# default target
 all: $(BINARY_NAME)
+
+# standard build rules
+.SUFFIXES: .o .c
+.c.o:
+	$(Q_CC)$(CC) $(CFLAGS) $(EXTRA_CFLAGS) -MD -c $< -o $@
 
 $(BINARY_NAME): $(OBJ) Makefile
 	$(Q_LD)$(CC) -o $@ $(OBJ) $(LDFLAGS)
-
-.c.o:
-	$(Q_CC)$(CC) $(CFLAGS) $(EXTRA_CFLAGS) -MD -c $< -o $@
--include $(DEP)
 
 clean:
 	rm -f $(BINARY_NAME) $(OBJ) $(DEP)
@@ -89,5 +94,9 @@ clean:
 install: $(BINARY_NAME)
 	mkdir -p $(SBINDIR)
 	install -m 0755 $(BINARY_NAME) $(SBINDIR)
+
+# load dependencies
+DEP = $(OBJ:.o=.d)
+-include $(DEP)
 
 .PHONY: all clean install
