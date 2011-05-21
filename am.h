@@ -32,6 +32,8 @@
 #include <fcntl.h>
 #include <time.h>
 
+#include <openssl/bio.h>
+#include <openssl/buffer.h>
 #include <openssl/pem.h>
 #include <openssl/conf.h>
 #include <openssl/x509v3.h>
@@ -117,15 +119,15 @@ typedef enum key_algorithm_en{
 /* Definitions */
 #define IF_NAMESIZE			16
 #define AM_PORT 			64305
-#define MAXBUFLEN 			1500
+#define MAXBUFLEN 			1500-20-8 //MTU - IP_HEADER - UDP_HEADER
 #define SUBJECT_NAME_SIZE 	16
 #define FULL_SUB_NM_SZ		3*SUBJECT_NAME_SIZE
 #define AES_BLOCK_SIZE 		16
 #define AES_KEY_SIZE 		16
 #define AES_IV_SIZE 		16
-#define RAND_LEN 			(AES_BLOCK_SIZE*64)-1
+#define RAND_LEN 			(AES_BLOCK_SIZE*48)-1	//Chosen so auth_packets are well below MAXBUFLEN
 
-#define CRYPTO_DIR			"./tmp_crypto/"
+#define CRYPTO_DIR			"./.crypto/"
 #define MY_KEY				CRYPTO_DIR "my_private_key"
 #define MY_CERT				CRYPTO_DIR "my_pc"
 #define MY_REQ 				CRYPTO_DIR "my_pc_req"
@@ -162,15 +164,22 @@ typedef struct trusted_neigh_st {
 } trusted_neigh;
 
 typedef struct am_packet_st {
-	uint16_t id;
-	uint8_t type;
+	uint16_t 	id;
+	uint8_t 	type;
 } __attribute__((packed)) am_packet;
 
 typedef struct routing_auth_packet_st {
-	unsigned char rand[RAND_LEN];
-	unsigned char key[AES_KEY_SIZE];
-	unsigned char iv[AES_IV_SIZE];
+	uint16_t 	rand_len;
+	uint8_t 	iv_len;
+	uint8_t		sign_len;
+//	uint8_t 	key_len;
 }__attribute__((packed)) routing_auth_packet;
+
+//typedef struct routing_auth_packet_st {
+//	unsigned char rand[RAND_LEN*(4/3)+3];
+//	unsigned char key[AES_KEY_SIZE];
+//	unsigned char iv[AES_IV_SIZE];
+//}__attribute__((packed)) routing_auth_packet;
 
 
 
@@ -189,6 +198,7 @@ typedef enum am_state_en {
 } am_state;
 
 typedef enum am_type_en{
+	NO_AM_DATA,
 	SIGNATURE,
 	AL_FULL,
 	AL_ROW,
@@ -243,8 +253,8 @@ void auth_invite_send(sockaddr_in *sin_dest);
 void auth_request_send(sockaddr_in *sin_dest);
 void auth_issue_send(sockaddr_in *sin_dest);
 
-void all_sign_send(EVP_CIPHER_CTX *master, int *key_count, routing_auth_packet **payload);
-void neigh_sign_send();
+char *all_sign_send(EVP_PKEY *pkey, EVP_CIPHER_CTX *master, int *key_count);
+void neigh_sign_send(EVP_PKEY *pkey, sockaddr_in *addr, char *buf);
 void neigh_req_pc_send();
 void neigh_pc_send(sockaddr_in *sin_dest);
 
@@ -273,6 +283,12 @@ void neigh_add(uint32_t addr, uint16_t id, unsigned char *mac_value);
 
 EVP_PKEY *openssl_key_copy(EVP_PKEY *key);
 int openssl_cert_read(in_addr addr, unsigned char **s, EVP_PKEY **p);
+
+
+
+char * base64_encode(unsigned char * input, int length);
+unsigned char * base64_decode(char * input, int in_length, int *out_length);
+
 
 
 /* Necessary external variables */

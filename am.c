@@ -22,7 +22,7 @@ void tool_dump_memory(unsigned char* data, size_t len) {
 	printf("Data in [%p..%p): ",data,data+len);
 	for (i=0;i<len;i++) {
 		if(!(i%32)) {
-			printf("\n[%d - %d]: ",i, ( i+32 <= len ? i+32 : len ));
+			printf("\n[%4d - %4d]: ",i, ( i+32 <= len ? i+32 : len ));
 		}
 		printf("%02X ", ((unsigned char*)data)[i]);
 	}
@@ -52,6 +52,7 @@ sockaddr_in my_addr, broadcast_addr;
 char *interface;
 uint16_t my_id;
 int32_t am_send_socket, am_recv_socket;
+unsigned char *current_key = NULL;
 
 
 /* Function called from batman.c that creates a separate AM main thread */
@@ -111,7 +112,7 @@ void *am_main() {
 
 	am_type am_type_rcvd;
 
-	routing_auth_packet *auth_pkt = NULL;
+	char *auth_pkt = NULL;
 
 	EVP_PKEY *tmp_pub, *pkey = NULL;
 	EVP_CIPHER_CTX aes_master;
@@ -266,9 +267,9 @@ void *am_main() {
 
 								if(pthread_mutex_trylock(&auth_lock) == 0) {
 									if(num_trusted_neigh == 1) {
-										all_sign_send(&aes_master, &key_count, &auth_pkt);
+										auth_pkt = all_sign_send(pkey, &aes_master, &key_count);
 									} else {
-										neigh_sign_send(dst, auth_pkt);
+										neigh_sign_send(pkey, dst, auth_pkt);
 									}
 									pthread_mutex_unlock(&auth_lock);
 								}
@@ -303,7 +304,7 @@ void *am_main() {
 
 
 							if(pthread_mutex_trylock(&auth_lock) == 0) {
-								all_sign_send(&aes_master, &key_count, &auth_pkt);
+//								auth_pkt = all_sign_send(pkey, &aes_master, &key_count);
 								pthread_mutex_unlock(&auth_lock);
 							}
 						}
@@ -332,7 +333,7 @@ void *am_main() {
 					neigh_pc_send(dst);
 
 					/* Send Signature */
-					neigh_sign_send(dst, auth_pkt);
+					neigh_sign_send(pkey, dst, auth_pkt);
 
 					my_state = WAIT_FOR_NEIGH_SIG;
 
@@ -354,7 +355,7 @@ void *am_main() {
 						dst->sin_family = AF_INET;
 						dst->sin_port = htons(AM_PORT);
 
-						neigh_sign_send(dst, auth_pkt);
+						neigh_sign_send(pkey, dst, auth_pkt);
 
 						free(dst);
 						my_state = READY;
@@ -895,67 +896,152 @@ void neigh_pc_send(sockaddr_in *sin_dest) {
 }
 
 /* "Broadcast" Signed RAND Auth Packet to neighbors */
-void all_sign_send(EVP_CIPHER_CTX *master, int *key_count, routing_auth_packet **payloadp) {
+char *all_sign_send(EVP_PKEY *pkey, EVP_CIPHER_CTX *master, int *key_count) {
 
 	printf("Sending SIGNATURE message to all neighbors\n");
 
 	my_state = SENDING_NEW_SIGS;
 
-	char *buf, *ptr;
-	unsigned char *current_key = NULL, *current_iv = NULL, *current_rand = NULL;
+	char *buf, *ptr, *keylen_ptr;
+	unsigned char *current_iv = NULL, *current_rand = NULL;
 	int i;
 	am_packet *header;
 	int value_len = RAND_LEN;
 	int packet_len;
-	routing_auth_packet *payload;
+	routing_auth_packet *auth_header;
 
-	if(*payloadp == NULL || payloadp == NULL) {
-		payload = malloc(sizeof(routing_auth_packet));
-	} else {
-		free(*payloadp);
-		payload = *payloadp;
-	}
+	unsigned int signature_len = (unsigned int)EVP_PKEY_size(pkey);
+
+//	if(*packetp == NULL || packetp == NULL) {
+//		auth_header = malloc(sizeof(routing_auth_packet)+signature_len);
+//	} else {
+//		free(*payloadp);
+//		auth_header = *payloadp;
+//	}
 
 	/* First Generate New Current Key & IV */
 	*key_count = *key_count + 1;
+	if(current_key != NULL)
+		free(current_key);
 	current_key = openssl_key_generate(master, *key_count);
 	openssl_key_iv_select(&current_iv, AES_IV_SIZE);
 
 
 	/* Generate New RAND */
 	openssl_tool_gen_rand(&current_rand, RAND_LEN);
+	tool_dump_memory(current_rand, RAND_LEN);
 
 	/* Sign Payload */
 	//TODO: sign the paayload!
+	unsigned char *signature_buffer = NULL;
+	EVP_MD_CTX *md_ctx;
+
+	md_ctx = EVP_MD_CTX_create();
+
+	EVP_SignInit(md_ctx, EVP_sha1());
+
+	EVP_SignUpdate(md_ctx, current_key, AES_KEY_SIZE);
+	EVP_SignUpdate(md_ctx, current_iv, AES_IV_SIZE);
+	EVP_SignUpdate(md_ctx, current_rand, RAND_LEN);
+
+	signature_buffer = malloc(signature_len);
+
+	if( EVP_SignFinal(md_ctx, signature_buffer, &signature_len, pkey) != 1) {
+		ERR_print_errors_fp(stderr);
+		return NULL;
+	}
+
+
+
+//	memcpy((unsigned char *)&(payload->key), current_key, AES_KEY_SIZE);
+//	memcpy((unsigned char *)&(payload->iv), current_iv, AES_IV_SIZE);
+//	memcpy((unsigned char *)&(payload->rand), current_rand, RAND_LEN);
+//	payload->sign_len = (uint8_t)signature_len;
+//	memcpy((unsigned char *)payload+sizeof(routing_auth_packet), signature_buffer, signature_len);
+
+
+	/* Create Base64 encodings of payload */
+	char *b64_iv 	= base64_encode(current_iv, AES_IV_SIZE);
+//	char *b64_key 	= base64_encode(current_key, AES_KEY_SIZE);
+	char *b64_rand 	= base64_encode(current_rand, RAND_LEN);
+	char *b64_sign	= base64_encode(signature_buffer, signature_len);
+
+	printf("IV:\n%s",b64_iv);
+//	printf("\nKEY:\n%s",b64_key);
+	printf("\nRAND:\n%s",b64_rand);
+	printf("\nSIGN:\n%s\n",b64_sign);
+
 
 	/* Send Payload & Signature */
 	header = (am_packet *) malloc(sizeof(am_packet));
 	header->id = my_id;
 	header->type = SIGNATURE;
 
-	memcpy((unsigned char *)&(payload->key), current_key, AES_KEY_SIZE);
-	memcpy((unsigned char *)&(payload->iv), current_iv, AES_IV_SIZE);
-	memcpy((unsigned char *)&(payload->rand), current_rand, RAND_LEN);
+
+	auth_header = malloc(sizeof(routing_auth_packet));
+	auth_header->iv_len = strlen(b64_iv);
+//	auth_header->key_len = strlen(b64_key);
+	auth_header->rand_len = strlen(b64_rand);
+	auth_header->sign_len = strlen(b64_sign);
+
+	printf("rand_len = %d\n", auth_header->rand_len);
+	printf("iv_len = %d\n", auth_header->iv_len);
+	printf("sign_len = %d\n", auth_header->sign_len);
+
+//	int packet_size = strlen(b64_iv)+strlen(b64_key)+strlen(b64_rand)+strlen(b64_sign)+sizeof(routing_auth_packet);
+
+
+//	unsigned char *auth_packet = malloc(packet_size);
+//	memcpy(auth_packet, auth_header, sizeof(routing_auth_packet));
+//	memcpy(auth_packet+sizeof(routing_auth_packet), (unsigned char *)b64_iv, strlen(b64_iv));
+//	memcpy(auth_packet+sizeof(routing_auth_packet)+strlen(b64_iv), (unsigned char *)b64_key, strlen(b64_key));
+//	memcpy(auth_packet+sizeof(routing_auth_packet)+strlen(b64_iv)+strlen(b64_key), (unsigned char *)b64_rand, strlen(b64_rand));
+//	memcpy(auth_packet+sizeof(routing_auth_packet)+strlen(b64_iv)+strlen(b64_key)+strlen(b64_rand), (unsigned char *)b64_sign, strlen(b64_sign));
 
 	buf = malloc(MAXBUFLEN);
 	memset(buf, 0, sizeof(buf));
 	memcpy(buf, header, sizeof(am_packet));
 	ptr = buf;
 	ptr += sizeof(am_packet);
-	memcpy(ptr, payload, sizeof(routing_auth_packet));
+	memcpy(ptr, auth_header, sizeof(routing_auth_packet));
+	ptr += sizeof(routing_auth_packet);
+//	keylen_ptr = ptr - 1;
+	memcpy(ptr, b64_rand, strlen(b64_rand));
+	ptr += strlen(b64_rand);
+	memcpy(ptr, b64_iv, strlen(b64_iv));
+	ptr += strlen(b64_iv);
+	memcpy(ptr, b64_sign, strlen(b64_sign));
+	ptr += strlen(b64_sign);
 
-	packet_len = sizeof(am_packet);
-	packet_len += sizeof(routing_auth_packet);
 
 	sockaddr_in *tmp_dest = malloc(sizeof(sockaddr_in));
 	tmp_dest->sin_family = AF_INET;
 	tmp_dest->sin_port = htons(AM_PORT);
 	for(i=0; i<num_trusted_neigh; i++) {
+
 		tmp_dest->sin_addr.s_addr = neigh_list[i]->addr;
+
+		/* Encrypt auth_packet with neighs public key */
+		//TODO: Retrieve public key from AL, and encrypt
+		unsigned char *encrypted_key = current_key;
+		char *b64_key 	= base64_encode(encrypted_key, AES_KEY_SIZE);	//TODO: CHANGE AES_KEY_SIZE TO OUTPUT SZ FROM ENCR_ALG...
+
+
+		/* Put packet together in buffer */
+		memset(ptr, 0 , buf+MAXBUFLEN-ptr);
+		memcpy(ptr, b64_key, strlen(b64_key));
+
+		packet_len = (ptr + strlen(b64_key)) - buf;
+
+
+		/* Send packet to neigh */
+		printf("packet_len = %d\n", packet_len);
 		sendto(am_send_socket, buf, packet_len, 0, (sockaddr *)tmp_dest, sizeof(sockaddr_in));
 	}
+
+	memset(ptr, 0 , buf+MAXBUFLEN-ptr);
+
 	free(tmp_dest);
-	free(buf);
 	free(header);
 
 	/* Generate Routing VALUE from RAND */
@@ -967,40 +1053,55 @@ void all_sign_send(EVP_CIPHER_CTX *master, int *key_count, routing_auth_packet *
 	free(current_key);
 
 	my_state = READY;
-	*payloadp = payload;
+//	*payloadp = payload;
+	return buf;
 }
 
 /* Send Signed RAND Auth Packet to new neighbor */
-void neigh_sign_send(sockaddr_in *addr, routing_auth_packet *payload) {
+void neigh_sign_send(EVP_PKEY *pkey, sockaddr_in *addr, char *buf) {
 
 	printf("Send current SIGN message to new neighbor\n");
-	char *buf, *ptr;
-	am_packet *header;
-	int packet_len;
+//	char *buf, *ptr;
+//	am_packet *header;
+//	int packet_len = EVP_PKEY_size(pkey);
+//
+//	header = (am_packet *) malloc(sizeof(am_packet));
+//	header->id = my_id;
+//	header->type = NEIGH_SIGN;
 
-	my_state = SENDING_SIG;
-	//TODO: Check if I need sleep here..
+//	buf = malloc(MAXBUFLEN);
+//	memset(buf, 0, sizeof(buf));
+//	memcpy(buf, header, sizeof(am_packet));
+//	ptr = buf;
+//	ptr += sizeof(am_packet);
+//	memcpy(ptr, payload, sizeof(routing_auth_packet)+packet_len);
 
-	header = (am_packet *) malloc(sizeof(am_packet));
-	header->id = my_id;
-	header->type = NEIGH_SIGN;
+//	packet_len += sizeof(am_packet);
+//	packet_len += sizeof(routing_auth_packet);
 
-	buf = malloc(MAXBUFLEN);
-	memset(buf, 0, sizeof(buf));
-	memcpy(buf, header, sizeof(am_packet));
-	ptr = buf;
-	ptr += sizeof(am_packet);
-	memcpy(ptr, payload, sizeof(routing_auth_packet));
+	char *payload_ptr,* key_ptr;
 
-	packet_len = sizeof(am_packet);
-	packet_len += sizeof(routing_auth_packet);
+	payload_ptr = buf + sizeof(am_packet) + sizeof(routing_auth_packet);
+	key_ptr = payload_ptr + strlen(payload_ptr);
 
+	/* Encrypt auth_packet with neighs public key */
+	//TODO: Retrieve public key from AL, and encrypt
+	unsigned char *encrypted_key = current_key;
+	char *b64_key 	= base64_encode(encrypted_key, AES_KEY_SIZE);	//TODO: CHANGE AES_KEY_SIZE TO OUTPUT SZ FROM ENCR_ALG...
+
+
+	/* Put packet together in buffer */
+	memcpy(key_ptr, b64_key, strlen(b64_key));
+
+	int packet_len = sizeof(am_packet) + sizeof(routing_auth_packet) + strlen(payload_ptr);
+	printf("packet_len = %d\n", packet_len);
 	sendto(am_send_socket, buf, packet_len, 0, (sockaddr *)addr, sizeof(sockaddr_in));
 
-	free(buf);
-	free(header);
+	memset(key_ptr, 0 , buf+MAXBUFLEN-key_ptr);
 
-	my_state = READY;
+//	free(buf);
+//	free(header);
+
 }
 
 
@@ -1040,15 +1141,57 @@ int auth_invite_recv(char *ptr) {
 int neigh_sign_recv(uint32_t addr, uint16_t id, char *ptr) {
 
 	printf("Receive SIGN message from neighbor\n");
-	routing_auth_packet *payload = (routing_auth_packet *)ptr;
 
-	EVP_CIPHER_CTX received_ctx;
-	EVP_EncryptInit(&received_ctx, EVP_aes_128_cbc(), (unsigned char *)&(payload->key), (unsigned char *)&(payload->iv));
-	unsigned char *mac_value;
-	int mac_value_len = RAND_LEN;
-	mac_value = openssl_aes_encrypt(&received_ctx, (unsigned char *)&(payload->rand), &mac_value_len);
+	routing_auth_packet *auth_header = (routing_auth_packet *)ptr;
+	ptr = ptr + sizeof(routing_auth_packet);
+	printf("rand_len = %d\n", auth_header->rand_len);
+	printf("iv_len = %d\n", auth_header->iv_len);
+	printf("sign_len = %d\n", auth_header->sign_len);
 
-	neigh_add(addr, id, mac_value);
+	/* Decode Base64 variables, except key */
+	unsigned char *randval, *iv, *sign;
+	int rand_len, iv_len, sign_len;
+
+	randval = base64_decode(ptr, auth_header->rand_len, &rand_len);
+	iv = base64_decode(ptr + auth_header->rand_len, auth_header->iv_len, &iv_len);
+	sign = base64_decode(ptr + auth_header->rand_len + auth_header->iv_len, auth_header->sign_len, &sign_len);
+
+	tool_dump_memory(randval, rand_len);
+
+//	/* Verify Signature */
+//	unsigned char *rcvd_sig = (unsigned char *)payload+(payload->sign_len);
+//	EVP_MD_CTX *md_ctx = EVP_MD_CTX_create();
+//
+//	EVP_VerifyInit(md_ctx, EVP_sha1());
+//
+//	EVP_VerifyUpdate(md_ctx, payload->key, AES_KEY_SIZE);
+//	EVP_VerifyUpdate(md_ctx, payload->iv, AES_IV_SIZE);
+//	EVP_VerifyUpdate(md_ctx, payload->rand, RAND_LEN);
+//
+//	int i;
+//	for(i=0; i<num_auth_nodes; i++) {
+//		if(authenticated_list[i]->id == id)
+//			break;
+//	}
+//
+//	if(i==num_auth_nodes) {
+//		printf("Could not find node in AL\n");
+//		return 0;
+//	}
+//
+//	if(EVP_VerifyFinal(md_ctx,rcvd_sig, payload->sign_len, authenticated_list[i]->pub_key) != 1) {
+//		ERR_print_errors_fp(stderr);
+//		return 0;
+//	}
+//
+//
+//	EVP_CIPHER_CTX received_ctx;
+//	EVP_EncryptInit(&received_ctx, EVP_aes_128_cbc(), (unsigned char *)&(payload->key), (unsigned char *)&(payload->iv));
+//	unsigned char *mac_value;
+//	int mac_value_len = RAND_LEN;
+//	mac_value = openssl_aes_encrypt(&received_ctx, (unsigned char *)&(payload->rand), &mac_value_len);
+//
+//	neigh_add(addr, id, mac_value);
 
 	return 1;
 
@@ -1217,7 +1360,92 @@ void socks_am_destroy(int32_t *send, int32_t *recv) {
 
 
 
+/* BASE 64 */
 
+/* Encode to Base64 */
+char * base64_encode(unsigned char * input, int length) {
+
+    BIO *b64 = NULL;
+    BIO * bmem = NULL;
+    BUF_MEM *bptr = NULL;
+    char * output = NULL;
+
+    b64 = BIO_new((BIO_METHOD *)BIO_f_base64());
+    BIO_set_flags(b64, BIO_FLAGS_BASE64_NO_NL);
+    bmem = BIO_new(BIO_s_mem());
+    b64 = BIO_push(b64, bmem);
+    BIO_write(b64, input, length);
+    BIO_flush(b64);
+    BIO_get_mem_ptr(b64, &bptr);
+
+    output = (char *) calloc (bptr->length + 1, sizeof(char));
+    memcpy(output, bptr->data, bptr->length);
+
+    BIO_free_all(b64);
+
+    return output;
+}
+
+/* Decode from Base64 */
+unsigned char * base64_decode(char * input, int in_length, int *out_length) {
+
+	//TODO: Fix this to actually decode, now only encoding...
+
+	  BIO *b64, *bmem;
+
+	  char *output = (char *)malloc(in_length);
+	  memset(output, 0, in_length);
+
+	  b64 = BIO_new(BIO_f_base64());
+	  BIO_set_flags(b64, BIO_FLAGS_BASE64_NO_NL);
+	  bmem = BIO_new_mem_buf(input, in_length);
+	  bmem = BIO_push(b64, bmem);
+
+	  *out_length = BIO_read(bmem, output, in_length);
+
+	  BIO_free_all(bmem);
+
+	  unsigned char *retval = malloc(*out_length);
+	  memcpy(retval, output, *out_length);
+
+	  return retval;
+
+
+//    BIO *b64 = NULL;
+//    BIO * bmem = NULL;
+//    BUF_MEM *bptr = NULL;
+//    unsigned char * output = NULL;
+//
+//    bmem = BIO_new_mem_buf((void *)input, in_length);
+//
+//    b64 = BIO_new(BIO_f_base64());
+//    BIO_set_flags(b64, BIO_FLAGS_BASE64_NO_NL);
+//
+//    bmem = BIO_push(b64, bmem);
+//
+//    out_length = BIO_read(bmem, (void *));
+
+
+//    BIO *b64 = NULL;
+//    BIO * bmem = NULL;
+//    BUF_MEM *bptr = NULL;
+//    char * output = NULL;
+//
+//    b64 = BIO_new((BIO_METHOD *)BIO_f_base64());
+//    BIO_set_flags(b64, BIO_FLAGS_BASE64_NO_NL);
+//    bmem = BIO_new(BIO_s_mem());
+//    b64 = BIO_push(b64, bmem);
+//    BIO_read(b64, input, in_length);
+//    BIO_flush(b64);
+//    BIO_get_mem_ptr(b64, &bptr);
+//
+//    output = (char *) calloc (bptr->length + 1, sizeof(char));
+//    memcpy(output, bptr->data, bptr->length);
+//    *out_length = bptr->length;
+//
+//    BIO_free_all(b64);
+
+}
 
 
 /* Certificate and Requests Creation Helper Functions */
