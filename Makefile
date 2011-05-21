@@ -48,6 +48,7 @@ OS_OBJ =	$(BSD_OBJ) $(POSIX_OBJ)
 endif
 
 OBJ = batman.o originator.o schedule.o list-batman.o allocate.o bitarray.o hash.o profile.o ring_buffer.o hna.o $(OS_OBJ)
+MANPAGE = man/batmand.8
 
 # activate this variable to deactivate policy routing for backward compatibility
 #NO_POLICY_ROUTING = -DNO_POLICY_ROUTING
@@ -78,6 +79,7 @@ LINK.o = $(Q_LD)$(CC) $(LDFLAGS) $(TARGET_ARCH)
 # standard install paths
 PREFIX = /usr/local
 SBINDIR = $(PREFIX)/sbin
+MANDIR = $(PREFIX)/share/man
 
 # try to generate revision
 REVISION = $(shell if [ -d .git ]; then echo $$(git describe --always --dirty 2> /dev/null || echo "[unknown]"); fi)
@@ -99,7 +101,9 @@ clean:
 
 install: $(BINARY_NAME)
 	$(MKDIR) $(DESTDIR)$(SBINDIR)
+	$(MKDIR) $(DESTDIR)$(MANDIR)/man8
 	$(INSTALL) -m 0755 $(BINARY_NAME) $(DESTDIR)$(SBINDIR)
+	$(INSTALL) -m 0644 $(MANPAGE) $(DESTDIR)$(MANDIR)/man8
 
 # load dependencies
 DEP = $(OBJ:.o=.d)
