@@ -36,33 +36,33 @@ LDFLAGS +=	-lpthread
 SBINDIR =	$(INSTALL_PREFIX)/usr/sbin
 
 UNAME =		$(shell uname)
-POSIX_C =	posix/init.c posix/posix.c posix/tunnel.c posix/unix_socket.c
-BSD_C =		bsd/route.c bsd/tun.c bsd/kernel.c bsd/compat.c
+POSIX_OBJ =	posix/init.o posix/posix.o posix/tunnel.o posix/unix_socket.o
+BSD_OBJ =	bsd/route.o bsd/tun.o bsd/kernel.o bsd/compat.o
+LINUX_OBJ =	linux/route.o linux/tun.o linux/kernel.o
 
 ifeq ($(UNAME),Linux)
-OS_C =		linux/route.c linux/tun.c linux/kernel.c $(POSIX_C)
+OS_OBJ =	$(LINUX_OBJ) $(POSIX_OBJ)
 endif
 
 ifeq ($(UNAME),Darwin)
-OS_C =		$(BSD_C) $(POSIX_C)
+OS_OBJ =	$(BSD_OBJ) $(POSIX_OBJ)
 endif
 
 ifeq ($(UNAME),GNU/kFreeBSD)
-OS_C =		$(BSD_C) $(POSIX_C)
+OS_OBJ =	$(BSD_OBJ) $(POSIX_OBJ)
 LDFLAGS +=	-lfreebsd -lbsd
 endif
 
 ifeq ($(UNAME),FreeBSD)
-OS_C =		$(BSD_C) $(POSIX_C)
+OS_OBJ =	$(BSD_OBJ) $(POSIX_OBJ)
 endif
 
 ifeq ($(UNAME),OpenBSD)
-OS_C =		$(BSD_C) $(POSIX_C)
+OS_OBJ =	$(BSD_OBJ) $(POSIX_OBJ)
 endif
 
-SRC_C= batman.c originator.c schedule.c list-batman.c allocate.c bitarray.c hash.c profile.c ring_buffer.c hna.c $(OS_C)
-SRC_H= batman.h originator.h schedule.h list-batman.h os.h allocate.h bitarray.h hash.h profile.h packet.h types.h ring_buffer.h hna.h
-SRC_O= $(SRC_C:.c=.o)
+OBJ = batman.o originator.o schedule.o list-batman.o allocate.o bitarray.o hash.o profile.o ring_buffer.o hna.o $(OS_OBJ)
+DEP = $(OBJ:.o=.d)
 
 BINARY_NAME =	batmand
 
@@ -74,16 +74,15 @@ REVISION_VERSION =\"\ $(REVISION)\"
 
 all: $(BINARY_NAME)
 
-$(BINARY_NAME): $(SRC_O) $(SRC_H) Makefile
-	$(Q_LD)$(CC) -o $@ $(SRC_O) $(LDFLAGS)
+$(BINARY_NAME): $(OBJ) Makefile
+	$(Q_LD)$(CC) -o $@ $(OBJ) $(LDFLAGS)
 
 .c.o:
 	$(Q_CC)$(CC) $(CFLAGS) $(EXTRA_CFLAGS) -MD -c $< -o $@
--include $(SRC_C:.c=.d)
+-include $(DEP)
 
 clean:
-	rm -f $(BINARY_NAME) *.o posix/*.o linux/*.o bsd/*.o
-	rm -f *.d posix/*.d linux/*.d bsd/*.d
+	rm -f $(BINARY_NAME) $(OBJ) $(DEP)
 
 install:
 	mkdir -p $(SBINDIR)
