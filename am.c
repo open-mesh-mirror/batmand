@@ -167,7 +167,7 @@ void *am_main() {
 
 	/* Else create a PC Request	 */
 	else {
-		openssl_cert_create_req(pkey, subject_name);
+		openssl_cert_create_req(&pkey, subject_name);
 	}
 
 
@@ -304,7 +304,7 @@ void *am_main() {
 
 
 							if(pthread_mutex_trylock(&auth_lock) == 0) {
-//								auth_pkt = all_sign_send(pkey, &aes_master, &key_count);
+								auth_pkt = all_sign_send(pkey, &aes_master, &key_count);
 								pthread_mutex_unlock(&auth_lock);
 							}
 						}
@@ -320,10 +320,10 @@ void *am_main() {
 					if(!openssl_cert_read(neigh_addr, &subject_name, &tmp_pub))
 						break;
 
-					al_add(neigh_addr.s_addr, rcvd_id, AUTHENTICATED, subject_name, tmp_pub);
+					/* Verify PC Rights (ProxyCertInfo) */
+					//TODO:Check access rights policy
 
-					/* Verify PC Signature and Rights (ProxyCertInfo) */
-					//TODO: Verify signature on PC and check access rights policy
+					al_add(neigh_addr.s_addr, rcvd_id, AUTHENTICATED, subject_name, tmp_pub);
 
 					/* Send own PC */
 					dst = (sockaddr_in *) malloc(sizeof(sockaddr_in));
@@ -335,7 +335,7 @@ void *am_main() {
 					/* Send Signature */
 					neigh_sign_send(pkey, dst, auth_pkt);
 
-					my_state = WAIT_FOR_NEIGH_SIG;
+//					my_state = WAIT_FOR_NEIGH_SIG;
 
 					free(dst);
 
@@ -536,19 +536,19 @@ int openssl_cert_create_pc0(EVP_PKEY **pkey, unsigned char **subject_name) {
 }
 
 /* Create PC REQ for an UNAUTHENTICATED Node */
-int openssl_cert_create_req(EVP_PKEY *pkey, unsigned char *subject_name) {
+int openssl_cert_create_req(EVP_PKEY **pkey, unsigned char *subject_name) {
 
 	X509_REQ *req;
 	FILE *fp;
 	BIO *bio_err;
 
 	req = NULL;
-	pkey = NULL;
+	*pkey = NULL;
 
 	CRYPTO_mem_ctrl(CRYPTO_MEM_CHECK_ON);
 	bio_err = BIO_new_fp(stderr, BIO_NOCLOSE);
 
-	openssl_cert_mkreq(&req, &pkey, subject_name);
+	openssl_cert_mkreq(&req, pkey, subject_name);
 
 //	RSA_print_fp(stdout, pkey->pkey.rsa, 0);	//pkey.rsa changed with pkey.ec
 //	X509_REQ_print_fp(stdout, req);
@@ -557,7 +557,7 @@ int openssl_cert_create_req(EVP_PKEY *pkey, unsigned char *subject_name) {
 	/* Write Private Key to a file */
 	if(!(fp = fopen(MY_KEY, "w")))
 		fprintf(stderr, "Error opening file %s for writing!\n",MY_KEY);
-	if(PEM_write_PrivateKey(fp, pkey, NULL, NULL, 0, NULL, NULL) != 1)
+	if(PEM_write_PrivateKey(fp, *pkey, NULL, NULL, 0, NULL, NULL) != 1)
 		fprintf(stderr, "Error while writing the RSA private key to file %s\n",MY_KEY);
 	fclose(fp);
 
@@ -912,13 +912,6 @@ char *all_sign_send(EVP_PKEY *pkey, EVP_CIPHER_CTX *master, int *key_count) {
 
 	unsigned int signature_len = (unsigned int)EVP_PKEY_size(pkey);
 
-//	if(*packetp == NULL || packetp == NULL) {
-//		auth_header = malloc(sizeof(routing_auth_packet)+signature_len);
-//	} else {
-//		free(*payloadp);
-//		auth_header = *payloadp;
-//	}
-
 	/* First Generate New Current Key & IV */
 	*key_count = *key_count + 1;
 	if(current_key != NULL)
@@ -929,10 +922,8 @@ char *all_sign_send(EVP_PKEY *pkey, EVP_CIPHER_CTX *master, int *key_count) {
 
 	/* Generate New RAND */
 	openssl_tool_gen_rand(&current_rand, RAND_LEN);
-	tool_dump_memory(current_rand, RAND_LEN);
 
 	/* Sign Payload */
-	//TODO: sign the paayload!
 	unsigned char *signature_buffer = NULL;
 	EVP_MD_CTX *md_ctx;
 
@@ -952,35 +943,18 @@ char *all_sign_send(EVP_PKEY *pkey, EVP_CIPHER_CTX *master, int *key_count) {
 	}
 
 
-
-//	memcpy((unsigned char *)&(payload->key), current_key, AES_KEY_SIZE);
-//	memcpy((unsigned char *)&(payload->iv), current_iv, AES_IV_SIZE);
-//	memcpy((unsigned char *)&(payload->rand), current_rand, RAND_LEN);
-//	payload->sign_len = (uint8_t)signature_len;
-//	memcpy((unsigned char *)payload+sizeof(routing_auth_packet), signature_buffer, signature_len);
-
-
 	/* Create Base64 encodings of payload */
-	char *b64_iv 	= base64_encode(current_iv, AES_IV_SIZE);
-//	char *b64_key 	= base64_encode(current_key, AES_KEY_SIZE);
-	char *b64_rand 	= base64_encode(current_rand, RAND_LEN);
-	char *b64_sign	= base64_encode(signature_buffer, signature_len);
-
-	printf("IV:\n%s",b64_iv);
-//	printf("\nKEY:\n%s",b64_key);
-	printf("\nRAND:\n%s",b64_rand);
-	printf("\nSIGN:\n%s\n",b64_sign);
-
+	char *b64_iv 	= tool_base64_encode(current_iv, AES_IV_SIZE);
+	char *b64_rand 	= tool_base64_encode(current_rand, RAND_LEN);
+	char *b64_sign	= tool_base64_encode(signature_buffer, signature_len);
 
 	/* Send Payload & Signature */
 	header = (am_packet *) malloc(sizeof(am_packet));
 	header->id = my_id;
 	header->type = SIGNATURE;
 
-
 	auth_header = malloc(sizeof(routing_auth_packet));
 	auth_header->iv_len = strlen(b64_iv);
-//	auth_header->key_len = strlen(b64_key);
 	auth_header->rand_len = strlen(b64_rand);
 	auth_header->sign_len = strlen(b64_sign);
 
@@ -988,15 +962,6 @@ char *all_sign_send(EVP_PKEY *pkey, EVP_CIPHER_CTX *master, int *key_count) {
 	printf("iv_len = %d\n", auth_header->iv_len);
 	printf("sign_len = %d\n", auth_header->sign_len);
 
-//	int packet_size = strlen(b64_iv)+strlen(b64_key)+strlen(b64_rand)+strlen(b64_sign)+sizeof(routing_auth_packet);
-
-
-//	unsigned char *auth_packet = malloc(packet_size);
-//	memcpy(auth_packet, auth_header, sizeof(routing_auth_packet));
-//	memcpy(auth_packet+sizeof(routing_auth_packet), (unsigned char *)b64_iv, strlen(b64_iv));
-//	memcpy(auth_packet+sizeof(routing_auth_packet)+strlen(b64_iv), (unsigned char *)b64_key, strlen(b64_key));
-//	memcpy(auth_packet+sizeof(routing_auth_packet)+strlen(b64_iv)+strlen(b64_key), (unsigned char *)b64_rand, strlen(b64_rand));
-//	memcpy(auth_packet+sizeof(routing_auth_packet)+strlen(b64_iv)+strlen(b64_key)+strlen(b64_rand), (unsigned char *)b64_sign, strlen(b64_sign));
 
 	buf = malloc(MAXBUFLEN);
 	memset(buf, 0, sizeof(buf));
@@ -1005,7 +970,6 @@ char *all_sign_send(EVP_PKEY *pkey, EVP_CIPHER_CTX *master, int *key_count) {
 	ptr += sizeof(am_packet);
 	memcpy(ptr, auth_header, sizeof(routing_auth_packet));
 	ptr += sizeof(routing_auth_packet);
-//	keylen_ptr = ptr - 1;
 	memcpy(ptr, b64_rand, strlen(b64_rand));
 	ptr += strlen(b64_rand);
 	memcpy(ptr, b64_iv, strlen(b64_iv));
@@ -1023,8 +987,19 @@ char *all_sign_send(EVP_PKEY *pkey, EVP_CIPHER_CTX *master, int *key_count) {
 
 		/* Encrypt auth_packet with neighs public key */
 		//TODO: Retrieve public key from AL, and encrypt
+//		int j;
+//		for(j=0; j<num_auth_nodes; j++) {
+//
+//			if(neigh_list[i]->id == authenticated_list[j]->id) {
+//
+//				RSA *rsa = EVP_PKEY_get1_RSA(authenticated_list[j]->pub_key);
+//				unsigned char *encrypted_key = malloc(RSA_size(rsa));
+//
+//			}
+//		}
+
 		unsigned char *encrypted_key = current_key;
-		char *b64_key 	= base64_encode(encrypted_key, AES_KEY_SIZE);	//TODO: CHANGE AES_KEY_SIZE TO OUTPUT SZ FROM ENCR_ALG...
+		char *b64_key 	= tool_base64_encode(encrypted_key, AES_KEY_SIZE);	//TODO: CHANGE AES_KEY_SIZE TO OUTPUT SZ FROM ENCR_ALG...
 
 
 		/* Put packet together in buffer */
@@ -1033,9 +1008,7 @@ char *all_sign_send(EVP_PKEY *pkey, EVP_CIPHER_CTX *master, int *key_count) {
 
 		packet_len = (ptr + strlen(b64_key)) - buf;
 
-
 		/* Send packet to neigh */
-		printf("packet_len = %d\n", packet_len);
 		sendto(am_send_socket, buf, packet_len, 0, (sockaddr *)tmp_dest, sizeof(sockaddr_in));
 	}
 
@@ -1050,10 +1023,8 @@ char *all_sign_send(EVP_PKEY *pkey, EVP_CIPHER_CTX *master, int *key_count) {
 	auth_value = openssl_aes_encrypt(&current_ctx, current_rand, &value_len);
 
 	free(current_iv);
-	free(current_key);
 
 	my_state = READY;
-//	*payloadp = payload;
 	return buf;
 }
 
@@ -1061,23 +1032,6 @@ char *all_sign_send(EVP_PKEY *pkey, EVP_CIPHER_CTX *master, int *key_count) {
 void neigh_sign_send(EVP_PKEY *pkey, sockaddr_in *addr, char *buf) {
 
 	printf("Send current SIGN message to new neighbor\n");
-//	char *buf, *ptr;
-//	am_packet *header;
-//	int packet_len = EVP_PKEY_size(pkey);
-//
-//	header = (am_packet *) malloc(sizeof(am_packet));
-//	header->id = my_id;
-//	header->type = NEIGH_SIGN;
-
-//	buf = malloc(MAXBUFLEN);
-//	memset(buf, 0, sizeof(buf));
-//	memcpy(buf, header, sizeof(am_packet));
-//	ptr = buf;
-//	ptr += sizeof(am_packet);
-//	memcpy(ptr, payload, sizeof(routing_auth_packet)+packet_len);
-
-//	packet_len += sizeof(am_packet);
-//	packet_len += sizeof(routing_auth_packet);
 
 	char *payload_ptr,* key_ptr;
 
@@ -1087,20 +1041,18 @@ void neigh_sign_send(EVP_PKEY *pkey, sockaddr_in *addr, char *buf) {
 	/* Encrypt auth_packet with neighs public key */
 	//TODO: Retrieve public key from AL, and encrypt
 	unsigned char *encrypted_key = current_key;
-	char *b64_key 	= base64_encode(encrypted_key, AES_KEY_SIZE);	//TODO: CHANGE AES_KEY_SIZE TO OUTPUT SZ FROM ENCR_ALG...
+	char *b64_key 	= tool_base64_encode(encrypted_key, AES_KEY_SIZE);	//TODO: CHANGE AES_KEY_SIZE TO OUTPUT SZ FROM ENCR_ALG...
 
 
 	/* Put packet together in buffer */
 	memcpy(key_ptr, b64_key, strlen(b64_key));
 
 	int packet_len = sizeof(am_packet) + sizeof(routing_auth_packet) + strlen(payload_ptr);
-	printf("packet_len = %d\n", packet_len);
+
 	sendto(am_send_socket, buf, packet_len, 0, (sockaddr *)addr, sizeof(sockaddr_in));
 
 	memset(key_ptr, 0 , buf+MAXBUFLEN-key_ptr);
 
-//	free(buf);
-//	free(header);
 
 }
 
@@ -1144,54 +1096,73 @@ int neigh_sign_recv(uint32_t addr, uint16_t id, char *ptr) {
 
 	routing_auth_packet *auth_header = (routing_auth_packet *)ptr;
 	ptr = ptr + sizeof(routing_auth_packet);
-	printf("rand_len = %d\n", auth_header->rand_len);
-	printf("iv_len = %d\n", auth_header->iv_len);
-	printf("sign_len = %d\n", auth_header->sign_len);
 
-	/* Decode Base64 variables, except key */
-	unsigned char *randval, *iv, *sign;
-	int rand_len, iv_len, sign_len;
+	/* Decode Base64 variables */
+	unsigned char *randval, *iv, *sign, *encrypted_key;
+	int rand_len, iv_len, sign_len, encrypted_key_len;
 
-	randval = base64_decode(ptr, auth_header->rand_len, &rand_len);
-	iv = base64_decode(ptr + auth_header->rand_len, auth_header->iv_len, &iv_len);
-	sign = base64_decode(ptr + auth_header->rand_len + auth_header->iv_len, auth_header->sign_len, &sign_len);
+	randval = tool_base64_decode(ptr, auth_header->rand_len, &rand_len);
+	iv = tool_base64_decode(ptr + auth_header->rand_len, auth_header->iv_len, &iv_len);
+	sign = tool_base64_decode(ptr + auth_header->rand_len + auth_header->iv_len, auth_header->sign_len, &sign_len);
+	int tmp = strlen(ptr) - (auth_header->rand_len + auth_header->iv_len + auth_header->sign_len);
+	encrypted_key = tool_base64_decode(ptr + auth_header->rand_len + auth_header->iv_len + auth_header->sign_len, tmp, &encrypted_key_len);
 
-	tool_dump_memory(randval, rand_len);
+	/* Decrypt key */
+	//TODO: Decrypt key using your private key
+	unsigned char *key = encrypted_key;
+	int key_len = encrypted_key_len;
 
-//	/* Verify Signature */
+	/* Verify Signature */
 //	unsigned char *rcvd_sig = (unsigned char *)payload+(payload->sign_len);
-//	EVP_MD_CTX *md_ctx = EVP_MD_CTX_create();
+	EVP_MD_CTX *md_ctx = EVP_MD_CTX_create();
+
+	EVP_VerifyInit(md_ctx, EVP_sha1());
+
+	EVP_VerifyUpdate(md_ctx, key, key_len);
+	EVP_VerifyUpdate(md_ctx, iv, iv_len);
+	EVP_VerifyUpdate(md_ctx, randval, rand_len);
+
+	int i;
+	for(i=0; i<num_auth_nodes; i++) {
+		if(authenticated_list[i]->id == id)
+			break;
+	}
+
+	if(i==num_auth_nodes) {
+		printf("Could not find node in AL\n");
+		return 0;
+	}
+
+//	printf("\nTrying to verify signature with this public key:\n");
+//	PEM_write_PUBKEY(stdout,authenticated_list[i]->pub_key);
 //
-//	EVP_VerifyInit(md_ctx, EVP_sha1());
+//	printf("\nKEY:\n");
+//	tool_dump_memory(key, key_len);
 //
-//	EVP_VerifyUpdate(md_ctx, payload->key, AES_KEY_SIZE);
-//	EVP_VerifyUpdate(md_ctx, payload->iv, AES_IV_SIZE);
-//	EVP_VerifyUpdate(md_ctx, payload->rand, RAND_LEN);
+//	printf("\nIV:\n");
+//	tool_dump_memory(iv, iv_len);
 //
-//	int i;
-//	for(i=0; i<num_auth_nodes; i++) {
-//		if(authenticated_list[i]->id == id)
-//			break;
-//	}
+//	printf("\nRAND:\n");
+//	tool_dump_memory(randval, rand_len);
 //
-//	if(i==num_auth_nodes) {
-//		printf("Could not find node in AL\n");
-//		return 0;
-//	}
-//
-//	if(EVP_VerifyFinal(md_ctx,rcvd_sig, payload->sign_len, authenticated_list[i]->pub_key) != 1) {
-//		ERR_print_errors_fp(stderr);
-//		return 0;
-//	}
-//
-//
-//	EVP_CIPHER_CTX received_ctx;
-//	EVP_EncryptInit(&received_ctx, EVP_aes_128_cbc(), (unsigned char *)&(payload->key), (unsigned char *)&(payload->iv));
-//	unsigned char *mac_value;
-//	int mac_value_len = RAND_LEN;
-//	mac_value = openssl_aes_encrypt(&received_ctx, (unsigned char *)&(payload->rand), &mac_value_len);
-//
-//	neigh_add(addr, id, mac_value);
+//	printf("\n Checking againts this SIGN:\n");
+//	tool_dump_memory(sign, sign_len);
+
+	if(EVP_VerifyFinal(md_ctx,sign, sign_len, authenticated_list[i]->pub_key) != 1) {
+		ERR_print_errors_fp(stderr);
+		return 0;
+	}
+
+	printf("\nICH BIN HIER!\n\n");
+
+
+	EVP_CIPHER_CTX received_ctx;
+	EVP_EncryptInit(&received_ctx, EVP_aes_128_cbc(), key, iv);
+	unsigned char *mac_value;
+	int mac_value_len = RAND_LEN;
+	mac_value = openssl_aes_encrypt(&received_ctx, randval, &mac_value_len);
+
+	neigh_add(addr, id, mac_value);
 
 	return 1;
 
@@ -1363,7 +1334,7 @@ void socks_am_destroy(int32_t *send, int32_t *recv) {
 /* BASE 64 */
 
 /* Encode to Base64 */
-char * base64_encode(unsigned char * input, int length) {
+char *tool_base64_encode(unsigned char * input, int length) {
 
     BIO *b64 = NULL;
     BIO * bmem = NULL;
@@ -1387,9 +1358,7 @@ char * base64_encode(unsigned char * input, int length) {
 }
 
 /* Decode from Base64 */
-unsigned char * base64_decode(char * input, int in_length, int *out_length) {
-
-	//TODO: Fix this to actually decode, now only encoding...
+unsigned char *tool_base64_decode(char * input, int in_length, int *out_length) {
 
 	  BIO *b64, *bmem;
 
@@ -1407,43 +1376,9 @@ unsigned char * base64_decode(char * input, int in_length, int *out_length) {
 
 	  unsigned char *retval = malloc(*out_length);
 	  memcpy(retval, output, *out_length);
+	  free(output);
 
 	  return retval;
-
-
-//    BIO *b64 = NULL;
-//    BIO * bmem = NULL;
-//    BUF_MEM *bptr = NULL;
-//    unsigned char * output = NULL;
-//
-//    bmem = BIO_new_mem_buf((void *)input, in_length);
-//
-//    b64 = BIO_new(BIO_f_base64());
-//    BIO_set_flags(b64, BIO_FLAGS_BASE64_NO_NL);
-//
-//    bmem = BIO_push(b64, bmem);
-//
-//    out_length = BIO_read(bmem, (void *));
-
-
-//    BIO *b64 = NULL;
-//    BIO * bmem = NULL;
-//    BUF_MEM *bptr = NULL;
-//    char * output = NULL;
-//
-//    b64 = BIO_new((BIO_METHOD *)BIO_f_base64());
-//    BIO_set_flags(b64, BIO_FLAGS_BASE64_NO_NL);
-//    bmem = BIO_new(BIO_s_mem());
-//    b64 = BIO_push(b64, bmem);
-//    BIO_read(b64, input, in_length);
-//    BIO_flush(b64);
-//    BIO_get_mem_ptr(b64, &bptr);
-//
-//    output = (char *) calloc (bptr->length + 1, sizeof(char));
-//    memcpy(output, bptr->data, bptr->length);
-//    *out_length = bptr->length;
-//
-//    BIO_free_all(b64);
 
 }
 

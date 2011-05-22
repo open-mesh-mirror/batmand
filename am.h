@@ -236,7 +236,7 @@ static void openssl_tool_callback(int p, int n, void *arg);
 
 void create_signature();
 int openssl_cert_create_pc0(EVP_PKEY **pkey, unsigned char **subject_name);
-int openssl_cert_create_req(EVP_PKEY *pkey, unsigned char *subject_name);
+int openssl_cert_create_req(EVP_PKEY **pkey, unsigned char *subject_name);
 int openssl_cert_create_pc1(EVP_PKEY **pkey, char *addr, unsigned char **subject_name);
 
 int openssl_cert_selfsign(X509 **x509p, EVP_PKEY **pkeyp, unsigned char **subject_name);
@@ -286,8 +286,8 @@ int openssl_cert_read(in_addr addr, unsigned char **s, EVP_PKEY **p);
 
 
 
-char * base64_encode(unsigned char * input, int length);
-unsigned char * base64_decode(char * input, int in_length, int *out_length);
+char * tool_base64_encode(unsigned char * input, int length);
+unsigned char * tool_base64_decode(char * input, int in_length, int *out_length);
 
 
 
