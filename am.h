@@ -38,6 +38,10 @@
 #include <openssl/conf.h>
 #include <openssl/x509v3.h>
 #include <openssl/evp.h>
+#include <openssl/ec.h>
+#include <openssl/ecdh.h>
+#include <openssl/ecdsa.h>
+#include <openssl/hmac.h>
 #ifndef OPENSSL_NO_ENGINE
 #include <openssl/engine.h>
 #endif
@@ -138,6 +142,13 @@ typedef enum key_algorithm_en{
 #define ISSUED_CERT			CRYPTO_DIR "issued_pc"
 #define SP_CERT				CRYPTO_DIR "sp_pc"
 
+#define RSA_KEY_SIZE		1024
+//#define ECC_CURVE			NID_sect163k1
+#define ECC_CURVE			NID_secp160r1
+//#define ECIES_CURVE NID_secp521r1
+#define ECDH_CIPHER 		EVP_aes_128_cbc()
+#define ECDH_HASHER 		EVP_sha256()
+
 /* Naming standard structs */
 typedef struct addrinfo addrinfo;
 typedef struct sockaddr_in sockaddr_in;
@@ -146,7 +157,21 @@ typedef struct sockaddr sockaddr;
 typedef struct in_addr in_addr;
 typedef struct timeval timeval;
 
+
 /* AM Structs */
+
+typedef char * secure_t;
+typedef struct {
+
+struct {
+uint32_t key;
+uint32_t mac;
+uint32_t orig;
+uint32_t body;
+} length;
+
+} secure_head_t;
+
 typedef struct trusted_node_st {
 	uint16_t 		id;			//unique
 	uint32_t		addr;		//unique ip addr
@@ -157,10 +182,12 @@ typedef struct trusted_node_st {
 } trusted_node;
 
 typedef struct trusted_neigh_st {
-	uint16_t 		id;			//unique
-	uint32_t		addr;		//unique ip addr
-	unsigned char	*mac;		//Message Authentication Code (current)
-
+	uint16_t 		id;				//unique
+	uint32_t		addr;			//unique ip addr
+	uint64_t		window;			//Sliding window, if a bit is set 0 that pkt not received, else received
+	uint16_t		last_seq_num;	//Used with sliding windows
+	unsigned char	*mac;			//Message Authentication Code (current)
+	time_t 			last_rcvd_time;
 } trusted_neigh;
 
 typedef struct am_packet_st {
@@ -215,6 +242,7 @@ typedef enum am_type_en{
 typedef enum role_type_en{
 	UNAUTHENTICATED,
 	AUTHENTICATED,
+	RESTRICTED,
 	MASTER,
 	SP
 } role_type;
@@ -245,7 +273,7 @@ int openssl_cert_mkcert(EVP_PKEY **pkey, X509_REQ **reqp, X509 **pc1p, X509 **pc
 
 int add_ext(STACK_OF(X509_REQUEST) *sk, int nid, char *value);
 
-int openssl_tool_seed_prng(int bytes);
+int openssl_tool_seed_prng(int bytes);void *KDF1_SHA256(const void *in, size_t inlen, void *out, size_t *outlen);
 
 void send_signature();
 
@@ -255,16 +283,16 @@ void auth_issue_send(sockaddr_in *sin_dest);
 
 char *all_sign_send(EVP_PKEY *pkey, EVP_CIPHER_CTX *master, int *key_count);
 void neigh_sign_send(EVP_PKEY *pkey, sockaddr_in *addr, char *buf);
-void neigh_req_pc_send();
+void neigh_req_pc_send(sockaddr_in *neigh_addr);
 void neigh_pc_send(sockaddr_in *sin_dest);
 
 am_type am_header_extract(char *buf, char **ptr, int *id);
 
 int auth_request_recv(char *addr, char *ptr);
 int auth_issue_recv(char *ptr);
-int auth_invite_recv();
+int auth_invite_recv(char *ptr);
 
-int neigh_sign_recv(uint32_t addr, uint16_t id, char *ptr);
+int neigh_sign_recv(EVP_PKEY *pkey, uint32_t addr, uint16_t id, char *ptr);
 int neigh_pc_recv(in_addr addr, char *ptr);
 
 
@@ -284,20 +312,20 @@ void neigh_add(uint32_t addr, uint16_t id, unsigned char *mac_value);
 EVP_PKEY *openssl_key_copy(EVP_PKEY *key);
 int openssl_cert_read(in_addr addr, unsigned char **s, EVP_PKEY **p);
 
-
+int tool_sliding_window(uint16_t seq_num, uint16_t id);
 
 char * tool_base64_encode(unsigned char * input, int length);
 unsigned char * tool_base64_decode(char * input, int in_length, int *out_length);
 
+void *KDF1_SHA256(const void *in, size_t inlen, void *out, size_t *outlen);
 
 
 /* Necessary external variables */
-extern role_type my_role;
+extern role_type my_role, req_role;
 extern am_state my_state;
 extern pthread_t am_main_thread;
 extern uint32_t new_neighbor;
 extern uint32_t trusted_neighbors[100];
-extern uint8_t num_trusted_neighbors;
 extern unsigned char *auth_value;
 extern uint16_t auth_seq_num;
 extern pthread_mutex_t auth_lock;

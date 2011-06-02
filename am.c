@@ -14,7 +14,38 @@
 
 #include "am.h"
 
+void *KDF1_SHA256(const void *in, size_t inlen, void *out, size_t *outlen) {
 
+    if (*outlen < SHA256_DIGEST_LENGTH) {
+    	return NULL;
+    }
+    else {
+        *outlen = SHA256_DIGEST_LENGTH;
+    }
+    return SHA256(in, inlen, out);
+}
+
+void * secure_alloc(uint64_t key, uint64_t mac, uint64_t orig, uint64_t body) {
+
+	secure_t *cryptex = malloc(sizeof(secure_head_t) + key + mac + body);
+	secure_head_t *head = (secure_head_t *)cryptex;
+	head->length.key = key;
+	head->length.mac = mac;
+	head->length.orig = orig;
+	head->length.body = body;
+
+	return cryptex;
+}
+
+void * secure_body_data(secure_t *cryptex) {
+	secure_head_t *head = (secure_head_t *)cryptex;
+	return (char *)cryptex + (sizeof(secure_head_t) + head->length.key + head->length.mac);
+}
+
+void * secure_mac_data(secure_t *cryptex) {
+	secure_head_t *head = (secure_head_t *)cryptex;
+	return (char *)cryptex + (sizeof(secure_head_t) + head->length.key);
+}
 
 /* Debugging purposes */
 void tool_dump_memory(unsigned char* data, size_t len) {
@@ -30,10 +61,10 @@ void tool_dump_memory(unsigned char* data, size_t len) {
 }
 
 /* External Variables */
-role_type my_role;
+role_type my_role, req_role;
 am_state my_state;
 pthread_t am_main_thread;
-uint32_t new_neighbor;
+uint32_t new_neighbor, prev_neighbor;
 //uint32_t trusted_neighbors[100];
 unsigned char *auth_value;
 uint16_t auth_seq_num;
@@ -53,7 +84,15 @@ char *interface;
 uint16_t my_id;
 int32_t am_send_socket, am_recv_socket;
 unsigned char *current_key = NULL;
+time_t last_send_time;
 
+/* Usage function for my AM extension */
+secure_usage() {
+	fprintf( stderr, "Secure Usage: batman [options] -R/--role 'sp/authenticated/restricted' interface [interface interface]\n" );
+	fprintf( stderr, "       -R / --role 'sp'              start as Service Proxy / Master node\n" );
+	fprintf( stderr, "       -R / --role 'authenticated'   request to become authenticated with full rights\n" );
+	fprintf( stderr, "       -R / --role 'restricted'      request to become restricted (end-node only)\n" );
+}
 
 /* Function called from batman.c that creates a separate AM main thread */
 void am_thread_init(char *dev, sockaddr_in addr, sockaddr_in broad) {
@@ -142,7 +181,7 @@ void *am_main() {
 
 	/* Set user ID */
 	char addr_char[16];
-	addr_to_string(my_addr.sin_addr.s_addr, addr_char, sizeof (addr_char));
+	inet_ntop( AF_INET, &(my_addr.sin_addr.s_addr), addr_char, sizeof (addr_char) );
 	my_id = inet_addr(addr_char) % UINT16_MAX;
 
 	/* Generate Master Key and bind it to AES context*/
@@ -178,6 +217,15 @@ void *am_main() {
 	am_payload_ptr = NULL;
 	dst = NULL;
 
+//	uint16_t testint = 40960;
+//	int tmpsda;
+//	for (tmpsda = 0; tmpsda<16; tmpsda++) {
+//		printf("[%2d] %d + 1 = ", tmpsda, testint);
+//		testint = testint | 1;
+//		printf("%d\n", testint);
+//		testint = testint >> 1;
+//	}
+//	exit(1);
 	/* Main loop for the AM thread, will only exit when Batman is terminated */
 	while(1) {
 
@@ -201,12 +249,12 @@ void *am_main() {
 
 				case SIGNATURE:
 					/* Allowed in all states */
-					neigh_sign_recv(neigh_addr.s_addr, rcvd_id, am_payload_ptr);
+					neigh_sign_recv(pkey, neigh_addr.s_addr, rcvd_id, am_payload_ptr);
 					break;
 
 				case NEIGH_SIGN:
 					/* Allowed in all states */
-					neigh_sign_recv(neigh_addr.s_addr, rcvd_id, am_payload_ptr);
+					neigh_sign_recv(pkey, neigh_addr.s_addr, rcvd_id, am_payload_ptr);
 					if(my_state == WAIT_FOR_NEIGH_SIG)
 						my_state = READY;
 					break;
@@ -236,7 +284,7 @@ void *am_main() {
 							dst->sin_family = AF_INET;
 							dst->sin_port = htons(AM_PORT);
 							auth_request_send(dst);
-							my_state = WAIT_FOR_PC; //TODO: actually check whether the auth_request_send succeeded...
+							my_state = WAIT_FOR_PC;
 							free(dst);
 						}
 
@@ -249,7 +297,7 @@ void *am_main() {
 					if(my_role == SP && my_state == WAIT_FOR_REQ) {
 						my_state = SEND_PC;
 
-						if((uint32_t)((sockaddr_in*)((sockaddr *)&recv_addr))->sin_addr.s_addr == new_neighbor) {
+						if((uint32_t)((sockaddr_in*)((sockaddr *)&recv_addr))->sin_addr.s_addr == prev_neighbor) {
 
 							char *recv_addr_string = malloc(16);
 							recv_addr_string = inet_ntoa(((sockaddr_in*)((sockaddr *)&recv_addr))->sin_addr);
@@ -283,7 +331,7 @@ void *am_main() {
 						}
 					}
 
-					new_neighbor = 0;
+					prev_neighbor = 0;
 					my_state = READY;
 
 					break;
@@ -335,7 +383,7 @@ void *am_main() {
 					/* Send Signature */
 					neigh_sign_send(pkey, dst, auth_pkt);
 
-//					my_state = WAIT_FOR_NEIGH_SIG;
+					my_state = WAIT_FOR_NEIGH_SIG;
 
 					free(dst);
 
@@ -347,7 +395,7 @@ void *am_main() {
 						/* Receive Neighbors PC */
 						neigh_pc_recv(neigh_addr, am_payload_ptr);
 						openssl_cert_read(neigh_addr, &subject_name, &tmp_pub);
-						neigh_add(neigh_addr.s_addr, rcvd_id, NULL);
+//						neigh_add(neigh_addr.s_addr, rcvd_id, NULL);
 						al_add(neigh_addr.s_addr, rcvd_id, AUTHENTICATED, subject_name, tmp_pub);
 
 						dst = (sockaddr_in *) malloc(sizeof(sockaddr_in));
@@ -358,7 +406,8 @@ void *am_main() {
 						neigh_sign_send(pkey, dst, auth_pkt);
 
 						free(dst);
-						my_state = READY;
+						my_state = WAIT_FOR_NEIGH_SIG;
+//						new_neighbor = 0;
 					}
 					break;
 
@@ -369,28 +418,66 @@ void *am_main() {
 			data_rcvd = 0;
 		}
 
+		/* If BATMAN has found a new direct neighbor */
 		if(new_neighbor && my_state == READY) {
 
-			/* Check for new nodes */
-			if(my_role == SP) {
-				my_state = SEND_INVITE;
-				dst = (sockaddr_in *) malloc(sizeof(sockaddr_in));
-				dst->sin_addr.s_addr = new_neighbor;
-				dst->sin_family = AF_INET;
-				dst->sin_port = htons(AM_PORT);
-				auth_invite_send(dst);
-				my_state = WAIT_FOR_REQ;
-				free(dst);
-			}
+			dst = (sockaddr_in *) malloc(sizeof(sockaddr_in));
+			dst->sin_addr.s_addr = new_neighbor;
+			dst->sin_family = AF_INET;
+			dst->sin_port = htons(AM_PORT);
 
-			/* Check for new trusted neighbors */
-			if(my_role == AUTHENTICATED) {
-				/* Only one can initiate the neighbor's pc request or else collision */
-				if(my_addr.sin_addr.s_addr < new_neighbor) {
-					my_state = WAIT_FOR_NEIGH_PC;
-					neigh_req_pc_send();
+			/*Check if node is in AL */
+			int i;
+			for(i=0; i<num_auth_nodes; i++) {
+
+				if(new_neighbor == authenticated_list[i]->addr) {
+
+					/* Send Signature */
+					neigh_sign_send(pkey, dst, auth_pkt);
+
+					/* Check whether neighbor sent you sig first */
+					//TODO: maybe for-loop through this, might not be last one if many new neighs at same time...
+					if(neigh_list[num_trusted_neigh-1]->addr != new_neighbor)
+						my_state = WAIT_FOR_NEIGH_SIG;
+
+					break;
+
 				}
 			}
+
+			/* Not in AL, add to AL before neigh_list */
+			if(i == num_auth_nodes) {
+
+				/* If SP invite to handshake */
+				if(my_role == SP) {
+					my_state = WAIT_FOR_REQ;
+					auth_invite_send(dst);
+					prev_neighbor = new_neighbor;
+				}
+
+				/* If just AUTHENTICATED exchange PCs and SIGNs */
+				if(my_role == AUTHENTICATED) {
+
+					/* Only one can initiate the neighbor's pc request or else collision */
+					if(my_addr.sin_addr.s_addr < new_neighbor) {
+						my_state = WAIT_FOR_NEIGH_PC;
+						neigh_req_pc_send(dst);
+					}
+
+				}
+
+			}
+
+			new_neighbor = 0;
+			free(dst);
+
+		}
+
+		/* Check if more than 60 seconds since last all_sign_send */
+		time_t test_timer = time (NULL);
+		if(last_send_time != 0 && (test_timer - 60 > last_send_time) && (my_state == READY)) {
+			printf("Time to send new SIGN message to all neighbors!\n");
+			auth_pkt = all_sign_send(pkey, &aes_master, &key_count);
 		}
 	}
 	pthread_exit(NULL);
@@ -447,6 +534,9 @@ void neigh_add(uint32_t addr, uint16_t id, unsigned char *mac_value) {
 					free(neigh_list[i]->mac);
 
 				neigh_list[i]->mac = mac_value;
+				neigh_list[i]->window = 0;
+				neigh_list[i]->last_seq_num = 0;
+				neigh_list[i]->last_rcvd_time = time (NULL);
 
 			} else {
 
@@ -474,6 +564,9 @@ void neigh_add(uint32_t addr, uint16_t id, unsigned char *mac_value) {
 		neigh_list[num_trusted_neigh]->addr = addr;
 		neigh_list[num_trusted_neigh]->id = id;
 		neigh_list[num_trusted_neigh]->mac = mac_value;
+		neigh_list[i]->window = 0;
+		neigh_list[num_trusted_neigh]->last_seq_num = 0;
+		neigh_list[num_trusted_neigh]->last_rcvd_time = time (NULL);
 		num_trusted_neigh++;
 
 	}
@@ -501,6 +594,7 @@ int openssl_cert_create_pc0(EVP_PKEY **pkey, unsigned char **subject_name) {
 	openssl_cert_selfsign(&pc0, pkey, subject_name);
 
 //	RSA_print_fp(stdout,pkey->pkey.rsa,0);
+//	EC_KEY_print_fp(stdout, pkey->pkey.ec_key, 0);
 //	X509_print_fp(stdout,pc0);
 
 //	PEM_write_PrivateKey(stdout,pkey,NULL,NULL,0,NULL, NULL);
@@ -549,6 +643,8 @@ int openssl_cert_create_req(EVP_PKEY **pkey, unsigned char *subject_name) {
 	bio_err = BIO_new_fp(stderr, BIO_NOCLOSE);
 
 	openssl_cert_mkreq(&req, pkey, subject_name);
+
+//	EC_KEY_print_fp(stdout, *pkey->pkey.ec_key, 0);
 
 //	RSA_print_fp(stdout, pkey->pkey.rsa, 0);	//pkey.rsa changed with pkey.ec
 //	X509_REQ_print_fp(stdout, req);
@@ -622,7 +718,7 @@ int openssl_cert_create_pc1(EVP_PKEY **pkey, char *addr, unsigned char **subject
 
 	if(openssl_cert_mkcert(pkey, &req, &pc1, &pc0, subject_name) == 0) {
 
-		//		X509_print_fp(stdout,pc1);
+//		X509_print_fp(stdout,pc1);
 //		PEM_write_X509(stdout,pc1);
 
 		/* Write issued X509 PC1 to a file */
@@ -820,14 +916,14 @@ void auth_issue_send(sockaddr_in *sin_dest) {
 	free(buf);
 }
 
-void neigh_req_pc_send() {
+void neigh_req_pc_send(sockaddr_in *neigh_addr) {
 
 	printf("Requesting PC and sending my own PC to new neighbor\n");
 	char *buf, *ptr;
 	am_packet *am_header;
 	int packet_len;
 	FILE *fp;
-	sockaddr_in *neigh_addr;
+//	sockaddr_in *neigh_addr;
 
 	am_header = (am_packet *) malloc(sizeof(am_packet));
 	am_header->id = my_id;
@@ -847,15 +943,14 @@ void neigh_req_pc_send() {
 	packet_len += fread(ptr, 1, PEM_BUFSIZE, fp);
 	fclose(fp);
 
-	neigh_addr = malloc(sizeof(sockaddr_in));
-	neigh_addr->sin_addr.s_addr = new_neighbor;
-	neigh_addr->sin_family = AF_INET;
-	neigh_addr->sin_port = htons(AM_PORT);
+//	neigh_addr = malloc(sizeof(sockaddr_in));
+//	neigh_addr->sin_addr.s_addr = new_neighbor;
+//	neigh_addr->sin_family = AF_INET;
+//	neigh_addr->sin_port = htons(AM_PORT);
 
 	sendto(am_send_socket, buf, packet_len, 0, (sockaddr *)neigh_addr, sizeof(sockaddr_in));
 
-	new_neighbor = 0;
-	free(neigh_addr);
+//	free(neigh_addr);
 	free(am_header);
 	free(buf);
 }
@@ -898,7 +993,7 @@ void neigh_pc_send(sockaddr_in *sin_dest) {
 /* "Broadcast" Signed RAND Auth Packet to neighbors */
 char *all_sign_send(EVP_PKEY *pkey, EVP_CIPHER_CTX *master, int *key_count) {
 
-	printf("Sending SIGNATURE message to all neighbors\n");
+	printf("Broadcast new SIGN message to all neighbors\n");
 
 	my_state = SENDING_NEW_SIGS;
 
@@ -929,7 +1024,15 @@ char *all_sign_send(EVP_PKEY *pkey, EVP_CIPHER_CTX *master, int *key_count) {
 
 	md_ctx = EVP_MD_CTX_create();
 
-	EVP_SignInit(md_ctx, EVP_sha1());
+	if(pkey->type == EVP_PKEY_RSA)
+		EVP_SignInit(md_ctx, EVP_sha1());
+	else if(pkey->type == EVP_PKEY_EC)
+		EVP_SignInit(md_ctx, EVP_ecdsa());
+	else {
+		printf("Could not recognize Public Key Algorithm\n");
+		return NULL;
+	}
+
 
 	EVP_SignUpdate(md_ctx, current_key, AES_KEY_SIZE);
 	EVP_SignUpdate(md_ctx, current_iv, AES_IV_SIZE);
@@ -958,10 +1061,6 @@ char *all_sign_send(EVP_PKEY *pkey, EVP_CIPHER_CTX *master, int *key_count) {
 	auth_header->rand_len = strlen(b64_rand);
 	auth_header->sign_len = strlen(b64_sign);
 
-	printf("rand_len = %d\n", auth_header->rand_len);
-	printf("iv_len = %d\n", auth_header->iv_len);
-	printf("sign_len = %d\n", auth_header->sign_len);
-
 
 	buf = malloc(MAXBUFLEN);
 	memset(buf, 0, sizeof(buf));
@@ -986,30 +1085,226 @@ char *all_sign_send(EVP_PKEY *pkey, EVP_CIPHER_CTX *master, int *key_count) {
 		tmp_dest->sin_addr.s_addr = neigh_list[i]->addr;
 
 		/* Encrypt auth_packet with neighs public key */
-		//TODO: Retrieve public key from AL, and encrypt
-//		int j;
-//		for(j=0; j<num_auth_nodes; j++) {
+		int j;
+		for(j=0; j<num_auth_nodes; j++) {
+
+			if(neigh_list[i]->id == authenticated_list[j]->id) {
+
+				/* NEW ECC */
+
+//				EC_KEY *ephemeral = NULL, *recip_pubkey = NULL;
+//				const EC_GROUP *group = NULL;
+//				size_t envelope_length, block_length, key_length;
+//				unsigned char envelope_key[SHA256_DIGEST_LENGTH] = { 0 };
+//				unsigned char iv[AES_IV_SIZE] = { 0 };
+//				unsigned char block[EVP_MAX_BLOCK_LENGTH] = { 0 };
 //
-//			if(neigh_list[i]->id == authenticated_list[j]->id) {
+//				if ((key_length = EVP_CIPHER_key_length(ECDH_CIPHER)) * 2 > SHA256_DIGEST_LENGTH) {
+//					printf("The key derivation method will not produce enough envelope key material for the chosen ciphers. {envelope = %i / required = %zu}", SHA256_DIGEST_LENGTH / 8, (key_length * 2) / 8);
+//					return NULL;
+//				}
 //
-//				RSA *rsa = EVP_PKEY_get1_RSA(authenticated_list[j]->pub_key);
-//				unsigned char *encrypted_key = malloc(RSA_size(rsa));
+//				// Create the ephemeral key used specifically for this block of data.
+//				if (!(ephemeral = EC_KEY_new())) {
+//					printf("EC_KEY_new failed. {error = %s}\n", ERR_error_string(ERR_get_error(), NULL));
+//					return NULL;
+//				}
 //
-//			}
-//		}
+//				//Extract Public key from AL and copy group settings
+//				recip_pubkey = EVP_PKEY_get1_EC_KEY(authenticated_list[j]->pub_key);
+//				group = EC_KEY_get0_group(recip_pubkey);
+//
+//
+//				if (EC_KEY_set_group(ephemeral, group) != 1) {
+//					printf("EC_KEY_set_group failed. {error = %s}\n", ERR_error_string(ERR_get_error(), NULL));
+//					EC_GROUP_free(group);
+//					EC_KEY_free(ephemeral);
+//					return NULL;
+//				}
+//
+//				EC_GROUP_free(group);
+//
+//				if (EC_KEY_generate_key(ephemeral) != 1) {
+//					printf("EC_KEY_generate_key failed. {error = %s}\n", ERR_error_string(ERR_get_error(), NULL));
+//					EC_KEY_free(ephemeral);
+//					return NULL;
+//				}
+//
+//
+//				// Use the intersection of the provided keys to generate the envelope data used by the ciphers below. The ecies_key_derivation() function uses
+//				// SHA 256 to ensure we have a sufficient amount of envelope key material and that the material created is sufficiently secure.
+//				if (ECDH_compute_key(envelope_key, SHA256_DIGEST_LENGTH, EC_KEY_get0_public_key(recip_pubkey), ephemeral, KDF1_SHA256) != SHA256_DIGEST_LENGTH) {
+//					printf("An error occurred while trying to compute the envelope key. {error = %s}\n", ERR_error_string(ERR_get_error(), NULL));
+//					EC_KEY_free(ephemeral);
+//					EC_KEY_free(recip_pubkey);
+//					return NULL;
+//				}
+//
+//				// Determine the envelope and block lengths so we can allocate a buffer for the result.
+//				if ((block_length = EVP_CIPHER_block_size(ECDH_CIPHER)) == 0 || block_length > EVP_MAX_BLOCK_LENGTH ||
+//						(envelope_length = EC_POINT_point2oct(EC_KEY_get0_group(ephemeral), EC_KEY_get0_public_key(ephemeral), POINT_CONVERSION_COMPRESSED, NULL, 0, NULL)) == 0) {
+//
+//					printf("Invalid block or envelope length. {block = %zu / envelope = %zu}\n", block_length, envelope_length);
+//					EC_KEY_free(ephemeral);
+//					EC_KEY_free(recip_pubkey);
+//					return NULL;
+//				}
+//
+//
+//				secure_t *cryptex;
+//
+//				// We use a conditional to pad the length if the input buffer is not evenly divisible by the block size.
+//				if (!(cryptex = secure_alloc(envelope_length, EVP_MD_size(ECDH_HASHER), AES_KEY_SIZE, AES_KEY_SIZE + (AES_KEY_SIZE % block_length ? (block_length - (AES_KEY_SIZE % block_length)) : 0)))) {
+//					printf("Unable to allocate a secure_t buffer to hold the encrypted result.\n");
+//					EC_KEY_free(ephemeral);
+//					EC_KEY_free(recip_pubkey);
+//					return NULL;
+//				}
+//
+//
+//				// Store the public key portion of the ephemeral key.
+//				if (EC_POINT_point2oct(EC_KEY_get0_group(ephemeral), EC_KEY_get0_public_key(ephemeral), POINT_CONVERSION_COMPRESSED, (char *)cryptex+sizeof(secure_head_t), envelope_length, NULL) != envelope_length) {
+//					printf("An error occurred while trying to record the public portion of the envelope key. {error = %s}\n", ERR_error_string(ERR_get_error(), NULL));
+//					EC_KEY_free(ephemeral);
+//					EC_KEY_free(recip_pubkey);
+//					free(cryptex);
+//					return NULL;
+//				}
+//
+//				// The envelope key has been stored so we no longer need to keep the keys around.
+//				EC_KEY_free(ephemeral);
+//				EC_KEY_free(recip_pubkey);
+//
+//				// For now we use an empty initialization vector.
+//				memset(iv, 0, AES_IV_SIZE);
+////				RAND_pseudo_bytes(&iv, AES_IV_SIZE);
+//
+//				// Setup the cipher context, the body length, and store a pointer to the body buffer location.
+//				EVP_CIPHER_CTX cipher;
+//				void *body;
+//				int body_length;
+//
+//				EVP_CIPHER_CTX_init(&cipher);
+//				body = secure_body_data(cryptex);
+//				body_length = ((secure_head_t *)cryptex)->length.body;
+//
+//
+//				// Initialize the cipher with the envelope key.
+//				if (EVP_EncryptInit_ex(&cipher, ECDH_CIPHER, NULL, envelope_key, iv) != 1 ||
+//						EVP_CIPHER_CTX_set_padding(&cipher, 0) != 1 ||
+//						EVP_EncryptUpdate(&cipher, body, &body_length, current_key,
+//								AES_KEY_SIZE - (AES_KEY_SIZE % block_length)) != 1)
+//				{
+//
+//					printf("An error occurred while trying to secure the data using the chosen symmetric cipher. {error = %s}\n", ERR_error_string(ERR_get_error(), NULL));
+//					EVP_CIPHER_CTX_cleanup(&cipher);
+//					free(cryptex);
+//					return NULL;
+//
+//				}
+//
+//
+//				// Advance the pointer, then use pointer arithmetic to calculate how much of the body buffer has been used. The complex logic is needed so that we get
+//				// the correct status regardless of whether there was a partial data block.
+//				body += body_length;
+//				if ((body_length = ((secure_head_t *)cryptex)->length.body - (body - secure_body_data(cryptex))) < 0) {
+//					printf("The symmetric cipher overflowed!\n");
+//					EVP_CIPHER_CTX_cleanup(&cipher);
+//					free(cryptex);
+//					return NULL;
+//				}
+//
+//
+//				if (EVP_EncryptFinal_ex(&cipher, body, &body_length) != 1) {
+//					printf("Unable to secure the data using the chosen symmetric cipher. {error = %s}\n", ERR_error_string(ERR_get_error(), NULL));
+//					EVP_CIPHER_CTX_cleanup(&cipher);
+//					free(cryptex);
+//					return NULL;
+//				}
+//
+//				EVP_CIPHER_CTX_cleanup(&cipher);
+//
+//				// Generate an authenticated hash which can be used to validate the data during decryption.
+//				HMAC_CTX hmac;
+//				unsigned int mac_length;
+//				HMAC_CTX_init(&hmac);
+//				mac_length = ((secure_head_t *)cryptex)->length.mac;
+//
+//				// At the moment we are generating the hash using encrypted data. At some point we may want to validate the original text instead.
+//				HMAC_Init_ex(&hmac, envelope_key + key_length, key_length, ECDH_HASHER, NULL);
+//				HMAC_Update(&hmac, current_key, AES_KEY_SIZE);
+//				HMAC_Final(&hmac, secure_mac_data(cryptex), &mac_length);
+////				{
+////
+////					printf("Unable to generate a data authentication code. {error = %s}\n", ERR_error_string(ERR_get_error(), NULL));
+////					HMAC_CTX_cleanup(&hmac);
+////					free(cryptex);
+////					return NULL;
+////				}
+//
+//				HMAC_CTX_cleanup(&hmac);
+//
+//				tool_dump_memory((unsigned char *)secure_body_data(cryptex), body_length);
+//
+//				printf("\n\nICH BIN HIER!\n\n");
+//				exit(1);
 
-		unsigned char *encrypted_key = current_key;
-		char *b64_key 	= tool_base64_encode(encrypted_key, AES_KEY_SIZE);	//TODO: CHANGE AES_KEY_SIZE TO OUTPUT SZ FROM ENCR_ALG...
 
 
-		/* Put packet together in buffer */
-		memset(ptr, 0 , buf+MAXBUFLEN-ptr);
-		memcpy(ptr, b64_key, strlen(b64_key));
+				/* OLD ECC */
 
-		packet_len = (ptr + strlen(b64_key)) - buf;
+//				recip_pubkey = EVP_PKEY_get1_EC_KEY(authenticated_list[j]->pub_key);
+//				group = EC_KEY_get0_group(recip_pubkey);
+//
+//				ephemeral_key = EC_KEY_new();
+//				EC_KEY_set_group(ephemeral_key, group);
+//
+//				EC_KEY_generate_key(ephemeral_key);
+//
+//				// With this 256 bit long buffer, we have a 128bit (16 Byte) AES key and IV to encrypt the key being sent...
+//				ECDH_compute_key(key_iv_buf, sizeof key_iv_buf, EC_KEY_get0_public_key(recip_pubkey), ephemeral_key, KDF1_SHA256);
+//				unsigned char *key, *iv;
+//				key = malloc(AES_KEY_SIZE);
+//				iv = malloc(AES_IV_SIZE);
+//				memcpy(key, key_iv_buf, AES_KEY_SIZE);
+//				memcpy(iv, key_iv_buf+AES_KEY_SIZE, AES_IV_SIZE);
+//
+//				EVP_CIPHER_CTX aes_ctx;
+//				EVP_EncryptInit(&aes_ctx, EVP_aes_128_ecb(), key, iv);
+//				unsigned char *encrypted_key;
+//				int encrypted_key_len = AES_KEY_SIZE;
+//				encrypted_key = openssl_aes_encrypt(&aes_ctx, current_key, &encrypted_key_len);
+//
+//				free(key);
+//				free(iv);
+//
 
-		/* Send packet to neigh */
-		sendto(am_send_socket, buf, packet_len, 0, (sockaddr *)tmp_dest, sizeof(sockaddr_in));
+				RSA *neig_rsa = authenticated_list[j]->pub_key->pkey.rsa;
+
+				unsigned char *encrypted_key = malloc(RSA_size(neig_rsa));
+				if(RSA_public_encrypt(AES_KEY_SIZE, current_key, encrypted_key, neig_rsa, RSA_PKCS1_OAEP_PADDING) == -1) {
+					printf("Error while encrypting with neigbhbors public key\n");
+					break;
+				}
+
+				char *b64_key 	= tool_base64_encode(encrypted_key, RSA_size(neig_rsa));
+
+
+				/* Put packet together in buffer */
+				memset(ptr, 0 , buf+MAXBUFLEN-ptr);
+				memcpy(ptr, b64_key, strlen(b64_key));
+
+				packet_len = (ptr + strlen(b64_key)) - buf;
+
+				/* Send packet to neigh */
+				sendto(am_send_socket, buf, packet_len, 0, (sockaddr *)tmp_dest, sizeof(sockaddr_in));
+
+				//Go out of last for-loop, but continue with first loop to find next neighbor
+				break;
+
+			}
+		}
+
 	}
 
 	memset(ptr, 0 , buf+MAXBUFLEN-ptr);
@@ -1025,13 +1320,18 @@ char *all_sign_send(EVP_PKEY *pkey, EVP_CIPHER_CTX *master, int *key_count) {
 	free(current_iv);
 
 	my_state = READY;
+	last_send_time = time (NULL);
 	return buf;
 }
+
 
 /* Send Signed RAND Auth Packet to new neighbor */
 void neigh_sign_send(EVP_PKEY *pkey, sockaddr_in *addr, char *buf) {
 
-	printf("Send current SIGN message to new neighbor\n");
+	char *addr_char = malloc(16);
+	inet_ntop( AF_INET, &(addr->sin_addr.s_addr), addr_char, 16 );
+	printf("Send SIGN message to neighbor - %s\n", addr_char);
+	free(addr_char);
 
 	char *payload_ptr,* key_ptr;
 
@@ -1039,21 +1339,33 @@ void neigh_sign_send(EVP_PKEY *pkey, sockaddr_in *addr, char *buf) {
 	key_ptr = payload_ptr + strlen(payload_ptr);
 
 	/* Encrypt auth_packet with neighs public key */
-	//TODO: Retrieve public key from AL, and encrypt
-	unsigned char *encrypted_key = current_key;
-	char *b64_key 	= tool_base64_encode(encrypted_key, AES_KEY_SIZE);	//TODO: CHANGE AES_KEY_SIZE TO OUTPUT SZ FROM ENCR_ALG...
+	int j;
+	for(j=0; j<num_auth_nodes; j++) {
+
+		if(addr->sin_addr.s_addr == authenticated_list[j]->addr) {
+
+			RSA *neig_rsa = authenticated_list[j]->pub_key->pkey.rsa;
+
+			unsigned char *encrypted_key = malloc(RSA_size(neig_rsa));
+			if(RSA_public_encrypt(AES_KEY_SIZE, current_key, encrypted_key, neig_rsa, RSA_PKCS1_OAEP_PADDING) == -1) {
+				printf("Error while encrypting with neigbhbors public key\n");
+				break;
+			}
+
+			char *b64_key 	= tool_base64_encode(encrypted_key, RSA_size(neig_rsa));
 
 
-	/* Put packet together in buffer */
-	memcpy(key_ptr, b64_key, strlen(b64_key));
+			/* Put packet together in buffer */
+			memcpy(key_ptr, b64_key, strlen(b64_key));
+			int packet_len = sizeof(am_packet) + sizeof(routing_auth_packet) + strlen(payload_ptr);
 
-	int packet_len = sizeof(am_packet) + sizeof(routing_auth_packet) + strlen(payload_ptr);
+			sendto(am_send_socket, buf, packet_len, 0, (sockaddr *)addr, sizeof(sockaddr_in));
 
-	sendto(am_send_socket, buf, packet_len, 0, (sockaddr *)addr, sizeof(sockaddr_in));
+			memset(key_ptr, 0 , buf+MAXBUFLEN-key_ptr);
+			break;
 
-	memset(key_ptr, 0 , buf+MAXBUFLEN-key_ptr);
-
-
+		}
+	}
 }
 
 
@@ -1090,9 +1402,12 @@ int auth_invite_recv(char *ptr) {
 }
 
 /* Receive Routing Auth Packet */
-int neigh_sign_recv(uint32_t addr, uint16_t id, char *ptr) {
+int neigh_sign_recv(EVP_PKEY *pkey, uint32_t addr, uint16_t id, char *ptr) {
 
-	printf("Receive SIGN message from neighbor\n");
+	char *addr_char = malloc(16);
+	inet_ntop( AF_INET, &addr, addr_char, 16 );
+	printf("Receive SIGN message from neighbor - %s\n", addr_char);
+	free(addr_char);
 
 	routing_auth_packet *auth_header = (routing_auth_packet *)ptr;
 	ptr = ptr + sizeof(routing_auth_packet);
@@ -1107,54 +1422,68 @@ int neigh_sign_recv(uint32_t addr, uint16_t id, char *ptr) {
 	int tmp = strlen(ptr) - (auth_header->rand_len + auth_header->iv_len + auth_header->sign_len);
 	encrypted_key = tool_base64_decode(ptr + auth_header->rand_len + auth_header->iv_len + auth_header->sign_len, tmp, &encrypted_key_len);
 
-	/* Decrypt key */
-	//TODO: Decrypt key using your private key
-	unsigned char *key = encrypted_key;
-	int key_len = encrypted_key_len;
 
-	/* Verify Signature */
-//	unsigned char *rcvd_sig = (unsigned char *)payload+(payload->sign_len);
-	EVP_MD_CTX *md_ctx = EVP_MD_CTX_create();
-
-	EVP_VerifyInit(md_ctx, EVP_sha1());
-
-	EVP_VerifyUpdate(md_ctx, key, key_len);
-	EVP_VerifyUpdate(md_ctx, iv, iv_len);
-	EVP_VerifyUpdate(md_ctx, randval, rand_len);
-
+	unsigned char *key = NULL;
+	int key_len;
 	int i;
 	for(i=0; i<num_auth_nodes; i++) {
-		if(authenticated_list[i]->id == id)
+		if(authenticated_list[i]->id == id) {
+
+			/* Decrypt key */
+			key = malloc(AES_KEY_SIZE);
+			RSA_private_decrypt(encrypted_key_len, encrypted_key, key, pkey->pkey.rsa, RSA_PKCS1_OAEP_PADDING);
+			key_len = AES_KEY_SIZE;
+
+
+			/* Verify Signature */
+			EVP_MD_CTX *md_ctx = EVP_MD_CTX_create();
+
+			if (authenticated_list[i]->pub_key->type ==  EVP_PKEY_RSA)
+				EVP_VerifyInit(md_ctx, EVP_sha1());
+			else if (authenticated_list[i]->pub_key->type ==  EVP_PKEY_EC)
+				EVP_VerifyInit(md_ctx, EVP_ecdsa());
+			else {
+				printf("Unknown Public Key Algorithm\n");
+				return 0;
+			}
+
+			EVP_VerifyUpdate(md_ctx, key, key_len);
+			EVP_VerifyUpdate(md_ctx, iv, iv_len);
+			EVP_VerifyUpdate(md_ctx, randval, rand_len);
+
+			if(EVP_VerifyFinal(md_ctx,sign, sign_len, authenticated_list[i]->pub_key) != 1) {
+				ERR_print_errors_fp(stderr);
+				return 0;
+			}
 			break;
+		}
 	}
 
-	if(i==num_auth_nodes) {
+	if(i == num_auth_nodes) {
 		printf("Could not find node in AL\n");
 		return 0;
 	}
 
-//	printf("\nTrying to verify signature with this public key:\n");
-//	PEM_write_PUBKEY(stdout,authenticated_list[i]->pub_key);
-//
-//	printf("\nKEY:\n");
-//	tool_dump_memory(key, key_len);
-//
-//	printf("\nIV:\n");
-//	tool_dump_memory(iv, iv_len);
-//
-//	printf("\nRAND:\n");
-//	tool_dump_memory(randval, rand_len);
-//
-//	printf("\n Checking againts this SIGN:\n");
-//	tool_dump_memory(sign, sign_len);
 
-	if(EVP_VerifyFinal(md_ctx,sign, sign_len, authenticated_list[i]->pub_key) != 1) {
-		ERR_print_errors_fp(stderr);
-		return 0;
-	}
 
-	printf("\nICH BIN HIER!\n\n");
 
+
+
+
+	//	printf("\nTrying to verify signature with this public key:\n");
+	//	PEM_write_PUBKEY(stdout,authenticated_list[i]->pub_key);
+	//
+	//	printf("\nKEY:\n");
+	//	tool_dump_memory(key, key_len);
+	//
+	//	printf("\nIV:\n");
+	//	tool_dump_memory(iv, iv_len);
+	//
+	//	printf("\nRAND:\n");
+	//	tool_dump_memory(randval, rand_len);
+	//
+	//	printf("\n Checking againts this SIGN:\n");
+	//	tool_dump_memory(sign, sign_len);
 
 	EVP_CIPHER_CTX received_ctx;
 	EVP_EncryptInit(&received_ctx, EVP_aes_128_cbc(), key, iv);
@@ -1163,6 +1492,9 @@ int neigh_sign_recv(uint32_t addr, uint16_t id, char *ptr) {
 	mac_value = openssl_aes_encrypt(&received_ctx, randval, &mac_value_len);
 
 	neigh_add(addr, id, mac_value);
+
+	if(my_state == WAIT_FOR_NEIGH_SIG)
+		my_state = READY;
 
 	return 1;
 
@@ -1390,8 +1722,10 @@ int openssl_cert_selfsign(X509 **x509p, EVP_PKEY **pkeyp, unsigned char **subjec
 	X509 *x;
 	EVP_PKEY *pk;
 	RSA *rsa;
+//	EC_KEY *ec_key;
+//	EC_GROUP *ecgroup;
 	X509_NAME *name=NULL;
-	int bits = 512;
+	int bits = RSA_KEY_SIZE;
 
 
 	if ((pkeyp == NULL) || (*pkeyp == NULL))
@@ -1422,6 +1756,42 @@ int openssl_cert_selfsign(X509 **x509p, EVP_PKEY **pkeyp, unsigned char **subjec
 		goto err;
 		}
 	rsa=NULL;
+
+//	ec_key = EC_KEY_new();
+//
+//	if(ec_key == NULL) {
+//		printf("Could not initiate ECC key!\n");
+//		exit(1);
+//	}
+//
+//	if (!(ecgroup = EC_GROUP_new_by_curve_name(ECC_CURVE))) {
+//		printf("EC_GROUP_new_by_curve_name failed. {error = %s}\n", ERR_error_string(ERR_get_error(), NULL));
+//	}
+//
+//
+//	if (EC_GROUP_precompute_mult(ecgroup, NULL) != 1) {
+//		printf("EC_GROUP_precompute_mult failed. {error = %s}\n", ERR_error_string(ERR_get_error(), NULL));
+//		EC_GROUP_free(ecgroup);
+//	}
+//
+//	EC_GROUP_set_point_conversion_form(ecgroup, POINT_CONVERSION_COMPRESSED);
+//
+//	if(EC_KEY_set_group(ec_key, ecgroup) != 1) {
+//		printf("Failed to set group for EC Key\n");
+//		exit(1);
+//	}
+//
+//	if(EC_KEY_generate_key(ec_key) != 1) {
+//		printf("Failed to generate EC Key\n");
+//		exit(1);
+//	}
+//
+//	EC_KEY_print_fp(stdout, ec_key, 0);
+//
+//	if(!EVP_PKEY_assign_EC_KEY(pk, ec_key)) {
+//		printf("Failed to assign EC key to PKEY\n");
+//		exit(1);
+//	}
 
 	if(X509_set_version(x,2L) != 1)
 		fprintf(stderr,"Error setting certificate version");
@@ -1486,7 +1856,7 @@ int openssl_cert_selfsign(X509 **x509p, EVP_PKEY **pkeyp, unsigned char **subjec
 	}
 #endif
 
-	if (!X509_sign(x,pk,EVP_md5()))
+	if (!X509_sign(x,pk,EVP_sha1()))
 		goto err;
 
 	*x509p=x;
@@ -1502,9 +1872,11 @@ int openssl_cert_mkreq(X509_REQ **x509p, EVP_PKEY **pkeyp, unsigned char *subjec
 	X509_REQ *x;
 	EVP_PKEY *pk;
 	RSA *rsa;
+//	EC_KEY *ec_key;
+//	EC_GROUP *ecgroup;
 	X509_NAME *name=NULL;
 	STACK_OF(X509_EXTENSION) *exts = NULL;
-	int bits = 512;
+	int bits = RSA_KEY_SIZE;
 
 	if ((pk=EVP_PKEY_new()) == NULL)
 		goto err;
@@ -1518,8 +1890,45 @@ int openssl_cert_mkreq(X509_REQ **x509p, EVP_PKEY **pkeyp, unsigned char *subjec
 
 	rsa=NULL;
 
-	X509_REQ_set_pubkey(x,pk);
+//	ec_key = EC_KEY_new();
+//
+//	if(ec_key == NULL) {
+//		printf("Could not initiate ECC key!\n");
+//		exit(1);
+//	}
+//
+//	if (!(ecgroup = EC_GROUP_new_by_curve_name(ECC_CURVE))) {
+//		printf("EC_GROUP_new_by_curve_name failed. {error = %s}\n", ERR_error_string(ERR_get_error(), NULL));
+//	}
+//
+//
+//	if (EC_GROUP_precompute_mult(ecgroup, NULL) != 1) {
+//		printf("EC_GROUP_precompute_mult failed. {error = %s}\n", ERR_error_string(ERR_get_error(), NULL));
+//		EC_GROUP_free(ecgroup);
+//	}
+//
+//	EC_GROUP_set_point_conversion_form(ecgroup, POINT_CONVERSION_COMPRESSED);
+//
+//
+//
+//	if(EC_KEY_set_group(ec_key, ecgroup) != 1) {
+//		printf("Failed to set group for EC Key\n");
+//		exit(1);
+//	}
+//
+//	if(EC_KEY_generate_key(ec_key) != 1) {
+//		printf("Failed to generate EC Key\n");
+//		exit(1);
+//	}
+//
+//	EC_KEY_print_fp(stdout, ec_key, 0);
+//
+//	if(!EVP_PKEY_assign_EC_KEY(pk, ec_key)) {
+//		printf("Failed to assign EC key to PKEY\n");
+//		exit(1);
+//	}
 
+	X509_REQ_set_pubkey(x,pk);
 	name=X509_REQ_get_subject_name(x);
 
 	/*
@@ -1531,7 +1940,7 @@ int openssl_cert_mkreq(X509_REQ **x509p, EVP_PKEY **pkeyp, unsigned char *subjec
 	sprintf((char *)subject_name,"%d",rand()%UINT32_MAX);
 	X509_NAME_add_entry_by_txt(name,"CN", MBSTRING_ASC, subject_name, -1, -1, 0);
 
-#ifdef REQUEST_EXTENSIONS
+//#ifdef REQUEST_EXTENSIONS
 	/* Certificate requests can contain extensions, which can be used
 	 * to indicate the extensions the requestor would like added to
 	 * their certificate. CAs might ignore them however or even choke
@@ -1545,106 +1954,109 @@ int openssl_cert_mkreq(X509_REQ **x509p, EVP_PKEY **pkeyp, unsigned char *subjec
 	exts = sk_X509_EXTENSION_new_null();
 	/* Standard extenions */
 
-	add_ext_req(exts, NID_key_usage, "critical,digitalSignature,keyEncipherment");
+	if(req_role == AUTHENTICATED)
+		openssl_cert_add_ext_req(exts, NID_netscape_comment, "critical,myProxyCertInfoExtension:0,1");
+	else
+		openssl_cert_add_ext_req(exts, NID_netscape_comment, "critical,myProxyCertInfoExtension:0,0");
 
+//	char * pci_value = "critical, language:Inherit all";
 
-	/* PROCYCERTINFO */
+//	X509_EXTENSION *ext =NULL;
+//	ext = X509V3_EXT_conf(NULL, NULL, "proxyCertInfo", "critical,language:Inherit all");
+//	ext = X509V3_EXT_conf_nid(NULL, NULL, NID_proxyCertInfo, pci_value);
 
-	//Les http://root.cern.ch/svn/root/vendors/xrootd/current/src/XrdCrypto/XrdCryptosslgsiAux.cc
-
-	//Create ProxyPolicy
-    PROXYPOLICY *proxyPolicy;
-    proxyPolicy = NULL;
-//    ASN1_CTX c; /* Function below needs this to be defined */
-//    M_ASN1_New_Malloc(proxyPolicy, PROXYPOLICY);
-    proxyPolicy = (PROXYPOLICY *)OPENSSL_malloc(sizeof(PROXYPOLICY));
-    proxyPolicy->policy_language = OBJ_nid2obj(NID_id_ppl_inheritAll);
-    proxyPolicy->policy = NULL;
-//    M_ASN1_New_Error(ASN1_F_PROXYPOLICY_NEW);
-
-    //Create ProxyCertInfo
-    PROXYCERTINFO *proxyCertInfo;
-    proxyCertInfo = NULL;
-//    M_ASN1_New_Malloc(proxyCertInfo, PROXYCERTINFO);
-    proxyCertInfo = (PROXYCERTINFO *)OPENSSL_malloc(sizeof(PROXYCERTINFO));
-    memset(proxyCertInfo, (int) NULL, sizeof(PROXYCERTINFO));
-    proxyCertInfo->path_length = NULL;
-    proxyCertInfo->policy = proxyPolicy;
-
-
-    //Mucho try-as-i-go, need cleanup!!!
-    X509V3_CTX ctx;
-    X509V3_CONF_METHOD method = { NULL, NULL, NULL, NULL };
-    long db = 0;
-
-    char language[80];
-    int pathlen;
-    unsigned char *policy = NULL;
-    int policy_len;
-    char *value;
-    char *tmp;
-
-    ASN1_OCTET_STRING *             ext_data;
-    int                             length;
-    unsigned char *                 data;
-    unsigned char *                 der_data;
-    X509_EXTENSION *                proxyCertInfo_ext;
-    const X509V3_EXT_METHOD *       proxyCertInfo_ext_method;
-
-    proxyCertInfo_ext_method = X509V3_EXT_get_nid(NID_proxyCertInfo);
+//	/* PROCYCERTINFO */
+//
+//	//Les http://root.cern.ch/svn/root/vendors/xrootd/current/src/XrdCrypto/XrdCryptosslgsiAux.cc
+//
+//	//Create ProxyPolicy
+//    PROXYPOLICY *proxyPolicy;
+//    proxyPolicy = NULL;
+////    ASN1_CTX c; /* Function below needs this to be defined */
+////    M_ASN1_New_Malloc(proxyPolicy, PROXYPOLICY);
+//    proxyPolicy = (PROXYPOLICY *)OPENSSL_malloc(sizeof(PROXYPOLICY));
+//    proxyPolicy->policy_language = OBJ_nid2obj(NID_id_ppl_inheritAll);
+//    proxyPolicy->policy = NULL;
+////    M_ASN1_New_Error(ASN1_F_PROXYPOLICY_NEW);
+//
+//    //Create ProxyCertInfo
+//    PROXYCERTINFO *proxyCertInfo;
+//    proxyCertInfo = NULL;
+////    M_ASN1_New_Malloc(proxyCertInfo, PROXYCERTINFO);
+//    proxyCertInfo = (PROXYCERTINFO *)OPENSSL_malloc(sizeof(PROXYCERTINFO));
+//    memset(proxyCertInfo, (int) NULL, sizeof(PROXYCERTINFO));
+//    proxyCertInfo->path_length = NULL;
+//    proxyCertInfo->policy = proxyPolicy;
+//
+//
+//    //Mucho try-as-i-go, need cleanup!!!
+//    X509V3_CTX ctx;
+//    X509V3_CONF_METHOD method = { NULL, NULL, NULL, NULL };
+//    long db = 0;
+//
+//    char language[80];
+//    int pathlen;
+//    unsigned char *policy = NULL;
+//    int policy_len;
+//    char *value;
+//    char *tmp;
+//
+//    ASN1_OCTET_STRING *             ext_data;
+//    int                             length;
+//    unsigned char *                 data;
+//    unsigned char *                 der_data;
+//    X509_EXTENSION *                proxyCertInfo_ext;
+//    const X509V3_EXT_METHOD *       proxyCertInfo_ext_method;
+//
+//    proxyCertInfo_ext_method = X509V3_EXT_get_nid(NID_proxyCertInfo);
 
 //    proxyCertInfo_ext_method = X509V3_EXT_get_nid(OBJ_txt2nid(PROXYCERTINFO_OLD_OID));
-
-
-
+//
+//
+//
 //    OBJ_obj2txt(language, 80, proxyCertInfo->policy->policy_language, 1);
 //    sprintf(&language, "blablabla");
 //    proxyCertInfo->policy->policy_language = OBJ_txt2obj(language, 1);
-
-    pathlen = 0;
-    ASN1_INTEGER_set(&(proxyCertInfo->path_length), (long)pathlen);
-
+//
+//    pathlen = 0;
+//    ASN1_INTEGER_set(&(proxyCertInfo->path_length), (long)pathlen);
+//
 //    if (proxyCertInfo->policy->policy) {
 //    	policy_len = M_ASN1_STRING_length(proxyCertInfo->policy->policy);
 //    	policy = malloc(policy_len + 1);
 //    	memcpy(policy, M_ASN1_STRING_data(proxyCertInfo->policy->policy), policy_len);
 //    	policy[policy_len] = '\0';
 //    }
-
-
+//
+//
 //    X509V3_set_ctx(&ctx, NULL, NULL, NULL, NULL, 0L);
 //    ctx.db_meth = &method;
 //    ctx.db = &db;
-
+//
 //    pci_ext = X509V3_EXT_conf_nid(NULL, &ctx, NID_proxyCertInfo, value);
 //    X509_EXTENSION_set_critical(pci_ext, 1);
-
+//
 //    add_ext(exts, NID_proxyCertInfo, value);
-
-    if(proxyCertInfo_ext_method) {
-    	printf("\n\next_method\n\n\n");
-    }
-    if (proxyCertInfo_ext_method->i2v) {
-    	printf("\n\next_method->i2v\n\n\n");
-    }
-    if(proxyCertInfo_ext_method->v2i) {
-    	printf("\n\next_method->v2i\n\n\n");
-    }
-    if (proxyCertInfo_ext_method->i2r) {
-    	printf("\n\next_method->i2r\n\n\n");
-    }
-    if(proxyCertInfo_ext_method->r2i) {
-    	printf("\n\next_method->r2i\n\n\n");
-    }
-
-
-    printf("\n\nTEST\n\n\n");
-    proxyCertInfo_ext_method->i2d(proxyCertInfo, NULL);
-
-
-//    } else {
-//    	printf("\n\nFAEN\n\n\n");
+//
+//    if(proxyCertInfo_ext_method) {
+//    	printf("\n\next_method\n\n\n");
 //    }
+//    if (proxyCertInfo_ext_method->i2v) {
+//    	printf("\n\next_method->i2v\n\n\n");
+//    }
+//    if(proxyCertInfo_ext_method->v2i) {
+//    	printf("\n\next_method->v2i\n\n\n");
+//    }
+//    if (proxyCertInfo_ext_method->i2r) {
+//    	printf("\n\next_method->i2r\n\n\n");
+//    }
+//    if(proxyCertInfo_ext_method->r2i) {
+//    	printf("\n\next_method->r2i\n\n\n");
+//    }
+//
+//
+//    printf("\n\nTEST\n\n\n");
+//    proxyCertInfo_ext_method->i2d(proxyCertInfo, NULL);
 
 
 
@@ -1654,8 +2066,8 @@ int openssl_cert_mkreq(X509_REQ **x509p, EVP_PKEY **pkeyp, unsigned char *subjec
 	{
 		int nid;
 		nid = OBJ_create("1.2.3.4", "MyAlias", "My Test Alias Extension");
-		X509V3_EXT_add_alias(nid, NID_netscape_comment);
-		add_ext(x, nid, "example comment alias");
+		X509V3_EXT_add_alias(nid, NID_certificate_policies);
+		openssl_cert_add_ext_req(x, nid, "example comment alias");
 	}
 #endif
 
@@ -1665,7 +2077,7 @@ int openssl_cert_mkreq(X509_REQ **x509p, EVP_PKEY **pkeyp, unsigned char *subjec
 
 	sk_X509_EXTENSION_pop_free(exts, X509_EXTENSION_free);
 
-#endif
+//#endif
 
 	if (!X509_REQ_sign(x,pk,EVP_sha1()))
 		goto err;
@@ -1750,18 +2162,44 @@ int openssl_cert_mkcert(EVP_PKEY **pkey, X509_REQ **reqp,X509 **pc1p, X509 **pc0
 	if(!(X509_gmtime_adj(X509_get_notAfter(cert), (long)60*60*8)))
 		fprintf(stderr,"Error setting the end lifetime of cert");
 
-	/* Sign the certificate with PC0 */
-	if(EVP_PKEY_type(my_pkey->type) == EVP_PKEY_RSA) {
-		const EVP_MD *digest = EVP_sha1();
+	/* Get and set proxypolicy */
+	STACK_OF(X509_EXTENSION) *req_exts = X509_REQ_get_extensions(*reqp);
+//	X509_EXTENSION *ex;
+//	ex = X509V3_EXT_conf_nid(NULL, NULL, nid, value);
+//	if (!ex)
+//		return 0;
+	if (req_exts != NULL) {
+		int num_exts = sk_X509_EXTENSION_num(req_exts);
+		X509_EXTENSION *req_ex = NULL;
+		req_ex = sk_X509_EXTENSION_pop(req_exts);
+//		openssl_cert_add_ext_req(exts, NID_netscape_comment, "critical,myProxyCertInfoExtension:0,0");
+//		const unsigned char *req_value;
+//		d2i_ASN1_OCTET_STRING(&(req_ex->value), &req_value, req_ex->value->length);
 
-		if(!(X509_sign(cert, my_pkey, digest)))
-			fprintf(stderr,"Error signing cert");
-	} else {
+//		STACK_OF(X509_EXTENSION) *exts = NULL;
+//		sk_X509_EXTENSION_push(exts, req_ex);
+		X509_add_ext(cert, req_ex, -1);
+	}
+
+
+	/* Sign the certificate with PC0 */
+	const EVP_MD *digest;
+	if(EVP_PKEY_type(my_pkey->type) == EVP_PKEY_RSA) {
+
+		digest = EVP_sha1();
+
+	} else if(EVP_PKEY_type(my_pkey->type) == EVP_PKEY_EC) {
+
+		digest = EVP_ecdsa();
+
+	}else {
+
 		printf("Error signing the certificate, aborting operation!\n");
 		return 1;
 	}
 
-
+	if(!(X509_sign(cert, my_pkey, digest)))
+		fprintf(stderr,"Error signing cert");
 
 
 	/* Write the cert to disk */
@@ -1782,7 +2220,7 @@ int openssl_cert_mkcert(EVP_PKEY **pkey, X509_REQ **reqp,X509 **pc1p, X509 **pc0
 }
 
 /* Add extensions to REQ */
-int add_ext_req(STACK_OF(X509_REQUEST) *sk, int nid, char *value) {
+int openssl_cert_add_ext_req(STACK_OF(X509_REQUEST) *sk, int nid, char *value) {
 	X509_EXTENSION *ex;
 	ex = X509V3_EXT_conf_nid(NULL, NULL, nid, value);
 	if (!ex)
@@ -1895,8 +2333,8 @@ EVP_PKEY *openssl_key_copy(EVP_PKEY *key) {
 
 		case EVP_PKEY_EC:
 		{
-			EC_KEY *ec = EVP_PKEY_get1_EC_KEY(key);
-			EVP_PKEY_set1_EC_KEY(pnew,ec);
+			EC_KEY *ec_key = EVP_PKEY_get1_EC_KEY(key);
+			EVP_PKEY_set1_EC_KEY(pnew,ec_key);
 			break;
 		}
 
@@ -1993,3 +2431,62 @@ unsigned char *openssl_key_generate(EVP_CIPHER_CTX *aes_master, int key_count) {
 
 }
 
+
+/* Manage sliding window to prevent replay attacks */
+int tool_sliding_window(uint16_t seq_num, uint16_t id) {
+
+	int i;
+	for (i=0; i<100; i++) {
+
+		/* Find the node id in neighbor list */
+		if(id == neigh_list[i]->id) {
+
+			/* Received Auth Sequence Number is newer/higher than last */
+			if (seq_num > neigh_list[i]->last_seq_num) {
+
+				/* Shift window according to the difference between new and last seq num */
+				int difference = seq_num - neigh_list[i]->last_seq_num;
+				neigh_list[i]->window = neigh_list[i]->window << difference;
+
+				/* Set bit in window to indicate this seq num received */
+				neigh_list[i]->window = neigh_list[i]->window | 1;
+
+				/* Update new last seq num to new one */
+				neigh_list[i]->last_seq_num = seq_num;
+
+				return 1;
+
+			}
+
+			/* Received Auth Sequence Number is inside the window size */
+			else if (seq_num >= neigh_list[i]->last_seq_num - 63) {		//window size 64
+
+				int offset = ( neigh_list[i]->last_seq_num - seq_num ) % 64;
+
+				/* Check whether the packet is received before, i.e. the bit is set */
+				if(neigh_list[i]->window & ( 1 << offset )) {
+
+					printf("Received replay packet, throwing away!\n\n");
+					return 0;
+				}
+
+				/* If not, then add to window */
+				else {
+
+					/* Set bit in window to indicate this seq num received */
+					neigh_list[i]->window = neigh_list[i]->window | ( 1 << offset );
+
+					return 1;
+				}
+
+			}
+
+			/* Received Auth Sequence Number is outside window size, old */
+			else {
+
+				printf("Received old (possible replay) packet, throwing away!\n");
+				return 0;
+			}
+		}
+	}
+}

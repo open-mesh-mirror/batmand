@@ -922,8 +922,9 @@ int8_t batman(void)
 			/******************** Begin Authentication Module Extension ********************/
 
 			/*
-			 * If the daemon is not authenticated, or it receives an authentication token which it does not recognize,
-			 * the authentication procedure in the Authentication Module is called. No packets received when authenticating
+			 * If the daemon is not authenticated, or it receives an authentication
+			 * token which it does not recognize, the authentication procedure in the
+			 * Authentication Module is called. No packets received when authenticating
 			 * will be processed.
 			 */
 
@@ -957,6 +958,10 @@ int8_t batman(void)
 				printf("MAC Extract did not match!\n");
 				goto send_packets;
 			}
+
+			/* Check whether the packet is new and not a replayed packet */
+			if(!tool_sliding_window(bat_packet->auth_seqno, neigh_list[neigh_counter]->id))
+				goto send_packets;
 
 			/********************* End Authentication Module Extension *********************/
 

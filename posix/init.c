@@ -161,7 +161,7 @@ void apply_init_args( int argc, char *argv[] ) {
 		{"purge-timeout",     		required_argument,	0, 'q'},
 		{"disable-aggregation",     no_argument,       	0, 'x'},
 		{"disable-client-nat",     	no_argument,       	0, 'z'},
-		{"SP",						no_argument,		0, 'S'},
+		{"role",					required_argument,	0, 'R'},
 		{0, 0, 0, 0}
 	};
 
@@ -172,7 +172,8 @@ void apply_init_args( int argc, char *argv[] ) {
 	if ( strstr( SOURCE_VERSION, "-" ) != NULL )
 		printf( "WARNING: You are using the unstable batman branch. If you are interested in *using* batman get the latest stable release !\n" );
 
-	while ( ( optchar = getopt_long( argc, argv, "a:A:bcd:hHio:g:p:r:s:vV:S", long_options, &option_index ) ) != -1 ) {
+	req_role = UNAUTHENTICATED;
+	while ( ( optchar = getopt_long( argc, argv, "a:A:bcd:hHio:g:p:r:R:s:vV:", long_options, &option_index ) ) != -1 ) {
 
 		switch ( optchar ) {
 
@@ -360,11 +361,24 @@ void apply_init_args( int argc, char *argv[] ) {
 				found_args += ((*((char*)( optarg - 1)) == optchar) ? 1 : 2);
 				break;
 
-			case 'S':
-				printf("Assumed Service Proxy Role\n");
-				my_role = SP;
-				found_args++;
+			case 'R':
+			{
+				printf("Secure Ad Hoc Network extension enabled\n");
+				char *req = optarg;
+				if(strncmp(optarg, "sp", strlen(req)) == 0)
+					my_role = SP;
+				else if(strncmp(optarg, "restricted", strlen(req)) == 0)
+					req_role = RESTRICTED;
+				else if(strncmp(optarg, "authenticated", strlen(req)) == 0)
+					req_role = AUTHENTICATED;
+				else {
+					secure_usage();
+					exit(EXIT_SUCCESS);
+				}
+
+				found_args += ((*((char*)( optarg - 1)) == optchar) ? 1 : 2);
 				break;
+			}
 
 			case 'v':
 
@@ -397,6 +411,11 @@ void apply_init_args( int argc, char *argv[] ) {
 
 		}
 
+	}
+
+	if(req_role == UNAUTHENTICATED && my_role != SP) {
+		secure_usage();
+		exit(EXIT_SUCCESS);
 	}
 
 	if (!unix_client && info_output) {
