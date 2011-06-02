@@ -299,8 +299,7 @@ void *am_main() {
 
 						if((uint32_t)((sockaddr_in*)((sockaddr *)&recv_addr))->sin_addr.s_addr == prev_neighbor) {
 
-							char *recv_addr_string = malloc(16);
-							recv_addr_string = inet_ntoa(((sockaddr_in*)((sockaddr *)&recv_addr))->sin_addr);
+							char *recv_addr_string = inet_ntoa(((sockaddr_in*)((sockaddr *)&recv_addr))->sin_addr);
 							if(auth_request_recv(recv_addr_string, am_payload_ptr)) {
 								dst = (sockaddr_in *) malloc(sizeof(sockaddr_in));
 								dst->sin_addr = ((sockaddr_in*)((sockaddr *)&recv_addr))->sin_addr;
@@ -326,6 +325,7 @@ void *am_main() {
 
 							}
 
+
 						} else {
 							printf("Request from unknown node!\n");
 						}
@@ -349,7 +349,9 @@ void *am_main() {
 							openssl_cert_read(emptyaddr , &subject_name, &tmp_pub);
 							neigh_add(neigh_addr.s_addr, rcvd_id, NULL);
 							al_add(neigh_addr.s_addr, rcvd_id, SP, subject_name, tmp_pub);
-
+							printf("1\n");
+							EVP_PKEY_free(tmp_pub);
+							printf("2\n");
 
 							if(pthread_mutex_trylock(&auth_lock) == 0) {
 								auth_pkt = all_sign_send(pkey, &aes_master, &key_count);
@@ -372,6 +374,7 @@ void *am_main() {
 					//TODO:Check access rights policy
 
 					al_add(neigh_addr.s_addr, rcvd_id, AUTHENTICATED, subject_name, tmp_pub);
+					EVP_PKEY_free(tmp_pub);
 
 					/* Send own PC */
 					dst = (sockaddr_in *) malloc(sizeof(sockaddr_in));
@@ -480,6 +483,7 @@ void *am_main() {
 			auth_pkt = all_sign_send(pkey, &aes_master, &key_count);
 		}
 	}
+	free(subject_name);
 	pthread_exit(NULL);
 }
 
@@ -716,7 +720,7 @@ int openssl_cert_create_pc1(EVP_PKEY **pkey, char *addr, unsigned char **subject
 	fclose(fp);
 
 
-	if(openssl_cert_mkcert(pkey, &req, &pc1, &pc0, subject_name) == 0) {
+	if(openssl_cert_mkcert(pkey, req, &pc1, &pc0, subject_name) == 0) {
 
 //		X509_print_fp(stdout,pc1);
 //		PEM_write_X509(stdout,pc1);
@@ -737,6 +741,9 @@ int openssl_cert_create_pc1(EVP_PKEY **pkey, char *addr, unsigned char **subject
 	OBJ_cleanup();
 #endif
 
+
+	X509_free(pc0);
+
 	CRYPTO_mem_leaks(bio_err);
 	BIO_free(bio_err);
 	return(0);
@@ -756,11 +763,11 @@ int openssl_cert_read(in_addr addr, unsigned char **s, EVP_PKEY **p) {
 		subject_name = *s;
 	}
 
-	if(*p == NULL || p == NULL) {
-		pub_key = EVP_PKEY_new();
-	} else {
-		pub_key = *p;
-	}
+//	if(*p == NULL || p == NULL) {
+//		pub_key = EVP_PKEY_new();
+//	} else {
+//		pub_key = *p;
+//	}
 
 
 	if(addr.s_addr == 0) {
@@ -806,6 +813,8 @@ int openssl_cert_read(in_addr addr, unsigned char **s, EVP_PKEY **p) {
 
 //	free(recv_addr_string);
 
+	//TODO: This must be free'd, but not before the EVP_PKEY object that is free'd outside this function, maybe dereference and free outside this func??
+//	X509_free(cert);
 
 	*p = pub_key;
 	*s = subject_name;
@@ -1042,8 +1051,10 @@ char *all_sign_send(EVP_PKEY *pkey, EVP_CIPHER_CTX *master, int *key_count) {
 
 	if( EVP_SignFinal(md_ctx, signature_buffer, &signature_len, pkey) != 1) {
 		ERR_print_errors_fp(stderr);
+		EVP_MD_CTX_destroy(md_ctx);
 		return NULL;
 	}
+	EVP_MD_CTX_destroy(md_ctx);
 
 
 	/* Create Base64 encodings of payload */
@@ -1287,7 +1298,8 @@ char *all_sign_send(EVP_PKEY *pkey, EVP_CIPHER_CTX *master, int *key_count) {
 					break;
 				}
 
-				char *b64_key 	= tool_base64_encode(encrypted_key, RSA_size(neig_rsa));
+				char *b64_key = tool_base64_encode(encrypted_key, RSA_size(neig_rsa));
+
 
 
 				/* Put packet together in buffer */
@@ -1299,6 +1311,10 @@ char *all_sign_send(EVP_PKEY *pkey, EVP_CIPHER_CTX *master, int *key_count) {
 				/* Send packet to neigh */
 				sendto(am_send_socket, buf, packet_len, 0, (sockaddr *)tmp_dest, sizeof(sockaddr_in));
 
+				/* Free */
+				free(encrypted_key);
+				free(b64_key);
+
 				//Go out of last for-loop, but continue with first loop to find next neighbor
 				break;
 
@@ -1307,17 +1323,29 @@ char *all_sign_send(EVP_PKEY *pkey, EVP_CIPHER_CTX *master, int *key_count) {
 
 	}
 
-	memset(ptr, 0 , buf+MAXBUFLEN-ptr);
 
-	free(tmp_dest);
-	free(header);
 
 	/* Generate Routing VALUE from RAND */
 	EVP_CIPHER_CTX current_ctx;
 	EVP_EncryptInit(&current_ctx, EVP_aes_128_cbc(), current_key, current_iv);
+	if(key_count>1)
+		free(auth_value);
 	auth_value = openssl_aes_encrypt(&current_ctx, current_rand, &value_len);
 
+	EVP_CIPHER_CTX_cleanup(&current_ctx);
+
+
+	/* Free up stuff */
+	memset(ptr, 0 , buf+MAXBUFLEN-ptr);
+	free(tmp_dest);
+	free(header);
+	free(auth_header);
 	free(current_iv);
+	free(current_rand);
+	free(b64_iv);
+	free(b64_rand);
+	free(b64_sign);
+	free(signature_buffer);
 
 	my_state = READY;
 	last_send_time = time (NULL);
@@ -1362,6 +1390,9 @@ void neigh_sign_send(EVP_PKEY *pkey, sockaddr_in *addr, char *buf) {
 			sendto(am_send_socket, buf, packet_len, 0, (sockaddr *)addr, sizeof(sockaddr_in));
 
 			memset(key_ptr, 0 , buf+MAXBUFLEN-key_ptr);
+
+			free(encrypted_key);
+			free(b64_key);
 			break;
 
 		}
@@ -1453,8 +1484,11 @@ int neigh_sign_recv(EVP_PKEY *pkey, uint32_t addr, uint16_t id, char *ptr) {
 
 			if(EVP_VerifyFinal(md_ctx,sign, sign_len, authenticated_list[i]->pub_key) != 1) {
 				ERR_print_errors_fp(stderr);
+				EVP_MD_CTX_destroy(md_ctx);
 				return 0;
 			}
+
+			EVP_MD_CTX_destroy(md_ctx);
 			break;
 		}
 	}
@@ -1490,12 +1524,18 @@ int neigh_sign_recv(EVP_PKEY *pkey, uint32_t addr, uint16_t id, char *ptr) {
 	unsigned char *mac_value;
 	int mac_value_len = RAND_LEN;
 	mac_value = openssl_aes_encrypt(&received_ctx, randval, &mac_value_len);
+	EVP_CIPHER_CTX_cleanup(&received_ctx);
 
 	neigh_add(addr, id, mac_value);
 
 	if(my_state == WAIT_FOR_NEIGH_SIG)
 		my_state = READY;
 
+	free(encrypted_key);
+	free(key);
+	free(iv);
+	free(randval);
+	free(sign);
 	return 1;
 
 }
@@ -1939,6 +1979,7 @@ int openssl_cert_mkreq(X509_REQ **x509p, EVP_PKEY **pkeyp, unsigned char *subjec
 	subject_name = malloc(SUBJECT_NAME_SIZE);
 	sprintf((char *)subject_name,"%d",rand()%UINT32_MAX);
 	X509_NAME_add_entry_by_txt(name,"CN", MBSTRING_ASC, subject_name, -1, -1, 0);
+	free(subject_name);
 
 //#ifdef REQUEST_EXTENSIONS
 	/* Certificate requests can contain extensions, which can be used
@@ -2092,7 +2133,7 @@ err:
 
 
 /* PC1 Creation */
-int openssl_cert_mkcert(EVP_PKEY **pkey, X509_REQ **reqp,X509 **pc1p, X509 **pc0p, unsigned char **subject_name) {
+int openssl_cert_mkcert(EVP_PKEY **pkey, X509_REQ *req,X509 **pc1p, X509 **pc0p, unsigned char **subject_name) {
 	EVP_PKEY *req_pkey, *my_pkey;
 	X509_NAME *name, *req_name, *issuer_name;
 	X509_NAME_ENTRY *req_name_entry;
@@ -2100,9 +2141,9 @@ int openssl_cert_mkcert(EVP_PKEY **pkey, X509_REQ **reqp,X509 **pc1p, X509 **pc0
 	FILE *fp;
 
 	/* Verify signature on REQ */
-	if(!(req_pkey = X509_REQ_get_pubkey(*reqp)))
+	if(!(req_pkey = X509_REQ_get_pubkey(req)))
 		fprintf(stderr,"Error getting public key from request");
-	if(X509_REQ_verify(*reqp, req_pkey) != 1)
+	if(X509_REQ_verify(req, req_pkey) != 1)
 		fprintf(stderr,"Error verifying signature on certificate");
 
 	/* Read my private key */
@@ -2114,7 +2155,7 @@ int openssl_cert_mkcert(EVP_PKEY **pkey, X509_REQ **reqp,X509 **pc1p, X509 **pc0
 
 
 	/* Read Subject Name of request */
-	if(!(req_name = X509_REQ_get_subject_name(*reqp)))
+	if(!(req_name = X509_REQ_get_subject_name(req)))
 		fprintf(stderr,"Error getting subject name from request\n");
 
 	/* Read Subject Name of PC0 */
@@ -2149,6 +2190,9 @@ int openssl_cert_mkcert(EVP_PKEY **pkey, X509_REQ **reqp,X509 **pc1p, X509 **pc0
 	if(X509_set_subject_name(cert, name) != 1)
 		fprintf(stderr,"Error setting the subject name to the certificate\n");
 
+	X509_NAME_free(name);
+	X509_NAME_ENTRY_free(req_name_entry);
+
 	X509_NAME_oneline(X509_get_subject_name(cert),(char *)*subject_name, FULL_SUB_NM_SZ);
 
 
@@ -2163,7 +2207,7 @@ int openssl_cert_mkcert(EVP_PKEY **pkey, X509_REQ **reqp,X509 **pc1p, X509 **pc0
 		fprintf(stderr,"Error setting the end lifetime of cert");
 
 	/* Get and set proxypolicy */
-	STACK_OF(X509_EXTENSION) *req_exts = X509_REQ_get_extensions(*reqp);
+	STACK_OF(X509_EXTENSION) *req_exts = X509_REQ_get_extensions(req);
 //	X509_EXTENSION *ex;
 //	ex = X509V3_EXT_conf_nid(NULL, NULL, nid, value);
 //	if (!ex)
@@ -2180,6 +2224,8 @@ int openssl_cert_mkcert(EVP_PKEY **pkey, X509_REQ **reqp,X509 **pc1p, X509 **pc0
 //		sk_X509_EXTENSION_push(exts, req_ex);
 		X509_add_ext(cert, req_ex, -1);
 	}
+
+	sk_X509_EXTENSION_free(req_exts);
 
 
 	/* Sign the certificate with PC0 */
@@ -2213,6 +2259,7 @@ int openssl_cert_mkcert(EVP_PKEY **pkey, X509_REQ **reqp,X509 **pc1p, X509 **pc0
 	*pc1p = cert;
 	*pkey = req_pkey;
 
+//	X509_REQ_free(req);
 	EVP_PKEY_free(my_pkey);
 
 	return(0);
@@ -2427,6 +2474,7 @@ unsigned char *openssl_key_generate(EVP_CIPHER_CTX *aes_master, int key_count) {
 	}
 	printf("%02X\n", ret[tmp-1]);
 
+	free(plaintext);
 	return ret;
 
 }

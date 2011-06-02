@@ -269,7 +269,7 @@ int openssl_cert_create_pc1(EVP_PKEY **pkey, char *addr, unsigned char **subject
 
 int openssl_cert_selfsign(X509 **x509p, EVP_PKEY **pkeyp, unsigned char **subject_name);
 int openssl_cert_mkreq(X509_REQ **x509p, EVP_PKEY **pkeyp, unsigned char *subject_name);
-int openssl_cert_mkcert(EVP_PKEY **pkey, X509_REQ **reqp, X509 **pc1p, X509 **pc0p, unsigned char **subject_name);
+int openssl_cert_mkcert(EVP_PKEY **pkey, X509_REQ *reqp, X509 **pc1p, X509 **pc0p, unsigned char **subject_name);
 
 int add_ext(STACK_OF(X509_REQUEST) *sk, int nid, char *value);
 
