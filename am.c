@@ -159,6 +159,7 @@ void *am_main() {
 
 	int key_count = 0;
 	int rcvd_id;
+	time_t test_timer;
 
 
 
@@ -308,7 +309,7 @@ void *am_main() {
 								openssl_cert_create_pc1(&tmp_pub, recv_addr_string, &subject_name);
 								auth_issue_send(dst);
 
-								neigh_add(dst->sin_addr.s_addr, rcvd_id, NULL);
+								neigh_list_add(dst->sin_addr.s_addr, rcvd_id, NULL);
 
 								al_add(dst->sin_addr.s_addr, rcvd_id, AUTHENTICATED, subject_name, tmp_pub);
 
@@ -347,7 +348,7 @@ void *am_main() {
 							in_addr emptyaddr;
 							emptyaddr.s_addr = 0;
 							openssl_cert_read(emptyaddr , &subject_name, &tmp_pub);
-							neigh_add(neigh_addr.s_addr, rcvd_id, NULL);
+							neigh_list_add(neigh_addr.s_addr, rcvd_id, NULL);
 							al_add(neigh_addr.s_addr, rcvd_id, SP, subject_name, tmp_pub);
 							printf("1\n");
 							EVP_PKEY_free(tmp_pub);
@@ -398,7 +399,7 @@ void *am_main() {
 						/* Receive Neighbors PC */
 						neigh_pc_recv(neigh_addr, am_payload_ptr);
 						openssl_cert_read(neigh_addr, &subject_name, &tmp_pub);
-//						neigh_add(neigh_addr.s_addr, rcvd_id, NULL);
+//						neigh_list_add(neigh_addr.s_addr, rcvd_id, NULL);
 						al_add(neigh_addr.s_addr, rcvd_id, AUTHENTICATED, subject_name, tmp_pub);
 
 						dst = (sockaddr_in *) malloc(sizeof(sockaddr_in));
@@ -477,11 +478,29 @@ void *am_main() {
 		}
 
 		/* Check if more than 60 seconds since last all_sign_send */
-		time_t test_timer = time (NULL);
+		test_timer = time (NULL);
 		if(last_send_time != 0 && (test_timer - 60 > last_send_time) && (my_state == READY)) {
 			printf("Time to send new SIGN message to all neighbors!\n");
+			free(auth_pkt);
 			auth_pkt = all_sign_send(pkey, &aes_master, &key_count);
 		}
+
+		/* Check whether some neighbors should be purged */
+		{
+			int i;
+			for(i=0;i<num_trusted_neigh;i++) {
+
+				if(test_timer - 130 > neigh_list[i]->last_rcvd_time){
+					printf("Not received new keystream from #'%d' in 130 seconds, removing from neighbor list!\n", neigh_list[i]->id);
+					neig_list_remove(i);
+
+					/* If found, list is changing, so wait till next run before removing more */
+					break;
+				}
+
+			}
+		}
+
 	}
 	free(subject_name);
 	pthread_exit(NULL);
@@ -526,7 +545,7 @@ void al_add(uint32_t addr, uint16_t id, role_type role, unsigned char *subject_n
 }
 
 /* Add node to trusted neighbor list */
-void neigh_add(uint32_t addr, uint16_t id, unsigned char *mac_value) {
+void neigh_list_add(uint32_t addr, uint16_t id, unsigned char *mac_value) {
 
 	int i;
 	for(i=0; i<num_trusted_neigh; i++) {
@@ -542,22 +561,17 @@ void neigh_add(uint32_t addr, uint16_t id, unsigned char *mac_value) {
 				neigh_list[i]->last_seq_num = 0;
 				neigh_list[i]->last_rcvd_time = time (NULL);
 
+				printf("Added new keystream to node already in neighbor list\n");
+
 			} else {
 
 				printf("New address does not match previously stored address, removing node from list\n");
 
-				if(neigh_list[i]->mac != NULL)
-					free(neigh_list[i]->mac);
-
-				free(neigh_list[i]);
-
 				if (mac_value != NULL)
 					free(mac_value);
 
-				num_trusted_neigh--;
-
+				neig_list_remove(i);
 			}
-
 			break;
 		}
 	}
@@ -573,8 +587,38 @@ void neigh_add(uint32_t addr, uint16_t id, unsigned char *mac_value) {
 		neigh_list[num_trusted_neigh]->last_rcvd_time = time (NULL);
 		num_trusted_neigh++;
 
+		printf("Added new node to neighbor list\n");
+
 	}
 
+}
+
+/* Remove from Neighbor List */
+int neig_list_remove(int pos) {
+
+	/* First check whether this node exists at all (sanity check) */
+	if(neigh_list[pos] == NULL) {
+		printf("Node does not exist in NL, cannot remove!\n");
+		return 0;
+	}
+
+	/* Check whether keystream exists, remove if so! */
+	if(neigh_list[pos]->mac != NULL)
+		free(neigh_list[pos]->mac);
+
+	/* Free up neighbor in memory */
+	free(neigh_list[pos]);
+
+	/* Re-arrange Neighbor List to avoid scarce population */
+	int i;
+	for(i=pos+1; i<num_trusted_neigh; i++) {
+		neigh_list[i-1] = neigh_list[i];
+	}
+
+	/* Finally, number of trusted neighbors has shrunk :) */
+	num_trusted_neigh--;
+
+	return 1;
 }
 
 /* Create RAND for Routing Auth Data */
@@ -1332,6 +1376,8 @@ char *all_sign_send(EVP_PKEY *pkey, EVP_CIPHER_CTX *master, int *key_count) {
 		free(auth_value);
 	auth_value = openssl_aes_encrypt(&current_ctx, current_rand, &value_len);
 
+	auth_seq_num = 0;
+
 	EVP_CIPHER_CTX_cleanup(&current_ctx);
 
 
@@ -1526,7 +1572,7 @@ int neigh_sign_recv(EVP_PKEY *pkey, uint32_t addr, uint16_t id, char *ptr) {
 	mac_value = openssl_aes_encrypt(&received_ctx, randval, &mac_value_len);
 	EVP_CIPHER_CTX_cleanup(&received_ctx);
 
-	neigh_add(addr, id, mac_value);
+	neigh_list_add(addr, id, mac_value);
 
 	if(my_state == WAIT_FOR_NEIGH_SIG)
 		my_state = READY;

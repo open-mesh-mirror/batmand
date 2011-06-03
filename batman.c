@@ -936,13 +936,13 @@ int8_t batman(void)
 				}
 			}
 
-			if(neigh_counter == num_trusted_neigh && my_state ==  READY) {
+			if(neigh_counter == num_trusted_neigh) {
 
-				if(my_role == SP) {
+				if(my_role == SP && my_state ==  READY) {
 					new_neighbor = neigh;
 				}
 
-				if(my_role == AUTHENTICATED) {
+				if(my_role == AUTHENTICATED && my_state ==  READY) {
 					/* Check to see whether the other node is AUTHENTICATED */
 					if(memcmp(&(bat_packet->auth), empty_check, 2) != 0)
 						new_neighbor = neigh;

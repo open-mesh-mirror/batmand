@@ -307,7 +307,7 @@ void openssl_key_master_ctx(EVP_CIPHER_CTX *master);
 unsigned char *openssl_aes_encrypt(EVP_CIPHER_CTX *e, unsigned char *plaintext, int *len);
 
 void al_add(uint32_t addr, uint16_t id, role_type role, unsigned char *subject_name, EVP_PKEY *key);
-void neigh_add(uint32_t addr, uint16_t id, unsigned char *mac_value);
+void neigh_list_add(uint32_t addr, uint16_t id, unsigned char *mac_value);
 
 EVP_PKEY *openssl_key_copy(EVP_PKEY *key);
 int openssl_cert_read(in_addr addr, unsigned char **s, EVP_PKEY **p);
