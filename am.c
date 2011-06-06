@@ -67,6 +67,7 @@ pthread_t am_main_thread;
 uint32_t new_neighbor, prev_neighbor;
 //uint32_t trusted_neighbors[100];
 unsigned char *auth_value;
+int auth_value_len;
 uint16_t auth_seq_num;
 
 trusted_node *authenticated_list[100];
@@ -481,6 +482,13 @@ void *am_main() {
 		test_timer = time (NULL);
 		if(last_send_time != 0 && (test_timer - 60 > last_send_time) && (my_state == READY)) {
 			printf("Time to send new SIGN message to all neighbors!\n");
+			free(auth_pkt);
+			auth_pkt = all_sign_send(pkey, &aes_master, &key_count);
+		}
+
+		/* If most of keystream is used, make new */
+		if(auth_seq_num > 0.9*(auth_value_len/2)) {
+			printf("Used more than 90 percent of keystream, time to make new!\n");
 			free(auth_pkt);
 			auth_pkt = all_sign_send(pkey, &aes_master, &key_count);
 		}
@@ -1281,7 +1289,7 @@ char *all_sign_send(EVP_PKEY *pkey, EVP_CIPHER_CTX *master, int *key_count) {
 //
 //				// Generate an authenticated hash which can be used to validate the data during decryption.
 //				HMAC_CTX hmac;
-//				unsigned int mac_length;
+//				unsigned int mac_length;	mac_value = ;
 //				HMAC_CTX_init(&hmac);
 //				mac_length = ((secure_head_t *)cryptex)->length.mac;
 //
@@ -1369,16 +1377,48 @@ char *all_sign_send(EVP_PKEY *pkey, EVP_CIPHER_CTX *master, int *key_count) {
 
 
 
-	/* Generate Routing VALUE from RAND */
-	EVP_CIPHER_CTX current_ctx;
-	EVP_EncryptInit(&current_ctx, EVP_aes_128_cbc(), current_key, current_iv);
-	if(key_count>1)
-		free(auth_value);
-	auth_value = openssl_aes_encrypt(&current_ctx, current_rand, &value_len);
+	/* Generate Keystream from Nonce */
 
+	if(*key_count>1)
+		free(auth_value);
+
+	int rand_len = RAND_LEN;
+	auth_value = malloc(rand_len*10+10);
+	auth_value_len = 0;
+
+	for(i=0; i<10; i++) {
+
+		/* Do encryption */
+		EVP_CIPHER_CTX current_ctx;
+		EVP_EncryptInit(&current_ctx, EVP_aes_128_cbc(), current_key, current_iv);
+		unsigned char *tmp = openssl_aes_encrypt(&current_ctx, current_rand, &value_len);
+		EVP_CIPHER_CTX_cleanup(&current_ctx);
+
+		/* Place ciphertext in keystream */
+		int auth_pos = auth_value_len;
+		auth_value_len += value_len;
+		memcpy(auth_value+auth_pos, tmp, value_len);
+
+		/* Change to new IV */
+		memcpy(current_iv, tmp, AES_IV_SIZE);
+
+		/* Alter the Nonce before next encryption */
+		int j;
+		for(j=0;j<rand_len/10; j++) {
+			current_rand[j+(i*(rand_len/10))] = ( (current_rand[j+(i*(rand_len/10))]) ^ i );
+//			printf("index : %d\n", j+(i*(rand_len/10)));
+		}
+//		tool_dump_memory(current_rand, RAND_LEN);
+
+		free(tmp);
+		value_len = RAND_LEN;
+
+	}
+
+//	tool_dump_memory(auth_value, auth_value_len);
 	auth_seq_num = 0;
 
-	EVP_CIPHER_CTX_cleanup(&current_ctx);
+
 
 
 	/* Free up stuff */
@@ -1387,12 +1427,12 @@ char *all_sign_send(EVP_PKEY *pkey, EVP_CIPHER_CTX *master, int *key_count) {
 	free(header);
 	free(auth_header);
 	free(current_iv);
+	memset(current_rand, 0, RAND_LEN);
 	free(current_rand);
 	free(b64_iv);
 	free(b64_rand);
 	free(b64_sign);
 	free(signature_buffer);
-
 	my_state = READY;
 	last_send_time = time (NULL);
 	return buf;
@@ -1565,12 +1605,44 @@ int neigh_sign_recv(EVP_PKEY *pkey, uint32_t addr, uint16_t id, char *ptr) {
 	//	printf("\n Checking againts this SIGN:\n");
 	//	tool_dump_memory(sign, sign_len);
 
-	EVP_CIPHER_CTX received_ctx;
-	EVP_EncryptInit(&received_ctx, EVP_aes_128_cbc(), key, iv);
-	unsigned char *mac_value;
+
+
+	unsigned char *mac_value = malloc(rand_len*10+10);
 	int mac_value_len = RAND_LEN;
-	mac_value = openssl_aes_encrypt(&received_ctx, randval, &mac_value_len);
-	EVP_CIPHER_CTX_cleanup(&received_ctx);
+
+	rand_len = RAND_LEN;
+	auth_value_len = 0;
+
+	for(i=0; i<10; i++) {
+
+		/* Do encryption */
+		EVP_CIPHER_CTX received_ctx;
+		EVP_EncryptInit(&received_ctx, EVP_aes_128_cbc(), key, iv);
+		unsigned char *tmp = openssl_aes_encrypt(&received_ctx, randval, &mac_value_len);
+		EVP_CIPHER_CTX_cleanup(&received_ctx);
+
+		/* Place ciphertext in keystream */
+		int auth_pos = auth_value_len;
+		auth_value_len += mac_value_len;
+		memcpy(mac_value+auth_pos, tmp, mac_value_len);
+
+		/* Change to new IV */
+		memcpy(iv, tmp, AES_IV_SIZE);
+
+		/* Alter the Nonce before next encryption */
+		int j;
+		for(j=0;j<rand_len/10; j++) {
+			randval[j+(i*(rand_len/10))] = ( (randval[j+(i*(rand_len/10))]) ^ i );
+//			printf("index : %d\n", j+(i*(rand_len/10)));
+		}
+//		tool_dump_memory(current_rand, RAND_LEN);
+
+		free(tmp);
+		mac_value_len = RAND_LEN;
+
+	}
+
+//	tool_dump_memory(mac_value, auth_value_len);
 
 	neigh_list_add(addr, id, mac_value);
 
