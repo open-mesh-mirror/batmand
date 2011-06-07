@@ -251,16 +251,10 @@ void *am_main() {
 
 				case SIGNATURE:
 					/* Allowed in all states */
-					neigh_sign_recv(pkey, neigh_addr.s_addr, rcvd_id, am_payload_ptr);
-					break;
-
-				case NEIGH_SIGN:
-					/* Allowed in all states */
 
 					if (my_state == WAIT_FOR_NEIGH_SIG_ACK) {
 
 						neigh_list_add(dst->sin_addr.s_addr, rcvd_id, NULL);
-
 						al_add(dst->sin_addr.s_addr, rcvd_id, AUTHENTICATED, subject_name, tmp_pub);
 
 						if(pthread_mutex_trylock(&auth_lock) == 0) {
@@ -275,6 +269,13 @@ void *am_main() {
 						free(dst);
 						my_state = READY;
 					}
+
+
+					neigh_sign_recv(pkey, neigh_addr.s_addr, rcvd_id, am_payload_ptr);
+					break;
+
+				case NEIGH_SIGN:
+					/* Allowed in all states */
 
 					neigh_sign_recv(pkey, neigh_addr.s_addr, rcvd_id, am_payload_ptr);
 
@@ -1113,9 +1114,9 @@ char *all_sign_send(EVP_PKEY *pkey, EVP_CIPHER_CTX *master, int *key_count) {
 
 	/* First Generate New Current Key & IV */
 	*key_count = *key_count + 1;
-	if(current_key != NULL)
-		free(current_key);
-	current_key = openssl_key_generate(master, *key_count);
+//	if(current_key != NULL)
+//		free(current_key);
+	openssl_key_generate(master, *key_count, &current_key);
 	openssl_key_iv_select(&current_iv, AES_IV_SIZE);
 
 
@@ -1489,42 +1490,42 @@ void neigh_sign_send(EVP_PKEY *pkey, sockaddr_in *addr, char *buf) {
 	inet_ntop( AF_INET, &(addr->sin_addr.s_addr), addr_char, 16 );
 	printf("Send SIGN message to neighbor - %s\n", addr_char);
 	free(addr_char);
-printf("1\n");
+printf("SIGN message func end\n");
 	char *payload_ptr,* key_ptr;
 
 	payload_ptr = buf + sizeof(am_packet) + sizeof(routing_auth_packet);
 	key_ptr = payload_ptr + strlen(payload_ptr);
-printf("2\n");
+
 	/* Encrypt auth_packet with neighs public key */
 	int j;
 	for(j=0; j<num_auth_nodes; j++) {
-printf("3\n");
+
 		if(addr->sin_addr.s_addr == authenticated_list[j]->addr) {
-printf("4\n");
+
 			RSA *neig_rsa = authenticated_list[j]->pub_key->pkey.rsa;
-printf("5\n");
+
 			unsigned char *encrypted_key = malloc(RSA_size(neig_rsa));
-printf("6\n");
+
 			if(RSA_public_encrypt(AES_KEY_SIZE, current_key, encrypted_key, neig_rsa, RSA_PKCS1_OAEP_PADDING) == -1) {
 				printf("Error while encrypting with neigbhbors public key\n");
 				break;
 			}
-printf("7\n");
+
 			char *b64_key 	= tool_base64_encode(encrypted_key, RSA_size(neig_rsa));
-printf("8\n");
+
 
 			/* Put packet together in buffer */
 			memcpy(key_ptr, b64_key, strlen(b64_key));
 			int packet_len = sizeof(am_packet) + sizeof(routing_auth_packet) + strlen(payload_ptr);
-printf("9\n");
+
 			sendto(am_send_socket, buf, packet_len, 0, (sockaddr *)addr, sizeof(sockaddr_in));
-printf("10\n");
+
 			memset(key_ptr, 0 , buf+MAXBUFLEN-key_ptr);
 
 			free(encrypted_key);
 			free(b64_key);
+printf("SIGN message func end\n");
 			break;
-printf("func end\n");
 		}
 	}
 }
@@ -2611,13 +2612,18 @@ unsigned char *openssl_aes_decrypt(EVP_CIPHER_CTX *e, unsigned char *ciphertext,
 }
 
 /* Generate new key (incl. IV), from master key */
-unsigned char *openssl_key_generate(EVP_CIPHER_CTX *aes_master, int key_count) {
+void openssl_key_generate(EVP_CIPHER_CTX *aes_master, int key_count, unsigned char **keyp) {
 
 	unsigned char *ret;
 	int i, tmp, ol;
 
+	if(keyp == NULL || *keyp == NULL) {
+		ret = malloc(EVP_CIPHER_CTX_block_size(aes_master));
+	} else {
+		ret = *keyp;
+	}
+
 	ol = 0;
-	ret = malloc(EVP_CIPHER_CTX_block_size(aes_master));
 
 	/* Create plaintext from key_count - each new key will be cipher of i=1,2,3... */
 	unsigned char *plaintext = malloc(sizeof(key_count));
@@ -2637,7 +2643,7 @@ unsigned char *openssl_key_generate(EVP_CIPHER_CTX *aes_master, int key_count) {
 	printf("%02X\n", ret[tmp-1]);
 
 	free(plaintext);
-	return ret;
+	*keyp = ret;
 
 }
 
