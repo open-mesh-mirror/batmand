@@ -261,6 +261,16 @@ void *am_main() {
 						my_state = READY;
 
 					if (my_state == WAIT_FOR_NEIGH_SIG_ACK) {
+<<<<<<< HEAD
+=======
+						char *recv_addr_string = inet_ntoa(((sockaddr_in*)((sockaddr *)&recv_addr))->sin_addr);
+						dst = (sockaddr_in *) malloc(sizeof(sockaddr_in));
+						dst->sin_addr = ((sockaddr_in*)((sockaddr *)&recv_addr))->sin_addr;
+						dst->sin_family = AF_INET;
+						dst->sin_port = htons(AM_PORT);
+						openssl_cert_create_pc1(&tmp_pub, recv_addr_string, &subject_name);
+						auth_issue_send(dst);
+>>>>>>> ce9060ef34d30f3d603a05663f3670f4e684dae6
 
 						neigh_list_add(dst->sin_addr.s_addr, rcvd_id, NULL);
 
@@ -321,12 +331,21 @@ void *am_main() {
 
 							char *recv_addr_string = inet_ntoa(((sockaddr_in*)((sockaddr *)&recv_addr))->sin_addr);
 							if(auth_request_recv(recv_addr_string, am_payload_ptr)) {
+<<<<<<< HEAD
 								dst = (sockaddr_in *) malloc(sizeof(sockaddr_in));
 								dst->sin_addr = ((sockaddr_in*)((sockaddr *)&recv_addr))->sin_addr;
 								dst->sin_family = AF_INET;
 								dst->sin_port = htons(AM_PORT);
 								openssl_cert_create_pc1(&tmp_pub, recv_addr_string, &subject_name);
 								auth_issue_send(dst);
+=======
+//								dst = (sockaddr_in *) malloc(sizeof(sockaddr_in));
+//								dst->sin_addr = ((sockaddr_in*)((sockaddr *)&recv_addr))->sin_addr;
+//								dst->sin_family = AF_INET;
+//								dst->sin_port = htons(AM_PORT);
+//								openssl_cert_create_pc1(&tmp_pub, recv_addr_string, &subject_name);
+//								auth_issue_send(dst);
+>>>>>>> ce9060ef34d30f3d603a05663f3670f4e684dae6
 //
 //								neigh_list_add(dst->sin_addr.s_addr, rcvd_id, NULL);
 //
