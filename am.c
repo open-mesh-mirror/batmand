@@ -251,16 +251,10 @@ void *am_main() {
 
 				case SIGNATURE:
 					/* Allowed in all states */
-					neigh_sign_recv(pkey, neigh_addr.s_addr, rcvd_id, am_payload_ptr);
-					break;
-
-				case NEIGH_SIGN:
-					/* Allowed in all states */
 
 					if (my_state == WAIT_FOR_NEIGH_SIG_ACK) {
 
 						neigh_list_add(dst->sin_addr.s_addr, rcvd_id, NULL);
-
 						al_add(dst->sin_addr.s_addr, rcvd_id, AUTHENTICATED, subject_name, tmp_pub);
 
 						if(pthread_mutex_trylock(&auth_lock) == 0) {
@@ -275,6 +269,13 @@ void *am_main() {
 						free(dst);
 						my_state = READY;
 					}
+
+
+					neigh_sign_recv(pkey, neigh_addr.s_addr, rcvd_id, am_payload_ptr);
+					break;
+
+				case NEIGH_SIGN:
+					/* Allowed in all states */
 
 					neigh_sign_recv(pkey, neigh_addr.s_addr, rcvd_id, am_payload_ptr);
 
