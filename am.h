@@ -297,7 +297,7 @@ int neigh_sign_recv(EVP_PKEY *pkey, uint32_t addr, uint16_t id, char *ptr);
 int neigh_pc_recv(in_addr addr, char *ptr);
 
 
-unsigned char *openssl_key_generate(EVP_CIPHER_CTX *aes_master, int key_count);
+void openssl_key_generate(EVP_CIPHER_CTX *aes_master, int key_count, unsigned char **keyp);
 void openssl_tool_gen_rand(unsigned char **rand, int len);
 
 void openssl_key_master_select(unsigned char **key, int b);
