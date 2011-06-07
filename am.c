@@ -273,6 +273,7 @@ void *am_main() {
 						}
 
 						free(dst);
+						my_state = READY;
 					}
 
 					neigh_sign_recv(pkey, neigh_addr.s_addr, rcvd_id, am_payload_ptr);
@@ -359,7 +360,7 @@ void *am_main() {
 					}
 
 					prev_neighbor = 0;
-					my_state = READY;
+//					my_state = READY;
 
 					break;
 
