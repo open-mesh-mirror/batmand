@@ -256,9 +256,6 @@ void *am_main() {
 
 				case NEIGH_SIGN:
 					/* Allowed in all states */
-					neigh_sign_recv(pkey, neigh_addr.s_addr, rcvd_id, am_payload_ptr);
-					if(my_state == WAIT_FOR_NEIGH_SIG)
-						my_state = READY;
 
 					if (my_state == WAIT_FOR_NEIGH_SIG_ACK) {
 
@@ -277,6 +274,12 @@ void *am_main() {
 
 						free(dst);
 					}
+
+					neigh_sign_recv(pkey, neigh_addr.s_addr, rcvd_id, am_payload_ptr);
+
+					if(my_state == WAIT_FOR_NEIGH_SIG)
+						my_state = READY;
+
 					break;
 
 				case AL_FULL:
