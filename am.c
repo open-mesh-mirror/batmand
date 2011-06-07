@@ -160,7 +160,7 @@ void *am_main() {
 
 	int key_count = 0;
 	int rcvd_id;
-	time_t test_timer;
+	time_t test_timer, state_timer;
 
 
 
@@ -507,6 +507,23 @@ void *am_main() {
 				}
 
 			}
+		}
+
+		/* Check state, if state not READY for a while (3 seconds), go to READY */
+		if(my_state != READY) {
+			if(state_timer==0)
+				state_timer = time(NULL);
+
+			if(test_timer - 3 > state_timer) {
+				my_state = READY;
+				state_timer = 0;
+			}
+
+		}else {
+
+			/* Make sure state_timer is zero if state is ready! */
+			if(state_timer!=0)
+				state_timer=0;
 		}
 
 	}
