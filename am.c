@@ -15,6 +15,13 @@
 #include "am.h"
 
 
+
+//TODO: Finn ut hvorfor send SIGN loop
+
+
+
+
+
 /* openssl_tool_callback function used by OpenSSL */
 static void openssl_tool_callback(int p, int n, void *arg) {
 	char c='B';
@@ -477,6 +484,7 @@ void *am_main() {
 
 					/* Send Signature */
 					neigh_sign_send(dst, auth_pkt);
+					printf("\nICH BIN HIER!!\n\n");
 
 					/* Check whether neighbor sent you sig first */
 					int j;
@@ -568,6 +576,9 @@ void *am_main() {
 			if(state_timer!=0)
 				state_timer=0;
 		}
+
+		/* Be CPU friendly and sleep a bit :) */
+		usleep(1000);
 
 	}
 	free(subject_name);
@@ -1505,7 +1516,7 @@ void neigh_sign_send(sockaddr_in *addr, char *buf) {
 	inet_ntop( AF_INET, &(addr->sin_addr.s_addr), addr_char, 16 );
 	printf("Send SIGN message to neighbor - %s\n", addr_char);
 	free(addr_char);
-printf("SIGN message func end\n");
+
 	char *payload_ptr,* key_ptr;
 
 	payload_ptr = buf + sizeof(am_packet) + sizeof(routing_auth_packet);
@@ -1539,7 +1550,7 @@ printf("SIGN message func end\n");
 
 			free(encrypted_key);
 			free(b64_key);
-printf("SIGN message func end\n");
+
 			break;
 		}
 	}
