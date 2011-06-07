@@ -31,6 +31,7 @@
 #include <stdio.h>
 #include <fcntl.h>
 #include <time.h>
+#include <pthread.h>
 
 #include <openssl/bio.h>
 #include <openssl/buffer.h>
@@ -212,17 +213,17 @@ typedef struct routing_auth_packet_st {
 
 /* AM Enums */
 typedef enum am_state_en {
-	READY,
-	SEND_INVITE,
-	WAIT_FOR_REQ,
-	SEND_REQ,
-	WAIT_FOR_PC,
-	SEND_PC,
-	SENDING_NEW_SIGS,
-	SENDING_SIG,
-	WAIT_FOR_NEIGH_SIG,
-	WAIT_FOR_NEIGH_PC,
-	WAIT_FOR_NEIGH_SIG_ACK	//special for SP waiting for sign as "ACK" after ISSUE
+	READY,					//0
+	SEND_INVITE,			//1
+	WAIT_FOR_REQ,			//2
+	SEND_REQ,				//3
+	WAIT_FOR_PC,			//4
+	SEND_PC,				//5
+	SENDING_NEW_SIGS,		//6
+	SENDING_SIG,			//7
+	WAIT_FOR_NEIGH_SIG,		//8
+	WAIT_FOR_NEIGH_PC,		//8
+	WAIT_FOR_NEIGH_SIG_ACK	//9 - special for SP waiting for sign as "ACK" after ISSUE
 } am_state;
 
 typedef enum am_type_en{
@@ -261,8 +262,6 @@ int socks_recv_setup(int32_t *recv, addrinfo *res);
 int socks_send_setup(int32_t *send);
 void socks_am_destroy(int32_t *send, int32_t *recv);
 
-static void openssl_tool_callback(int p, int n, void *arg);
-
 void create_signature();
 int openssl_cert_create_pc0(EVP_PKEY **pkey, unsigned char **subject_name);
 int openssl_cert_create_req(EVP_PKEY **pkey, unsigned char *subject_name);
@@ -283,7 +282,7 @@ void auth_request_send(sockaddr_in *sin_dest);
 void auth_issue_send(sockaddr_in *sin_dest);
 
 char *all_sign_send(EVP_PKEY *pkey, EVP_CIPHER_CTX *master, int *key_count);
-void neigh_sign_send(EVP_PKEY *pkey, sockaddr_in *addr, char *buf);
+void neigh_sign_send(sockaddr_in *addr, char *buf);
 void neigh_req_pc_send(sockaddr_in *neigh_addr);
 void neigh_pc_send(sockaddr_in *sin_dest);
 
@@ -309,6 +308,7 @@ unsigned char *openssl_aes_encrypt(EVP_CIPHER_CTX *e, unsigned char *plaintext, 
 
 void al_add(uint32_t addr, uint16_t id, role_type role, unsigned char *subject_name, EVP_PKEY *key);
 void neigh_list_add(uint32_t addr, uint16_t id, unsigned char *mac_value);
+int neig_list_remove(int pos);
 
 EVP_PKEY *openssl_key_copy(EVP_PKEY *key);
 int openssl_cert_read(in_addr addr, unsigned char **s, EVP_PKEY **p);
@@ -319,6 +319,10 @@ char * tool_base64_encode(unsigned char * input, int length);
 unsigned char * tool_base64_decode(char * input, int in_length, int *out_length);
 
 void *KDF1_SHA256(const void *in, size_t inlen, void *out, size_t *outlen);
+
+int openssl_cert_add_ext_req(STACK_OF(X509_REQUEST) *sk, int nid, char *value);
+
+void secure_usage();
 
 
 /* Necessary external variables */

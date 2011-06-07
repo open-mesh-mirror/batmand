@@ -14,6 +14,17 @@
 
 #include "am.h"
 
+
+/* openssl_tool_callback function used by OpenSSL */
+static void openssl_tool_callback(int p, int n, void *arg) {
+	char c='B';
+	if (p == 0) c='.';
+	if (p == 1) c='+';
+	if (p == 2) c='*';
+	if (p == 3) c='\n';
+	fputc(c,stderr);
+}
+
 void *KDF1_SHA256(const void *in, size_t inlen, void *out, size_t *outlen) {
 
     if (*outlen < SHA256_DIGEST_LENGTH) {
@@ -88,7 +99,7 @@ unsigned char *current_key = NULL;
 time_t last_send_time;
 
 /* Usage function for my AM extension */
-secure_usage() {
+void secure_usage() {
 	fprintf( stderr, "Secure Usage: batman [options] -R/--role 'sp/authenticated/restricted' interface [interface interface]\n" );
 	fprintf( stderr, "       -R / --role 'sp'              start as Service Proxy / Master node\n" );
 	fprintf( stderr, "       -R / --role 'authenticated'   request to become authenticated with full rights\n" );
@@ -160,7 +171,7 @@ void *am_main() {
 
 	int key_count = 0;
 	int rcvd_id;
-	time_t test_timer, state_timer;
+	time_t test_timer = 0, state_timer = 0;
 
 
 
@@ -261,7 +272,7 @@ void *am_main() {
 							if(num_trusted_neigh == 1) {
 								auth_pkt = all_sign_send(pkey, &aes_master, &key_count);
 							} else {
-								neigh_sign_send(pkey, dst, auth_pkt);
+								neigh_sign_send(dst, auth_pkt);
 							}
 							pthread_mutex_unlock(&auth_lock);
 						}
@@ -413,7 +424,7 @@ void *am_main() {
 					neigh_pc_send(dst);
 
 					/* Send Signature */
-					neigh_sign_send(pkey, dst, auth_pkt);
+					neigh_sign_send(dst, auth_pkt);
 
 					my_state = WAIT_FOR_NEIGH_SIG;
 
@@ -435,7 +446,7 @@ void *am_main() {
 						dst->sin_family = AF_INET;
 						dst->sin_port = htons(AM_PORT);
 
-						neigh_sign_send(pkey, dst, auth_pkt);
+						neigh_sign_send(dst, auth_pkt);
 
 						free(dst);
 						my_state = WAIT_FOR_NEIGH_SIG;
@@ -465,11 +476,16 @@ void *am_main() {
 				if(new_neighbor == authenticated_list[i]->addr) {
 
 					/* Send Signature */
-					neigh_sign_send(pkey, dst, auth_pkt);
+					neigh_sign_send(dst, auth_pkt);
 
 					/* Check whether neighbor sent you sig first */
-					//TODO: maybe for-loop through this, might not be last one if many new neighs at same time...
-					if(neigh_list[num_trusted_neigh-1]->addr != new_neighbor)
+					int j;
+					for(j=0; j<num_trusted_neigh; j++) {
+						if(neigh_list[j]->addr != new_neighbor)
+							break;
+					}
+
+					if(j == num_trusted_neigh)
 						my_state = WAIT_FOR_NEIGH_SIG;
 
 					break;
@@ -574,8 +590,7 @@ void al_add(uint32_t addr, uint16_t id, role_type role, unsigned char *subject_n
 	printf("ID           : %d\n", authenticated_list[num_auth_nodes]->id);
 
 	char addr_char[16];
-
-	addr_to_string(authenticated_list[num_auth_nodes]->addr, &addr_char, sizeof (addr_char));
+	inet_ntop( AF_INET, &(authenticated_list[num_auth_nodes]->addr), (char *)&addr_char, sizeof (addr_char) );
 
 	printf("IP ADDRESS   : %s\n", addr_char);
 	if(authenticated_list[num_auth_nodes]->role == 3) {
@@ -1102,7 +1117,7 @@ char *all_sign_send(EVP_PKEY *pkey, EVP_CIPHER_CTX *master, int *key_count) {
 
 	my_state = SENDING_NEW_SIGS;
 
-	char *buf, *ptr, *keylen_ptr;
+	char *buf, *ptr;
 	unsigned char *current_iv = NULL, *current_rand = NULL;
 	int i;
 	am_packet *header;
@@ -1484,7 +1499,7 @@ char *all_sign_send(EVP_PKEY *pkey, EVP_CIPHER_CTX *master, int *key_count) {
 
 
 /* Send Signed RAND Auth Packet to new neighbor */
-void neigh_sign_send(EVP_PKEY *pkey, sockaddr_in *addr, char *buf) {
+void neigh_sign_send(sockaddr_in *addr, char *buf) {
 
 	char *addr_char = malloc(16);
 	inet_ntop( AF_INET, &(addr->sin_addr.s_addr), addr_char, 16 );
@@ -2376,7 +2391,7 @@ int openssl_cert_mkcert(EVP_PKEY **pkey, X509_REQ *req,X509 **pc1p, X509 **pc0p,
 //	if (!ex)
 //		return 0;
 	if (req_exts != NULL) {
-		int num_exts = sk_X509_EXTENSION_num(req_exts);
+//		int num_exts = sk_X509_EXTENSION_num(req_exts);
 		X509_EXTENSION *req_ex = NULL;
 		req_ex = sk_X509_EXTENSION_pop(req_exts);
 //		openssl_cert_add_ext_req(exts, NID_netscape_comment, "critical,myProxyCertInfoExtension:0,0");
@@ -2445,16 +2460,7 @@ int openssl_cert_add_ext_req(STACK_OF(X509_REQUEST) *sk, int nid, char *value) {
 
 /* OpenSSL special functions */
 
-/* openssl_tool_callback function used by OpenSSL */
-static void openssl_tool_callback(int p, int n, void *arg) {
-	char c='B';
 
-	if (p == 0) c='.';
-	if (p == 1) c='+';
-	if (p == 2) c='*';
-	if (p == 3) c='\n';
-	fputc(c,stderr);
-}
 
 /* Seeding the PRNG */
 int openssl_tool_seed_prng(int bytes) {
@@ -2529,7 +2535,6 @@ void openssl_key_iv_select(unsigned char **i, int b) {
 /* Copy key (EVP_PKEY) object */
 EVP_PKEY *openssl_key_copy(EVP_PKEY *key) {
 	EVP_PKEY *pnew;
-	int key_type;
 
 	pnew = EVP_PKEY_new();
 	switch(key->type) {
@@ -2631,9 +2636,9 @@ void openssl_key_generate(EVP_CIPHER_CTX *aes_master, int key_count, unsigned ch
 	*plaintext = (unsigned char)key_count;
 	int len = strlen((char *)plaintext)+1;
 
-	EVP_EncryptUpdate(aes_master, &ret[0], &tmp, plaintext, len);
+	EVP_EncryptUpdate(aes_master, ret, &tmp, plaintext, len);
 	ol += tmp;
-	EVP_EncryptFinal(aes_master, &ret[ol], &tmp);
+	EVP_EncryptFinal(aes_master, ret+ol, &tmp);
 
 	printf("Generated New Current Key #%d: ",key_count);
 
@@ -2705,4 +2710,8 @@ int tool_sliding_window(uint16_t seq_num, uint16_t id) {
 			}
 		}
 	}
+
+	/* Should not get here  if function called correctly! */
+	return 0;
+
 }
