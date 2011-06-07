@@ -219,6 +219,7 @@ void *am_main() {
 //		all_sign_send(&aes_master, &key_count, &auth_pkt);
 
 		/* Initiate AL with yourself in it */
+		printf("addr of subject_name : %p\n",subject_name);
 		al_add(my_addr.sin_addr.s_addr, my_id, SP, subject_name, pkey);
 
 
@@ -594,7 +595,11 @@ void al_add(uint32_t addr, uint16_t id, role_type role, unsigned char *subject_n
 	authenticated_list[num_auth_nodes]->id = id;
 	authenticated_list[num_auth_nodes]->role = role;
 	authenticated_list[num_auth_nodes]->name = malloc(FULL_SUB_NM_SZ);
-	memcpy(authenticated_list[num_auth_nodes]->name, subject_name, FULL_SUB_NM_SZ);
+
+	if(strlen(subject_name)>FULL_SUB_NM_SZ)
+		memcpy(authenticated_list[num_auth_nodes]->name, subject_name, FULL_SUB_NM_SZ);
+	else
+		memcpy(authenticated_list[num_auth_nodes]->name, subject_name, strlen(subject_name));
 	authenticated_list[num_auth_nodes]->pub_key = openssl_key_copy(key);
 
 	printf("\nAdded new node to AL:\n");
