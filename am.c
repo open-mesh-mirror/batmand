@@ -209,17 +209,16 @@ void *am_main() {
 
 	num_trusted_neigh = 0;
 	num_auth_nodes = 0;
+	subject_name = malloc(FULL_SUB_NM_SZ);
 	if(my_role == SP) {
 
 		/* If you are the SP, create a PC0 */
-		subject_name = malloc(SUBJECT_NAME_SIZE);
 		openssl_cert_create_pc0(&pkey, &subject_name);
 
 		/* Create & Send Signed RANDOM Data (for continuous authentication) */
 //		all_sign_send(&aes_master, &key_count, &auth_pkt);
 
 		/* Initiate AL with yourself in it */
-		printf("addr of subject_name : %p\n",subject_name);
 		al_add(my_addr.sin_addr.s_addr, my_id, SP, subject_name, pkey);
 
 
@@ -227,7 +226,7 @@ void *am_main() {
 
 	/* Else create a PC Request	 */
 	else {
-		openssl_cert_create_req(&pkey, subject_name);
+		openssl_cert_create_req(&pkey, &subject_name);
 	}
 
 
@@ -596,10 +595,10 @@ void al_add(uint32_t addr, uint16_t id, role_type role, unsigned char *subject_n
 	authenticated_list[num_auth_nodes]->role = role;
 	authenticated_list[num_auth_nodes]->name = malloc(FULL_SUB_NM_SZ);
 
-	if(strlen(subject_name)>FULL_SUB_NM_SZ)
+	if(strlen((char *)subject_name)>FULL_SUB_NM_SZ)
 		memcpy(authenticated_list[num_auth_nodes]->name, subject_name, FULL_SUB_NM_SZ);
 	else
-		memcpy(authenticated_list[num_auth_nodes]->name, subject_name, strlen(subject_name));
+		memcpy(authenticated_list[num_auth_nodes]->name, subject_name, strlen((char *)subject_name));
 	authenticated_list[num_auth_nodes]->pub_key = openssl_key_copy(key);
 
 	printf("\nAdded new node to AL:\n");
@@ -761,7 +760,7 @@ int openssl_cert_create_pc0(EVP_PKEY **pkey, unsigned char **subject_name) {
 }
 
 /* Create PC REQ for an UNAUTHENTICATED Node */
-int openssl_cert_create_req(EVP_PKEY **pkey, unsigned char *subject_name) {
+int openssl_cert_create_req(EVP_PKEY **pkey, unsigned char **subject_name) {
 
 	X509_REQ *req;
 	FILE *fp;
@@ -2102,7 +2101,7 @@ err:
 
 
 /* PC REQ Creation */
-int openssl_cert_mkreq(X509_REQ **x509p, EVP_PKEY **pkeyp, unsigned char *subject_name) {
+int openssl_cert_mkreq(X509_REQ **x509p, EVP_PKEY **pkeyp, unsigned char **subject_name) {
 	X509_REQ *x;
 	EVP_PKEY *pk;
 	RSA *rsa;
@@ -2170,10 +2169,10 @@ int openssl_cert_mkreq(X509_REQ **x509p, EVP_PKEY **pkeyp, unsigned char *subjec
 	 * The Issuer name will be prepended by the issuer on creation.
 	 * TODO: Maybe use hash of public key, for now only a random number
 	 */
-	subject_name = malloc(SUBJECT_NAME_SIZE);
-	sprintf((char *)subject_name,"%d",rand()%UINT32_MAX);
-	X509_NAME_add_entry_by_txt(name,"CN", MBSTRING_ASC, subject_name, -1, -1, 0);
-	free(subject_name);
+//	subject_name = malloc(SUBJECT_NAME_SIZE);
+	sprintf((char *)*subject_name,"%d",rand()%UINT32_MAX);
+	X509_NAME_add_entry_by_txt(name,"CN", MBSTRING_ASC, *subject_name, -1, -1, 0);
+//	free(subject_name);
 
 //#ifdef REQUEST_EXTENSIONS
 	/* Certificate requests can contain extensions, which can be used
