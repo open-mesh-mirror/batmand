@@ -221,7 +221,8 @@ typedef enum am_state_en {
 	SENDING_NEW_SIGS,
 	SENDING_SIG,
 	WAIT_FOR_NEIGH_SIG,
-	WAIT_FOR_NEIGH_PC
+	WAIT_FOR_NEIGH_PC,
+	WAIT_FOR_NEIGH_SIG_ACK	//special for SP waiting for sign as "ACK" after ISSUE
 } am_state;
 
 typedef enum am_type_en{

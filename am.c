@@ -259,6 +259,31 @@ void *am_main() {
 					neigh_sign_recv(pkey, neigh_addr.s_addr, rcvd_id, am_payload_ptr);
 					if(my_state == WAIT_FOR_NEIGH_SIG)
 						my_state = READY;
+
+					if (my_state == WAIT_FOR_NEIGH_SIG_ACK) {
+						char *recv_addr_string = inet_ntoa(((sockaddr_in*)((sockaddr *)&recv_addr))->sin_addr);
+						dst = (sockaddr_in *) malloc(sizeof(sockaddr_in));
+						dst->sin_addr = ((sockaddr_in*)((sockaddr *)&recv_addr))->sin_addr;
+						dst->sin_family = AF_INET;
+						dst->sin_port = htons(AM_PORT);
+						openssl_cert_create_pc1(&tmp_pub, recv_addr_string, &subject_name);
+						auth_issue_send(dst);
+
+						neigh_list_add(dst->sin_addr.s_addr, rcvd_id, NULL);
+
+						al_add(dst->sin_addr.s_addr, rcvd_id, AUTHENTICATED, subject_name, tmp_pub);
+
+						if(pthread_mutex_trylock(&auth_lock) == 0) {
+							if(num_trusted_neigh == 1) {
+								auth_pkt = all_sign_send(pkey, &aes_master, &key_count);
+							} else {
+								neigh_sign_send(pkey, dst, auth_pkt);
+							}
+							pthread_mutex_unlock(&auth_lock);
+						}
+
+						free(dst);
+					}
 					break;
 
 				case AL_FULL:
@@ -303,27 +328,29 @@ void *am_main() {
 
 							char *recv_addr_string = inet_ntoa(((sockaddr_in*)((sockaddr *)&recv_addr))->sin_addr);
 							if(auth_request_recv(recv_addr_string, am_payload_ptr)) {
-								dst = (sockaddr_in *) malloc(sizeof(sockaddr_in));
-								dst->sin_addr = ((sockaddr_in*)((sockaddr *)&recv_addr))->sin_addr;
-								dst->sin_family = AF_INET;
-								dst->sin_port = htons(AM_PORT);
-								openssl_cert_create_pc1(&tmp_pub, recv_addr_string, &subject_name);
-								auth_issue_send(dst);
+//								dst = (sockaddr_in *) malloc(sizeof(sockaddr_in));
+//								dst->sin_addr = ((sockaddr_in*)((sockaddr *)&recv_addr))->sin_addr;
+//								dst->sin_family = AF_INET;
+//								dst->sin_port = htons(AM_PORT);
+//								openssl_cert_create_pc1(&tmp_pub, recv_addr_string, &subject_name);
+//								auth_issue_send(dst);
+//
+//								neigh_list_add(dst->sin_addr.s_addr, rcvd_id, NULL);
+//
+//								al_add(dst->sin_addr.s_addr, rcvd_id, AUTHENTICATED, subject_name, tmp_pub);
+//
+//								if(pthread_mutex_trylock(&auth_lock) == 0) {
+//									if(num_trusted_neigh == 1) {
+//										auth_pkt = all_sign_send(pkey, &aes_master, &key_count);
+//									} else {
+//										neigh_sign_send(pkey, dst, auth_pkt);
+//									}
+//									pthread_mutex_unlock(&auth_lock);
+//								}
+//
+//								free(dst);
 
-								neigh_list_add(dst->sin_addr.s_addr, rcvd_id, NULL);
-
-								al_add(dst->sin_addr.s_addr, rcvd_id, AUTHENTICATED, subject_name, tmp_pub);
-
-								if(pthread_mutex_trylock(&auth_lock) == 0) {
-									if(num_trusted_neigh == 1) {
-										auth_pkt = all_sign_send(pkey, &aes_master, &key_count);
-									} else {
-										neigh_sign_send(pkey, dst, auth_pkt);
-									}
-									pthread_mutex_unlock(&auth_lock);
-								}
-
-								free(dst);
+								my_state = WAIT_FOR_NEIGH_SIG_ACK;
 
 							}
 
