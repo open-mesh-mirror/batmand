@@ -189,6 +189,7 @@ typedef struct trusted_neigh_st {
 	uint16_t		last_seq_num;	//Used with sliding windows
 	unsigned char	*mac;			//Message Authentication Code (current)
 	time_t 			last_rcvd_time;
+	uint8_t			num_keystream_fails;
 } trusted_neigh;
 
 typedef struct am_packet_st {
@@ -292,7 +293,7 @@ int auth_request_recv(char *addr, char *ptr);
 int auth_issue_recv(char *ptr);
 int auth_invite_recv(char *ptr);
 
-int neigh_sign_recv(EVP_PKEY *pkey, uint32_t addr, uint16_t id, char *ptr);
+int neigh_sign_recv(EVP_PKEY *pkey, uint32_t addr, uint16_t id, char *ptr, char *auth_packet);
 int neigh_pc_recv(in_addr addr, char *ptr);
 
 

@@ -293,14 +293,14 @@ void *am_main() {
 						my_state = READY;
 					}
 
-					neigh_sign_recv(pkey, neigh_addr.s_addr, rcvd_id, am_payload_ptr);
+					neigh_sign_recv(pkey, neigh_addr.s_addr, rcvd_id, am_payload_ptr, auth_pkt);
 					new_neighbor = 0;
 					break;
 
 				case NEIGH_SIGN:
 					/* Allowed in all states */
 
-					neigh_sign_recv(pkey, neigh_addr.s_addr, rcvd_id, am_payload_ptr);
+					neigh_sign_recv(pkey, neigh_addr.s_addr, rcvd_id, am_payload_ptr, auth_pkt);
 
 					if(my_state == WAIT_FOR_NEIGH_SIG) {
 						my_state = READY;
@@ -491,7 +491,6 @@ void *am_main() {
 
 					/* Send Signature */
 					neigh_sign_send(dst, auth_pkt);
-					printf("ICH BIN HIER!!\n");
 
 					/* Check whether neighbor sent you sig first */
 					int j;
@@ -656,6 +655,7 @@ void neigh_list_add(uint32_t addr, uint16_t id, unsigned char *mac_value) {
 				neigh_list[i]->window = 0;
 				neigh_list[i]->last_seq_num = 0;
 				neigh_list[i]->last_rcvd_time = time (NULL);
+				neigh_list[i]->num_keystream_fails = 0;
 
 				printf("Added new keystream to node already in neighbor list\n");
 
@@ -681,6 +681,7 @@ void neigh_list_add(uint32_t addr, uint16_t id, unsigned char *mac_value) {
 		neigh_list[i]->window = 0;
 		neigh_list[num_trusted_neigh]->last_seq_num = 0;
 		neigh_list[num_trusted_neigh]->last_rcvd_time = time (NULL);
+		neigh_list[num_trusted_neigh]->num_keystream_fails = 0;
 		num_trusted_neigh++;
 
 		printf("Added new node to neighbor list\n");
@@ -1605,7 +1606,7 @@ int auth_invite_recv(char *ptr) {
 }
 
 /* Receive Routing Auth Packet */
-int neigh_sign_recv(EVP_PKEY *pkey, uint32_t addr, uint16_t id, char *ptr) {
+int neigh_sign_recv(EVP_PKEY *pkey, uint32_t addr, uint16_t id, char *ptr, char *auth_packet) {
 
 	char *addr_char = malloc(16);
 	inet_ntop( AF_INET, &addr, addr_char, 16 );
@@ -1628,7 +1629,7 @@ int neigh_sign_recv(EVP_PKEY *pkey, uint32_t addr, uint16_t id, char *ptr) {
 
 	unsigned char *key = NULL;
 	int key_len;
-	int i;
+	int i, j;
 	for(i=0; i<num_auth_nodes; i++) {
 		if(authenticated_list[i]->id == id) {
 
@@ -1716,7 +1717,6 @@ int neigh_sign_recv(EVP_PKEY *pkey, uint32_t addr, uint16_t id, char *ptr) {
 		memcpy(iv, tmp, AES_IV_SIZE);
 
 		/* Alter the Nonce before next encryption */
-		int j;
 		for(j=0;j<rand_len/10; j++) {
 			randval[j+(i*(rand_len/10))] = ( (randval[j+(i*(rand_len/10))]) ^ i );
 //			printf("index : %d\n", j+(i*(rand_len/10)));
@@ -1728,8 +1728,34 @@ int neigh_sign_recv(EVP_PKEY *pkey, uint32_t addr, uint16_t id, char *ptr) {
 
 	}
 
+	/*
+	 * For performance, check whether the node is in NL with same Keystream already
+	 * If so, it might be that other node does not know your keystream
+	 * Therefore send your keystream to him instead of adding to NL
+	 */
 
-	neigh_list_add(addr, id, mac_value);
+	if(my_state == READY) {
+
+		for (j=0; j<num_trusted_neigh; j++) {
+			if(neigh_list[j]->id == id) {
+				//Check 100 bytes, more than good enough odds, and safe against overflowing buffer
+				if(memcmp(neigh_list[j]->mac, mac_value, 100) == 0) {
+					printf("Already received this keystream from this neighbor, maybe he does not have mine, sending now!\n");
+					sockaddr_in dst;
+					dst.sin_addr.s_addr = addr;
+					dst.sin_family = AF_INET;
+					dst.sin_port = htons(AM_PORT);
+					neigh_sign_send(&dst,auth_packet);
+					break;
+				}
+				j = num_trusted_neigh;
+			}
+		}
+	}
+
+	/* If not repeated keystream, then save this in NL */
+	if(j==num_trusted_neigh)
+		neigh_list_add(addr, id, mac_value);
 
 	free(encrypted_key);
 	free(key);

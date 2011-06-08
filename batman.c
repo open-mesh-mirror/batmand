@@ -955,13 +955,27 @@ int8_t batman(void)
 				goto send_packets;
 
 			if(memcmp(neigh_list[neigh_counter]->mac+(bat_packet->auth_seqno*2), bat_packet->auth, 2) != 0) {
+
 				printf("MAC Extract did not match!\n");
+
+				neigh_list[neigh_counter]->num_keystream_fails ++;
+
+				/* Keystream is consequently fail, ergo need to handshake a new one */
+				if(neigh_list[neigh_counter]->num_keystream_fails > 10) {
+					new_neighbor = neigh;
+				}
+
 				goto send_packets;
 			}
 
 			/* Check whether the packet is new and not a replayed packet */
 			if(!tool_sliding_window(bat_packet->auth_seqno, neigh_list[neigh_counter]->id))
 				goto send_packets;
+
+
+			/* Everything seems fine, reset failcounter if more than 0 */
+			if(neigh_list[neigh_counter]->num_keystream_fails != 0)
+				neigh_list[neigh_counter]->num_keystream_fails = 0;
 
 			/********************* End Authentication Module Extension *********************/
 
