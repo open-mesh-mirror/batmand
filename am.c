@@ -1728,12 +1728,8 @@ int neigh_sign_recv(EVP_PKEY *pkey, uint32_t addr, uint16_t id, char *ptr) {
 
 	}
 
-//	tool_dump_memory(mac_value, auth_value_len);
 
 	neigh_list_add(addr, id, mac_value);
-
-	if(my_state == WAIT_FOR_NEIGH_SIG)
-		my_state = READY;
 
 	free(encrypted_key);
 	free(key);
@@ -2663,12 +2659,8 @@ void openssl_key_generate(EVP_CIPHER_CTX *aes_master, int key_count, unsigned ch
 	*plaintext = (unsigned char)key_count;
 	int len = strlen((char *)plaintext)+1;
 
-	printf("sizeof ret  : %d\n", EVP_CIPHER_CTX_block_size(aes_master));
-	printf("len : %d\n", len);
-
 	EVP_EncryptUpdate(aes_master, ret, &tmp, plaintext, len);
 	ol += tmp;
-	printf("ol : %d\n", ol);
 //	EVP_EncryptFinal(aes_master, ret+ol, &tmp);
 	//Remove padding, not wanted for key!
 	EVP_EncryptFinal(aes_master, ret, &tmp);
