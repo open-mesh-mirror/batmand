@@ -468,6 +468,18 @@ void *am_main() {
 					}
 					break;
 
+				case NEIGH_SIG_REQ:
+
+					/* Send keystream to neighbor, nothing else! */
+					dst = (sockaddr_in *) malloc(sizeof(sockaddr_in));
+					dst->sin_addr = ((sockaddr_in*)((sockaddr *)&recv_addr))->sin_addr;
+					dst->sin_family = AF_INET;
+					dst->sin_port = htons(AM_PORT);
+
+					neigh_sign_send(dst, auth_pkt);
+
+					break;
+
 				default:
 					printf("Received unknown AM Type %d, exiting with condition 1\n",am_type_rcvd);
 					exit(1);
@@ -538,6 +550,12 @@ void *am_main() {
 //			new_neighbor = 0;
 			free(dst);
 
+		}
+
+		/* Request keystream if not known */
+		if (new_neighbor && my_state == WAIT_FOR_REQ_SIG) {
+			neigh_sign_req_send(new_neighbor);
+			my_state = WAIT_FOR_NEIGH_SIG;
 		}
 
 		/* Check if more than 60 seconds since last all_sign_send */
@@ -655,7 +673,7 @@ void neigh_list_add(uint32_t addr, uint16_t id, unsigned char *mac_value) {
 				neigh_list[i]->window = 0;
 				neigh_list[i]->last_seq_num = 0;
 				neigh_list[i]->last_rcvd_time = time (NULL);
-				neigh_list[i]->num_keystream_fails = 0;
+//				neigh_list[i]->num_keystream_fails = 0;
 
 				printf("Added new keystream to node already in neighbor list\n");
 
@@ -681,7 +699,7 @@ void neigh_list_add(uint32_t addr, uint16_t id, unsigned char *mac_value) {
 		neigh_list[i]->window = 0;
 		neigh_list[num_trusted_neigh]->last_seq_num = 0;
 		neigh_list[num_trusted_neigh]->last_rcvd_time = time (NULL);
-		neigh_list[num_trusted_neigh]->num_keystream_fails = 0;
+//		neigh_list[num_trusted_neigh]->num_keystream_fails = 0;
 		num_trusted_neigh++;
 
 		printf("Added new node to neighbor list\n");
@@ -1572,6 +1590,27 @@ void neigh_sign_send(sockaddr_in *addr, char *buf) {
 	}
 }
 
+/* Send Keystream Request */
+void neigh_sign_req_send(uint32_t addr) {
+
+	printf("Sending my keystream request!\n");
+	am_packet *am_header;
+
+	am_header = (am_packet *) malloc(sizeof(am_packet));
+	am_header->id = my_id;
+	am_header->type = NEIGH_SIG_REQ;
+
+	sockaddr_in dst;
+	dst.sin_addr.s_addr = addr;
+	dst.sin_family = AF_INET;
+	dst.sin_port = htons(AM_PORT);
+
+	sendto(am_send_socket, (void *)am_header, sizeof(am_packet), 0, (struct sockaddr *)&dst, sizeof(sockaddr_in));
+
+	free(am_header);
+
+}
+
 
 /* Extract AM Data Type From Received AM Packet */
 am_type am_header_extract(char *buf, char **ptr, int *id) {
@@ -1741,7 +1780,6 @@ int neigh_sign_recv(EVP_PKEY *pkey, uint32_t addr, uint16_t id, char *ptr, char 
 
 				/* First do sanity check and see if older keystream exists */
 				if(neigh_list[j]->mac == NULL) {
-					j = num_trusted_neigh;
 					break;
 				}
 
@@ -1755,14 +1793,13 @@ int neigh_sign_recv(EVP_PKEY *pkey, uint32_t addr, uint16_t id, char *ptr, char 
 					neigh_sign_send(&dst,auth_packet);
 					break;
 				}
-				j = num_trusted_neigh;
 			}
 		}
 	}
 
-	/* If not repeated keystream, then save this in NL */
-	if(j==num_trusted_neigh)
-		neigh_list_add(addr, id, mac_value);
+	neigh_list_add(addr, id, mac_value);
+
+
 
 	free(encrypted_key);
 	free(key);

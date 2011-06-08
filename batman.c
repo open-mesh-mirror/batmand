@@ -958,11 +958,17 @@ int8_t batman(void)
 
 				printf("MAC Extract did not match!\n");
 
-				neigh_list[neigh_counter]->num_keystream_fails ++;
+				if(my_state == READY) {
 
-				/* Keystream is consequently fail, ergo need to handshake a new one */
-				if(neigh_list[neigh_counter]->num_keystream_fails > 10) {
-					new_neighbor = neigh;
+					neigh_list[neigh_counter]->num_keystream_fails ++;
+
+					/* Keystream is consequently fail, ergo need to handshake a new one */
+					if(neigh_list[neigh_counter]->num_keystream_fails > 20) {
+						my_state = WAIT_FOR_REQ_SIG;
+						new_neighbor = neigh;
+						neigh_list[neigh_counter]->num_keystream_fails = 0;
+					}
+
 				}
 
 				goto send_packets;

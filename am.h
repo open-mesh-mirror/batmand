@@ -224,7 +224,8 @@ typedef enum am_state_en {
 	SENDING_SIG,			//7
 	WAIT_FOR_NEIGH_SIG,		//8
 	WAIT_FOR_NEIGH_PC,		//8
-	WAIT_FOR_NEIGH_SIG_ACK	//9 - special for SP waiting for sign as "ACK" after ISSUE
+	WAIT_FOR_NEIGH_SIG_ACK,	//9 - special for SP waiting for sign as "ACK" after ISSUE
+	WAIT_FOR_REQ_SIG
 } am_state;
 
 typedef enum am_type_en{
@@ -322,6 +323,8 @@ unsigned char * tool_base64_decode(char * input, int in_length, int *out_length)
 void *KDF1_SHA256(const void *in, size_t inlen, void *out, size_t *outlen);
 
 int openssl_cert_add_ext_req(STACK_OF(X509_REQUEST) *sk, int nid, char *value);
+
+void neigh_sign_req_send(uint32_t addr);
 
 void secure_usage();
 
