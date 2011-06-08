@@ -271,12 +271,9 @@ void *am_main() {
 				case SIGNATURE:
 					/* Allowed in all states */
 
-					//TEST
-					neigh_sign_recv(pkey, neigh_addr.s_addr, rcvd_id, am_payload_ptr);
-
 					if (my_state == WAIT_FOR_NEIGH_SIG_ACK) {
 
-//						neigh_list_add(dst->sin_addr.s_addr, rcvd_id, NULL);
+						neigh_list_add(dst->sin_addr.s_addr, rcvd_id, NULL);
 						al_add(dst->sin_addr.s_addr, rcvd_id, AUTHENTICATED, subject_name, tmp_pub);
 
 						if(pthread_mutex_trylock(&auth_lock) == 0) {
@@ -294,10 +291,10 @@ void *am_main() {
 
 					if(my_state == WAIT_FOR_NEIGH_SIG) {
 						my_state = READY;
-						new_neighbor = 0;
 					}
 
-//					neigh_sign_recv(pkey, neigh_addr.s_addr, rcvd_id, am_payload_ptr);
+					neigh_sign_recv(pkey, neigh_addr.s_addr, rcvd_id, am_payload_ptr);
+					new_neighbor = 0;
 					break;
 
 				case NEIGH_SIGN:
@@ -1520,7 +1517,6 @@ char *all_sign_send(EVP_PKEY *pkey, EVP_CIPHER_CTX *master, int *key_count) {
 	free(b64_rand);
 	free(b64_sign);
 	free(signature_buffer);
-	my_state = READY;
 	last_send_time = time (NULL);
 	return buf;
 }
