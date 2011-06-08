@@ -210,6 +210,7 @@ void *am_main() {
 	num_trusted_neigh = 0;
 	num_auth_nodes = 0;
 	subject_name = malloc(FULL_SUB_NM_SZ);
+	memset(subject_name, 0, FULL_SUB_NM_SZ);
 	if(my_role == SP) {
 
 		/* If you are the SP, create a PC0 */
@@ -270,9 +271,12 @@ void *am_main() {
 				case SIGNATURE:
 					/* Allowed in all states */
 
+					//TEST
+					neigh_sign_recv(pkey, neigh_addr.s_addr, rcvd_id, am_payload_ptr);
+
 					if (my_state == WAIT_FOR_NEIGH_SIG_ACK) {
 
-						neigh_list_add(dst->sin_addr.s_addr, rcvd_id, NULL);
+//						neigh_list_add(dst->sin_addr.s_addr, rcvd_id, NULL);
 						al_add(dst->sin_addr.s_addr, rcvd_id, AUTHENTICATED, subject_name, tmp_pub);
 
 						if(pthread_mutex_trylock(&auth_lock) == 0) {
@@ -293,7 +297,7 @@ void *am_main() {
 						new_neighbor = 0;
 					}
 
-					neigh_sign_recv(pkey, neigh_addr.s_addr, rcvd_id, am_payload_ptr);
+//					neigh_sign_recv(pkey, neigh_addr.s_addr, rcvd_id, am_payload_ptr);
 					break;
 
 				case NEIGH_SIGN:
@@ -602,11 +606,13 @@ void al_add(uint32_t addr, uint16_t id, role_type role, unsigned char *subject_n
 	authenticated_list[num_auth_nodes]->id = id;
 	authenticated_list[num_auth_nodes]->role = role;
 	authenticated_list[num_auth_nodes]->name = malloc(FULL_SUB_NM_SZ);
+	memset(authenticated_list[num_auth_nodes]->name, 0, FULL_SUB_NM_SZ);
 
 	if(strlen((char *)subject_name)>FULL_SUB_NM_SZ)
 		memcpy(authenticated_list[num_auth_nodes]->name, subject_name, FULL_SUB_NM_SZ);
 	else
 		memcpy(authenticated_list[num_auth_nodes]->name, subject_name, strlen((char *)subject_name));
+
 	authenticated_list[num_auth_nodes]->pub_key = openssl_key_copy(key);
 
 	printf("\nAdded new node to AL:\n");
