@@ -1545,11 +1545,12 @@ void neigh_sign_send(sockaddr_in *addr, char *buf) {
 
 
 			/* Put packet together in buffer */
-			memset(key_ptr, 0 , buf+MAXBUFLEN-key_ptr);
 			memcpy(key_ptr, b64_key, strlen(b64_key));
 			int packet_len = sizeof(am_packet) + sizeof(routing_auth_packet) + strlen(payload_ptr);
 
 			sendto(am_send_socket, buf, packet_len, 0, (sockaddr *)addr, sizeof(sockaddr_in));
+
+			memset(key_ptr, 0 , buf+MAXBUFLEN-key_ptr);
 
 			free(encrypted_key);
 			free(b64_key);
