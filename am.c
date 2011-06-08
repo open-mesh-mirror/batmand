@@ -491,14 +491,17 @@ void *am_main() {
 
 					/* Send Signature */
 					neigh_sign_send(dst, auth_pkt);
-					printf("\nICH BIN HIER!!\n\n");
+					printf("ICH BIN HIER!!\n");
 
 					/* Check whether neighbor sent you sig first */
 					int j;
 					for(j=0; j<num_trusted_neigh; j++) {
-						if(neigh_list[j]->addr != new_neighbor)
+						if(neigh_list[j]->addr == new_neighbor)
 							break;
+
 					}
+
+					printf("num_trusted_neigh = %d\n", num_trusted_neigh);
 
 					if(j == num_trusted_neigh)
 						my_state = WAIT_FOR_NEIGH_SIG;
@@ -1393,7 +1396,6 @@ char *all_sign_send(EVP_PKEY *pkey, EVP_CIPHER_CTX *master, int *key_count) {
 //
 //				tool_dump_memory((unsigned char *)secure_body_data(cryptex), body_length);
 //
-//				printf("\n\nICH BIN HIER!\n\n");
 //				exit(1);
 
 
