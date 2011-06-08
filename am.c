@@ -288,6 +288,10 @@ void *am_main() {
 						my_state = READY;
 					}
 
+					if(my_state == WAIT_FOR_NEIGH_SIG) {
+						my_state = READY;
+						new_neighbor = 0;
+					}
 
 					neigh_sign_recv(pkey, neigh_addr.s_addr, rcvd_id, am_payload_ptr);
 					break;
@@ -297,8 +301,10 @@ void *am_main() {
 
 					neigh_sign_recv(pkey, neigh_addr.s_addr, rcvd_id, am_payload_ptr);
 
-					if(my_state == WAIT_FOR_NEIGH_SIG)
+					if(my_state == WAIT_FOR_NEIGH_SIG) {
 						my_state = READY;
+						new_neighbor = 0;
+					}
 
 					break;
 
@@ -495,6 +501,8 @@ void *am_main() {
 
 					if(j == num_trusted_neigh)
 						my_state = WAIT_FOR_NEIGH_SIG;
+					else
+						new_neighbor = 0;
 
 					break;
 
@@ -568,7 +576,6 @@ void *am_main() {
 			if(test_timer - 3 > state_timer) {
 				my_state = READY;
 				state_timer = 0;
-				new_neighbor = 0;
 			}
 
 		}else {
@@ -579,7 +586,7 @@ void *am_main() {
 		}
 
 		/* Be CPU friendly and sleep a bit :) */
-		usleep(1000);
+		usleep(10000);
 
 	}
 	free(subject_name);
