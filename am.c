@@ -1738,7 +1738,14 @@ int neigh_sign_recv(EVP_PKEY *pkey, uint32_t addr, uint16_t id, char *ptr, char 
 
 		for (j=0; j<num_trusted_neigh; j++) {
 			if(neigh_list[j]->id == id) {
-				//Check 100 bytes, more than good enough odds, and safe against overflowing buffer
+
+				/* First do sanity check and see if older keystream exists */
+				if(neigh_list[j]->mac == NULL) {
+					j = num_trusted_neigh;
+					break;
+				}
+
+				/* Check 100 bytes, more than good enough odds, and safe against overflowing buffer */
 				if(memcmp(neigh_list[j]->mac, mac_value, 100) == 0) {
 					printf("Already received this keystream from this neighbor, maybe he does not have mine, sending now!\n");
 					sockaddr_in dst;
