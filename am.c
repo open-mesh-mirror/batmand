@@ -524,7 +524,7 @@ void *am_main() {
 
 			}
 
-			new_neighbor = 0;
+//			new_neighbor = 0;
 			free(dst);
 
 		}
@@ -568,6 +568,7 @@ void *am_main() {
 			if(test_timer - 3 > state_timer) {
 				my_state = READY;
 				state_timer = 0;
+				new_neighbor = 0;
 			}
 
 		}else {
@@ -1144,8 +1145,7 @@ char *all_sign_send(EVP_PKEY *pkey, EVP_CIPHER_CTX *master, int *key_count) {
 
 	/* First Generate New Current Key & IV */
 	*key_count = *key_count + 1;
-//	if(current_key != NULL)
-//		free(current_key);
+
 	openssl_key_generate(master, *key_count, &current_key);
 	openssl_key_iv_select(&current_iv, AES_IV_SIZE);
 
@@ -1545,12 +1545,11 @@ void neigh_sign_send(sockaddr_in *addr, char *buf) {
 
 
 			/* Put packet together in buffer */
+			memset(key_ptr, 0 , buf+MAXBUFLEN-key_ptr);
 			memcpy(key_ptr, b64_key, strlen(b64_key));
 			int packet_len = sizeof(am_packet) + sizeof(routing_auth_packet) + strlen(payload_ptr);
 
 			sendto(am_send_socket, buf, packet_len, 0, (sockaddr *)addr, sizeof(sockaddr_in));
-
-			memset(key_ptr, 0 , buf+MAXBUFLEN-key_ptr);
 
 			free(encrypted_key);
 			free(b64_key);
@@ -2640,6 +2639,7 @@ void openssl_key_generate(EVP_CIPHER_CTX *aes_master, int key_count, unsigned ch
 	if(keyp == NULL || *keyp == NULL) {
 		ret = malloc(EVP_CIPHER_CTX_block_size(aes_master));
 	} else {
+		memset(*keyp, 0, EVP_CIPHER_CTX_block_size(aes_master));
 		ret = *keyp;
 	}
 
@@ -2651,9 +2651,15 @@ void openssl_key_generate(EVP_CIPHER_CTX *aes_master, int key_count, unsigned ch
 	*plaintext = (unsigned char)key_count;
 	int len = strlen((char *)plaintext)+1;
 
+	printf("sizeof ret  : %d\n", EVP_CIPHER_CTX_block_size(aes_master));
+	printf("len : %d\n", len);
+
 	EVP_EncryptUpdate(aes_master, ret, &tmp, plaintext, len);
 	ol += tmp;
-	EVP_EncryptFinal(aes_master, ret+ol, &tmp);
+	printf("ol : %d\n", ol);
+//	EVP_EncryptFinal(aes_master, ret+ol, &tmp);
+	//Remove padding, not wanted for key!
+	EVP_EncryptFinal(aes_master, ret, &tmp);
 
 	printf("Generated New Current Key #%d: ",key_count);
 
