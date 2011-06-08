@@ -216,9 +216,6 @@ void *am_main() {
 		/* If you are the SP, create a PC0 */
 		openssl_cert_create_pc0(&pkey, &subject_name);
 
-		/* Create & Send Signed RANDOM Data (for continuous authentication) */
-//		all_sign_send(&aes_master, &key_count, &auth_pkt);
-
 		/* Initiate AL with yourself in it */
 		al_add(my_addr.sin_addr.s_addr, my_id, SP, subject_name, pkey);
 
@@ -238,15 +235,6 @@ void *am_main() {
 	am_payload_ptr = NULL;
 	dst = NULL;
 
-//	uint16_t testint = 40960;
-//	int tmpsda;
-//	for (tmpsda = 0; tmpsda<16; tmpsda++) {
-//		printf("[%2d] %d + 1 = ", tmpsda, testint);
-//		testint = testint | 1;
-//		printf("%d\n", testint);
-//		testint = testint >> 1;
-//	}
-//	exit(1);
 	/* Main loop for the AM thread, will only exit when Batman is terminated */
 	while(1) {
 
@@ -358,22 +346,6 @@ void *am_main() {
 								dst->sin_port = htons(AM_PORT);
 								openssl_cert_create_pc1(&tmp_pub, recv_addr_string, &subject_name);
 								auth_issue_send(dst);
-
-//
-//								neigh_list_add(dst->sin_addr.s_addr, rcvd_id, NULL);
-//
-//								al_add(dst->sin_addr.s_addr, rcvd_id, AUTHENTICATED, subject_name, tmp_pub);
-//
-//								if(pthread_mutex_trylock(&auth_lock) == 0) {
-//									if(num_trusted_neigh == 1) {
-//										auth_pkt = all_sign_send(pkey, &aes_master, &key_count);
-//									} else {
-//										neigh_sign_send(pkey, dst, auth_pkt);
-//									}
-//									pthread_mutex_unlock(&auth_lock);
-//								}
-//
-//								free(dst);
 
 								my_state = WAIT_FOR_NEIGH_SIG_ACK;
 
@@ -673,7 +645,7 @@ void neigh_list_add(uint32_t addr, uint16_t id, unsigned char *mac_value) {
 				neigh_list[i]->window = 0;
 				neigh_list[i]->last_seq_num = 0;
 				neigh_list[i]->last_rcvd_time = time (NULL);
-//				neigh_list[i]->num_keystream_fails = 0;
+				neigh_list[i]->num_keystream_fails = 0;
 
 				printf("Added new keystream to node already in neighbor list\n");
 
@@ -699,7 +671,7 @@ void neigh_list_add(uint32_t addr, uint16_t id, unsigned char *mac_value) {
 		neigh_list[i]->window = 0;
 		neigh_list[num_trusted_neigh]->last_seq_num = 0;
 		neigh_list[num_trusted_neigh]->last_rcvd_time = time (NULL);
-//		neigh_list[num_trusted_neigh]->num_keystream_fails = 0;
+		neigh_list[num_trusted_neigh]->num_keystream_fails = 0;
 		num_trusted_neigh++;
 
 		printf("Added new node to neighbor list\n");
@@ -922,13 +894,6 @@ int openssl_cert_read(in_addr addr, unsigned char **s, EVP_PKEY **p) {
 		subject_name = *s;
 	}
 
-//	if(*p == NULL || p == NULL) {
-//		pub_key = EVP_PKEY_new();
-//	} else {
-//		pub_key = *p;
-//	}
-
-
 	if(addr.s_addr == 0) {
 
 		if(!(fp = fopen(SP_CERT, "r"))) {
@@ -969,8 +934,6 @@ int openssl_cert_read(in_addr addr, unsigned char **s, EVP_PKEY **p) {
 
 	pub_key = X509_get_pubkey(cert);
 	X509_NAME_oneline(X509_get_subject_name(cert),(char *)subject_name, FULL_SUB_NM_SZ);
-
-//	free(recv_addr_string);
 
 	//TODO: This must be free'd, but not before the EVP_PKEY object that is free'd outside this function, maybe dereference and free outside this func??
 //	X509_free(cert);
@@ -1091,7 +1054,6 @@ void neigh_req_pc_send(sockaddr_in *neigh_addr) {
 	am_packet *am_header;
 	int packet_len;
 	FILE *fp;
-//	sockaddr_in *neigh_addr;
 
 	am_header = (am_packet *) malloc(sizeof(am_packet));
 	am_header->id = my_id;
@@ -1111,14 +1073,8 @@ void neigh_req_pc_send(sockaddr_in *neigh_addr) {
 	packet_len += fread(ptr, 1, PEM_BUFSIZE, fp);
 	fclose(fp);
 
-//	neigh_addr = malloc(sizeof(sockaddr_in));
-//	neigh_addr->sin_addr.s_addr = new_neighbor;
-//	neigh_addr->sin_family = AF_INET;
-//	neigh_addr->sin_port = htons(AM_PORT);
-
 	sendto(am_send_socket, buf, packet_len, 0, (sockaddr *)neigh_addr, sizeof(sockaddr_in));
 
-//	free(neigh_addr);
 	free(am_header);
 	free(buf);
 }
