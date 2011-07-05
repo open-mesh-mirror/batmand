@@ -423,7 +423,7 @@ void debug_orig(void) {
 		uptime_sec = (uint64_t)(get_time_msec64() / 1000);
 
 		debug_output(2, "BOD\n");
-		debug_output(2, "%''12s     (%s/%i) %''15s [%10s], gw_class ... [B.A.T.M.A.N. %s%s, MainIF/IP: %s/%s, UT: %id%2ih%2im] \n", "Gateway", "#", TQ_MAX_VALUE, "Nexthop", "outgoingIF", SOURCE_VERSION, (strlen(REVISION_VERSION) > 3 ? REVISION_VERSION : ""), ((struct batman_if *)if_list.next)->dev, orig_str, (uint32_t)(uptime_sec/86400), (uint32_t)((uptime_sec%86400)/3600), (uint32_t)((uptime_sec%3600)/60));
+		debug_output(2, "%''12s     (%s/%i) %''15s [%10s], gw_class ... [B.A.T.M.A.N. %s, MainIF/IP: %s/%s, UT: %id%2ih%2im] \n", "Gateway", "#", TQ_MAX_VALUE, "Nexthop", "outgoingIF", SOURCE_VERSION, ((struct batman_if *)if_list.next)->dev, orig_str, (uint32_t)(uptime_sec/86400), (uint32_t)((uptime_sec%86400)/3600), (uint32_t)((uptime_sec%3600)/60));
 
 		if ( list_empty( &gw_list ) ) {
 
@@ -467,7 +467,7 @@ void debug_orig(void) {
 		uptime_sec = (uint64_t)(get_time_msec64() / 1000);
 
 		debug_output(1, "BOD \n");
-		debug_output(1, "  %-11s (%s/%i) %''15s [%10s]: %''20s ... [B.A.T.M.A.N. %s%s, MainIF/IP: %s/%s, UT: %id%2ih%2im] \n", "Originator", "#", TQ_MAX_VALUE, "Nexthop", "outgoingIF", "Potential nexthops", SOURCE_VERSION, (strlen(REVISION_VERSION) > 3 ? REVISION_VERSION : ""), ((struct batman_if *)if_list.next)->dev, orig_str, (uint32_t)(uptime_sec/86400), (uint32_t)((uptime_sec%86400)/3600), (uint32_t)((uptime_sec%3600)/60));
+		debug_output(1, "  %-11s (%s/%i) %''15s [%10s]: %''20s ... [B.A.T.M.A.N. %s, MainIF/IP: %s/%s, UT: %id%2ih%2im] \n", "Originator", "#", TQ_MAX_VALUE, "Nexthop", "outgoingIF", "Potential nexthops", SOURCE_VERSION, ((struct batman_if *)if_list.next)->dev, orig_str, (uint32_t)(uptime_sec/86400), (uint32_t)((uptime_sec%86400)/3600), (uint32_t)((uptime_sec%3600)/60));
 
 		if ( debug_clients.clients_num[3] > 0 ) {
 

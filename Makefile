@@ -55,7 +55,7 @@ MANPAGE = man/batmand.8
 
 # batmand flags and options
 CFLAGS +=	-pedantic -Wall -W -std=gnu99 -MD
-CPPFLAGS =	-DDEBUG_MALLOC -DMEMORY_USAGE -DPROFILE_DATA $(NO_POLICY_ROUTING) -DREVISION_VERSION=$(REVISION_VERSION)
+CPPFLAGS =	-DDEBUG_MALLOC -DMEMORY_USAGE -DPROFILE_DATA $(NO_POLICY_ROUTING)
 LDLIBS +=	-lpthread
 
 # disable verbose output
@@ -82,8 +82,12 @@ SBINDIR = $(PREFIX)/sbin
 MANDIR = $(PREFIX)/share/man
 
 # try to generate revision
-REVISION = $(shell if [ -d .git ]; then echo $$(git describe --always --dirty 2> /dev/null || echo "[unknown]"); fi)
-REVISION_VERSION =\"\ $(REVISION)\"
+REVISION= $(shell	if [ -d .git ]; then \
+				echo $$(git describe --always --dirty --match "v*" |sed 's/^v//' 2> /dev/null || echo "[unknown]"); \
+			fi)
+ifneq ($(REVISION),)
+CPPFLAGS += -DSOURCE_VERSION=\"$(REVISION)\"
+endif
 
 # default target
 all: $(BINARY_NAME)

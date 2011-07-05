@@ -3,7 +3,11 @@ ifeq ($(MAKING_MODULES),1)
 endif
 
 LINUX24:=2.4
-EXTRA_CFLAGS +=-DREVISION_VERSION=\"\ $(REVISION)\"
+ifneq ($(REVISION),)
+ccflags-y += -DSOURCE_VERSION=\"$(REVISION)\"
+else
+ccflags-y += -DSOURCE_VERSION=\"\"
+endif
 
 ifneq ($(strip $(findstring $(LINUX24),$(LINUX_VERSION))),$(LINUX24))
 

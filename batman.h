@@ -40,7 +40,9 @@
 #include "profile.h"
 #include "ring_buffer.h"
 
-#define SOURCE_VERSION "0.4-alpha" /* put exactly one distinct word inside the string like "0.3-pre-alpha" or "0.3-rc1" or "0.3" */
+#ifndef SOURCE_VERSION
+#define SOURCE_VERSION "0.4"
+#endif
 #define ADDR_STR_LEN 16
 #define TQ_MAX_VALUE 255
 
@@ -57,11 +59,6 @@
  * PROFILE_DATA   allows you to monitor the cpu usage for each function
  *
  ***/
-
-
-#ifndef REVISION_VERSION
-#define REVISION_VERSION "0"
-#endif
 
 
 

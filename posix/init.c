@@ -166,9 +166,6 @@ void apply_init_args( int argc, char *argv[] ) {
 	stop = 0;
 	prog_name = argv[0];
 
-	if ( strstr( SOURCE_VERSION, "-" ) != NULL )
-		printf( "WARNING: You are using the unstable batman branch. If you are interested in *using* batman get the latest stable release !\n" );
-
 	while ( ( optchar = getopt_long( argc, argv, "a:A:bcd:hHio:g:p:r:s:vV", long_options, &option_index ) ) != -1 ) {
 
 		switch ( optchar ) {
@@ -359,14 +356,14 @@ void apply_init_args( int argc, char *argv[] ) {
 
 			case 'v':
 
-				printf("B.A.T.M.A.N. %s%s (compatibility version %i)\n", SOURCE_VERSION, (strlen(REVISION_VERSION) > 3 ? REVISION_VERSION : ""), COMPAT_VERSION);
+				printf("B.A.T.M.A.N. %s (compatibility version %i)\n", SOURCE_VERSION, COMPAT_VERSION);
 				exit(EXIT_SUCCESS);
 
 			case 'V':
 
 				print_animation();
 
-				printf("\x1B[0;0HB.A.T.M.A.N. %s%s (compatibility version %i)\n", SOURCE_VERSION, (strlen(REVISION_VERSION) > 3 ? REVISION_VERSION : ""), COMPAT_VERSION);
+				printf("\x1B[0;0HB.A.T.M.A.N. %s (compatibility version %i)\n", SOURCE_VERSION, COMPAT_VERSION);
 				printf("\x1B[9;0H \t May the bat guide your path ...\n\n\n");
 
 				exit(EXIT_SUCCESS);
@@ -551,7 +548,7 @@ void apply_init_args( int argc, char *argv[] ) {
 
 		} else {
 
-			printf("B.A.T.M.A.N. %s%s (compatibility version %i)\n", SOURCE_VERSION, (strlen(REVISION_VERSION) > 3 ? REVISION_VERSION : ""), COMPAT_VERSION);
+			printf("B.A.T.M.A.N. %s (compatibility version %i)\n", SOURCE_VERSION, COMPAT_VERSION);
 
 			debug_clients.clients_num[ debug_level - 1 ]++;
 			debug_level_info = debugMalloc( sizeof(struct debug_level_info), 205 );
