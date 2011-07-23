@@ -10,8 +10,8 @@ endif
 
 
 UNAME:=$(shell uname -r)
-LINUX26=2.6
-LINUX_VERSION:=$(findstring $(LINUX26),$(UNAME))
+LINUX24=2.4
+LINUX_VERSION:=$(findstring $(LINUX24),$(UNAME))
 REVISION:=	$(shell if [ -d .svn ]; then \
 						if which svn > /dev/null; then \
 							svn info | grep "Rev:" | sed -e '1p' -n | awk '{print $$4}'; \
@@ -30,14 +30,14 @@ REVISION:=	$(shell if [ -d .svn ]; then \
 
 include $(PWD)/Makefile.kbuild
 
-ifneq ($(LINUX_VERSION),$(LINUX26))
+ifeq ($(LINUX_VERSION),$(LINUX24))
 TARGET:=batgat
 INCLUDE:=-I/lib/modules/$(UNAME)/build/include -I/usr/src/kernel-headers-$(UNAME)/include
 EXTRA_CFLAGS+=-D__KERNEL__ -DMODULE -O2 -Wall $(INCLUDE)
 CC:=gcc
 endif
 
-ifeq ($(LINUX_VERSION),$(LINUX26))
+ifneq ($(LINUX_VERSION),$(LINUX24))
 
 all:
 	$(MAKE) -C $(KERNELPATH) REVISION=$(REVISION) M=$(PWD) PWD=$(PWD) modules
