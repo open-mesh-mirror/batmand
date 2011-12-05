@@ -35,28 +35,6 @@ running, because it requires to install a different kernel.
 Remove the comment hash (#) leading this line in the Makefile:
 #NO_POLICY_ROUTING = -DNO_POLICY_ROUTING 
 
-
-Reducing the batmand daemon size:
-
-In case you don't need debug output levels greater than 2 (debug level 1
-shows originators, debug level 2 shows Internet gateways), add a 
-comment hash leading this line in the Makefile:
-
-DEBUG_GREATER_2 = -DDEBUG
-
-This will skip tons of debug information from the binary and save about 8 KB.
-
-
-Disable the easter-egg. The developers thought it would be fancy to have a
-easter-egg. If you are bartering for every single byte of binary size, you
-can disable it as well. Add a hash to this line:
-
-ENABLE_EASTEREGG = -DEASTEREGG
-
-This will save another 4 KB.
-
-
-
 Compiling
 ---------
 
