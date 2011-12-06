@@ -55,7 +55,7 @@ MANPAGE = man/batmand.8
 
 # batmand flags and options
 CFLAGS +=	-pedantic -Wall -W -std=gnu99 -MD
-CPPFLAGS =	-DDEBUG_MALLOC -DMEMORY_USAGE -DPROFILE_DATA $(NO_POLICY_ROUTING)
+CPPFLAGS +=	-DDEBUG_MALLOC -DMEMORY_USAGE -DPROFILE_DATA $(NO_POLICY_ROUTING)
 LDLIBS +=	-lpthread
 
 # disable verbose output
