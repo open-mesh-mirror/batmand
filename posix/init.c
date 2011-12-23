@@ -41,8 +41,6 @@
 #include "../batman.h"
 #include "../hna.h"
 
-#define IOCSETDEV 1
-
 int8_t stop;
 
 
@@ -1049,106 +1047,36 @@ void check_active_interfaces(void)
 
 void init_interface_gw (void) {
 
-	int32_t sock_opts, err, skfd;
-	struct ifreq ifr;
-	struct sockaddr_in sin;
-	struct batgat_ioc_args ioc;
+	int32_t sock_opts;
 	struct batman_if *batman_if = (struct batman_if *)if_list.next;
 
+	batman_if->addr.sin_port = htons(GW_PORT);
 
-	if ((batman_if->udp_tunnel_sock = use_gateway_module()) < 0) {
+	batman_if->udp_tunnel_sock = socket(PF_INET, SOCK_DGRAM, 0);
 
-		batman_if->addr.sin_port = htons(GW_PORT);
+	if (batman_if->udp_tunnel_sock < 0) {
 
-		batman_if->udp_tunnel_sock = socket(PF_INET, SOCK_DGRAM, 0);
-
-		if (batman_if->udp_tunnel_sock < 0) {
-
-			debug_output( 0, "Error - can't create tunnel socket: %s\n", strerror(errno) );
-			restore_defaults();
-			exit(EXIT_FAILURE);
-
-		}
-
-		if ( bind( batman_if->udp_tunnel_sock, (struct sockaddr *)&batman_if->addr, sizeof(struct sockaddr_in) ) < 0 ) {
-
-			debug_output( 0, "Error - can't bind tunnel socket: %s\n", strerror(errno) );
-			restore_defaults();
-			exit(EXIT_FAILURE);
-
-		}
-
-		/* make udp socket non blocking */
-		sock_opts = fcntl( batman_if->udp_tunnel_sock, F_GETFL, 0 );
-		fcntl( batman_if->udp_tunnel_sock, F_SETFL, sock_opts | O_NONBLOCK );
-
-		batman_if->addr.sin_port = htons(PORT);
-
-		pthread_create( &batman_if->listen_thread_id, NULL, &gw_listen, batman_if );
-
-	} else {
-
-		ioc.universal = strlen(batman_if->dev);
-		ioc.exists = 0;
-		strncpy(ioc.dev_name, batman_if->dev, IFNAMSIZ - 1);
-
-		if (ioctl(batman_if->udp_tunnel_sock, IOCSETDEV, &ioc) < 0) {
-			debug_output(0, "Error - can't add device %s: %s\n", batman_if->dev,strerror(errno));
-			batman_if->dev = NULL;
-			restore_defaults();
-			exit(EXIT_FAILURE);
-		}
-
-		/* set ip address of gate device */
-		if ((skfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
-			debug_output( 0, "Error - can't create socket to gate\n" );
-			restore_defaults();
-			exit( EXIT_FAILURE );
-		}
-
-		memset(&ifr, 0, sizeof(ifr));
-		memset(&sin, 0, sizeof(struct sockaddr));
-
-		strncpy(ifr.ifr_name, ioc.dev_name, IFNAMSIZ - 1);
-
-		sin.sin_family = AF_INET;
-		sin.sin_addr.s_addr = ioc.universal;
-		memcpy(&ifr.ifr_addr, &sin, sizeof(struct sockaddr));
-
-		if ((err = ioctl(skfd, SIOCSIFADDR, &ifr)) < 0) {
-			debug_output(0, "Error - can't set IFADDR %s: %s\n", ioc.dev_name, strerror(err));
-			close(skfd);
-			restore_defaults();
-			exit( EXIT_FAILURE );
-		}
-
-		memset(&ifr, 0, sizeof(ifr));
-		strncpy(ifr.ifr_name, ioc.dev_name, IFNAMSIZ - 1);
-		if (ioctl(skfd, SIOCGIFFLAGS, &ifr) < 0) {
-			debug_output(0, "Error - can't get IFFLAGS for %s: %s\n", ioc.dev_name, strerror(errno));
-			close(skfd);
-			restore_defaults();
-			exit( EXIT_FAILURE );
-		}
-
-		strncpy(ifr.ifr_name, ioc.dev_name, IFNAMSIZ - 1);
-		ifr.ifr_flags |= (IFF_UP | IFF_RUNNING);
-
-		if (ioctl(skfd, SIOCSIFFLAGS, &ifr) < 0) {
-			debug_output(0, "Error - can't set IFFLAGS for %s: %s\n", ioc.dev_name, strerror(errno));
-			close(skfd);
-			restore_defaults();
-			exit( EXIT_FAILURE );
-		}
-
-		close(skfd);
-
-		if (!ioc.exists)
-			add_del_route(ioc.universal, 16, 0, 0, ioc.ifindex, ioc.dev_name, 254, ROUTE_TYPE_UNICAST, ROUTE_ADD);
-
+		debug_output( 0, "Error - can't create tunnel socket: %s\n", strerror(errno) );
+		restore_defaults();
+		exit(EXIT_FAILURE);
 
 	}
 
+	if ( bind( batman_if->udp_tunnel_sock, (struct sockaddr *)&batman_if->addr, sizeof(struct sockaddr_in) ) < 0 ) {
+
+		debug_output( 0, "Error - can't bind tunnel socket: %s\n", strerror(errno) );
+		restore_defaults();
+		exit(EXIT_FAILURE);
+
+	}
+
+	/* make udp socket non blocking */
+	sock_opts = fcntl( batman_if->udp_tunnel_sock, F_GETFL, 0 );
+	fcntl( batman_if->udp_tunnel_sock, F_SETFL, sock_opts | O_NONBLOCK );
+
+	batman_if->addr.sin_port = htons(PORT);
+
+	pthread_create( &batman_if->listen_thread_id, NULL, &gw_listen, batman_if );
 }
 
 

@@ -143,11 +143,4 @@ struct curr_gw_data {
 	struct batman_if *batman_if;
 };
 
-struct batgat_ioc_args {
-	char dev_name[16];
-	unsigned char exists;
-	uint32_t universal;
-	uint32_t ifindex;
-};
-
 #endif

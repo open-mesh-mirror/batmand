@@ -169,19 +169,6 @@ int8_t bind_to_iface(int32_t sock, char *dev)
 	return 1;
 }
 
-int32_t use_gateway_module(void)
-{
-	int32_t fd;
-
-	if ((fd = open("/dev/batgat", O_WRONLY)) < 0) {
-		debug_output(0, "Warning - batgat kernel modul interface (/dev/batgat) not usable: %s\nThis may decrease the performance of batman!\n", strerror(errno));
-
-		return -1;
-	}
-
-	return fd;
-}
-
 int is_wifi_interface(char *dev, int fd)
 {
 	struct ifreq int_req;

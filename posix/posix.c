@@ -42,7 +42,6 @@
 
 #define BAT_LOGO_PRINT(x,y,z) printf( "\x1B[%i;%iH%c", y + 1, x, z )                      /* write char 'z' into column 'x', row 'y' */
 #define BAT_LOGO_END(x,y) printf("\x1B[8;0H");fflush(NULL);bat_wait( x, y );              /* end of current picture */
-#define IOCREMDEV 2
 
 static clock_t last_clock_tick;
 static float system_tick;
@@ -427,25 +426,11 @@ int8_t send_udp_packet(unsigned char *packet_buff, int32_t packet_buff_len, stru
 void del_gw_interface(void)
 {
 	struct batman_if *batman_if = (struct batman_if *)if_list.next;
-	struct batgat_ioc_args args;
 
-	/* TODO: unregister from kernel module per ioctl */
 	if (batman_if->udp_tunnel_sock > 0) {
 
 		if (batman_if->listen_thread_id != 0) {
 			pthread_join(batman_if->listen_thread_id, NULL);
-		} else {
-
-			if (batman_if->dev != NULL) {
-
-				strncpy(args.dev_name, batman_if->dev, IFNAMSIZ - 1);
-				args.universal = strlen(batman_if->dev);
-
-				if (ioctl(batman_if->udp_tunnel_sock, IOCREMDEV, &args) < 0)
-					debug_output(0, "Error - can't remove device %s from kernel module : %s\n", batman_if->dev,strerror(errno));
-
-			}
-
 		}
 
 		close(batman_if->udp_tunnel_sock);
