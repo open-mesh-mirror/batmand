@@ -32,9 +32,6 @@
 #include <netinet/ip.h>
 #include <netinet/udp.h>
 #include <netinet/tcp.h>
-#if defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__Darwin__)
-#include <sys/sockio.h>
-#endif
 #include <net/if.h>
 #include <fcntl.h>        /* open(), O_RDWR */
 
@@ -71,29 +68,17 @@ void init_bh_ports(void)
 
 static uint8_t get_tunneled_protocol(const unsigned char *buff)
 {
-#if defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__Darwin__)
-	return ((struct ip *)(buff + 1))->ip_p;
-#else
 	return ((struct iphdr *)(buff + 1))->protocol;
-#endif
 }
 
 static uint32_t get_tunneled_sender_ip(const unsigned char *buff)
 {
-#if defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__Darwin__)
-	return ((struct ip *)(buff + 1))->ip_src;
-#else
 	return ((struct iphdr *)(buff + 1))->saddr;
-#endif
 }
 
 static uint16_t get_tunneled_udpdest(const unsigned char *buff)
 {
-#if defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__Darwin__)
-       return ((struct udphdr *)(buff + 1 + ((struct ip *)(buff + 1))->ip_hl*4))->uh_dport;
-#else
        return ((struct udphdr *)(buff + 1 + ((struct iphdr *)(buff + 1))->ihl*4))->dest;
-#endif
 }
 
 static int8_t get_tun_ip(struct sockaddr_in *gw_addr, int32_t udp_sock, uint32_t *tun_addr)

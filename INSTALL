@@ -13,12 +13,11 @@ You need the usual compile environment and the libpthread-library
 and the kernel module "tun". Both should already be installed on
 your machine, if you use a PC with Linux. On embedded devices
 both may not be installed in order to save space. GNU Make is needed
-for compilation (currently BSD Make is not cooperating).
+for compilation.
 
-The *BSD and Mac OS operating systems are currently unmaintained,
-make targets are still available but will most probably not work.
-If you're interested in porting and maintaining B.A.T.M.A.N. for
-these systems, please contact us. We would appreciate your help.
+The ports to *BSD and Mac OS operating systems are currently not
+available. If you're interested in porting and maintaining B.A.T.M.A.N.
+for these systems, please contact us. We would appreciate your help.
 
 Tweaking
 --------

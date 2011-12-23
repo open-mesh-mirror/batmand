@@ -26,13 +26,6 @@
 #define _LINUX_LIST_H
 
 /*
- * XXX: Resolve conflict between this file and <sys/queue.h> on BSD systems.
- */
-#ifdef LIST_HEAD
-#undef LIST_HEAD
-#endif
-
-/*
  * Simple linked list implementation.
  *
  * Some of the internal functions ("__xxx") are useful when

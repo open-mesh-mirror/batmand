@@ -23,28 +23,10 @@ BINARY_NAME = batmand
 
 UNAME =		$(shell uname)
 POSIX_OBJ =	posix/init.o posix/posix.o posix/tunnel.o posix/unix_socket.o
-BSD_OBJ =	bsd/route.o bsd/tun.o bsd/kernel.o bsd/compat.o
 LINUX_OBJ =	linux/route.o linux/tun.o linux/kernel.o
 
 ifeq ($(UNAME),Linux)
 OS_OBJ =	$(LINUX_OBJ) $(POSIX_OBJ)
-endif
-
-ifeq ($(UNAME),Darwin)
-OS_OBJ =	$(BSD_OBJ) $(POSIX_OBJ)
-endif
-
-ifeq ($(UNAME),GNU/kFreeBSD)
-OS_OBJ =	$(BSD_OBJ) $(POSIX_OBJ)
-LDLIBS +=	-lfreebsd -lbsd
-endif
-
-ifeq ($(UNAME),FreeBSD)
-OS_OBJ =	$(BSD_OBJ) $(POSIX_OBJ)
-endif
-
-ifeq ($(UNAME),OpenBSD)
-OS_OBJ =	$(BSD_OBJ) $(POSIX_OBJ)
 endif
 
 OBJ = batman.o originator.o schedule.o list-batman.o allocate.o bitarray.o hash.o profile.o ring_buffer.o hna.o $(OS_OBJ)
