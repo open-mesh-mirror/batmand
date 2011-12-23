@@ -37,16 +37,16 @@ Remove the comment hash (#) leading this line in the Makefile:
 Compiling
 ---------
 
-You don't necessarily need to compile. May be your distribution
-or our download store offers precompiled packages. Check
-http://www.open-mesh.net/wiki/Download to get an overview.
+You don't necessarily need to compile. May be your distribution or our
+download store offers precompiled packages. Check
+http://www.open-mesh.org/wiki/open-mesh/Download to get an overview.
 
-Download and compile the latest stable sources from the download
-section http://www.open-mesh.net/wiki/Download by executing eg.:
+Download and compile the latest stable sources from the download section
+http://www.open-mesh.org/wiki/open-mesh/Download by executing eg.:
 
-$ wget http://downloads.open-mesh.net/batman/releases/batman-0.3.2/batman-0.3.2.tar.gz
-$ tar xzvf batman-0.3.2.tar.gz
-$ cd batmand-0.3.2
+$ wget http://downloads.open-mesh.org/batman/stable/sources/batmand/batmand-0.3.2.tar.gz
+$ tar xzvf batmand-0.3.2.tar.gz
+$ cd batman-0.3.2
 $ make
 
 After the compilation process is finished you'll find a executable
