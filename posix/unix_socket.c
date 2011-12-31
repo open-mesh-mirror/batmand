@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2006-2009 BATMAN contributors:
+ * Copyright (C) 2006-2012 BATMAN contributors:
  *
  * Marek Lindner
  *
