@@ -27,6 +27,7 @@ LINUX_OBJ =	linux/route.o linux/tun.o linux/kernel.o
 
 ifeq ($(UNAME),Linux)
 OS_OBJ =	$(LINUX_OBJ) $(POSIX_OBJ)
+CPPFLAGS +=	-D_GNU_SOURCE
 endif
 
 OBJ = batman.o originator.o schedule.o list-batman.o allocate.o bitarray.o hash.o profile.o ring_buffer.o hna.o $(OS_OBJ)

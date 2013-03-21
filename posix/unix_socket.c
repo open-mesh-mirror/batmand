@@ -21,7 +21,6 @@
 
 
 
-#define _GNU_SOURCE
 #include <sys/time.h>
 #include <stdio.h>
 #include <fcntl.h>

@@ -21,7 +21,6 @@
 
 
 
-#define _GNU_SOURCE
 #include <sys/ioctl.h>
 #include <arpa/inet.h>    /* inet_ntop() */
 #include <errno.h>
