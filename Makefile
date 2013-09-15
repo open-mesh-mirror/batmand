@@ -37,7 +37,7 @@ MANPAGE = man/batmand.8
 #NO_POLICY_ROUTING = -DNO_POLICY_ROUTING
 
 # batmand flags and options
-CFLAGS +=	-pedantic -Wall -W -std=gnu99 -MD
+CFLAGS +=	-pedantic -Wall -W -std=gnu99 -MD -fno-strict-aliasing
 CPPFLAGS +=	-DDEBUG_MALLOC -DMEMORY_USAGE -DPROFILE_DATA $(NO_POLICY_ROUTING)
 LDLIBS +=	-lpthread
 
