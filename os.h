@@ -19,8 +19,8 @@
  *
  */
 
-#ifndef _BATMAN_OS_H
-#define _BATMAN_OS_H
+#ifndef _BATMAND_OS_H
+#define _BATMAND_OS_H
 
 #include "batman.h"
 

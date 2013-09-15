@@ -19,7 +19,8 @@
  *
  */
 
-
+#ifndef _BATMAND_RING_BUFFER_H
+#define _BATMAND_RING_BUFFER_H
 
 #include <stdint.h>
 #include "batman.h"
@@ -28,3 +29,5 @@
 
 void ring_buffer_set(uint8_t tq_recv[], uint8_t *tq_index, uint8_t value);
 uint8_t ring_buffer_avg(uint8_t tq_recv[]);
+
+#endif

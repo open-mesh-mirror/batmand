@@ -19,7 +19,8 @@
  *
  */
 
-
+#ifndef _BATMAND_ORIGINATOR_H
+#define _BATMAND_ORIGINATOR_H
 
 #include "batman.h"
 #include "types.h"
@@ -33,3 +34,4 @@ void update_orig( struct orig_node *orig_node, struct bat_packet *in, uint32_t n
 void purge_orig( uint32_t curr_time );
 void debug_orig(void);
 
+#endif

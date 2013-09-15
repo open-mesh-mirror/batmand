@@ -21,8 +21,8 @@
 
 
 
-#ifndef _BATMAN_BATMAN_H
-#define _BATMAN_BATMAN_H
+#ifndef _BATMAND_BATMAN_H
+#define _BATMAND_BATMAN_H
 
 #include <sys/types.h>
 #include <netinet/in.h>

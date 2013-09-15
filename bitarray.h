@@ -19,7 +19,8 @@
  *
  */
 
-
+#ifndef _BATMAND_BITARRAY_H
+#define _BATMAND_BITARRAY_H
 
 #include "batman.h"
 #define WORD_BIT_SIZE ( sizeof(TYPE_OF_WORD) * 8 )
@@ -34,3 +35,4 @@ char bit_get_packet( TYPE_OF_WORD *seq_bits, int16_t seq_num_diff, int8_t set_ma
 int  bit_packet_count( TYPE_OF_WORD *seq_bits );
 uint8_t bit_count( int32_t to_count );
 
+#endif

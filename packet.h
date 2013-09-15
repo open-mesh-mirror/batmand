@@ -19,6 +19,9 @@
  *
  */
 
+#ifndef _BATMAND_PACKET_H
+#define _BATMAND_PACKET_H
+
 #define COMPAT_VERSION 5
 #define VIS_COMPAT_VERSION 23
 
@@ -57,3 +60,5 @@ struct vis_data {
 	uint8_t data;
 	uint32_t ip;
 } __attribute__((packed));
+
+#endif

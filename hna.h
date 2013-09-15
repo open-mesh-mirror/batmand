@@ -19,7 +19,8 @@
  *
  */
 
-
+#ifndef _BATMAND_HNA_H
+#define _BATMAND_HNA_H
 
 #include "batman.h"
 
@@ -82,3 +83,5 @@ void hna_global_update(struct orig_node *orig_node, unsigned char *new_hna,
 				int16_t new_hna_len, struct neigh_node *old_router);
 void hna_global_check_tq(struct orig_node *orig_node);
 void hna_global_del(struct orig_node *orig_node);
+
+#endif

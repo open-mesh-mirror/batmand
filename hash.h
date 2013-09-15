@@ -18,8 +18,8 @@
  * 02110-1301, USA
  *
  */
-#ifndef _BATMAN_HASH_H
-#define _BATMAN_HASH_H
+#ifndef _BATMAND_HASH_H
+#define _BATMAND_HASH_H
 
 
 

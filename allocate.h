@@ -20,10 +20,10 @@
  */
 
 
-#ifndef _ALLOCATE_H
-#define _ALLOCATE_H 1
-#include <stdint.h>
+#ifndef _BATMAND_ALLOCATE_H
+#define _BATMAND_ALLOCATE_H
 
+#include <stdint.h>
 
 
 void checkIntegrity(void);
