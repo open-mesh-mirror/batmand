@@ -80,20 +80,21 @@ void prof_print(void) {
 
 #else
 
+#include "batman.h"
 
-void prof_init( int32_t index, const char *name ) {
-
-}
-
-
-
-void prof_start( int32_t index ) {
+void prof_init( int32_t BATMANUNUSED(index), const char *BATMANUNUSED(name) ) {
 
 }
 
 
 
-void prof_stop( int32_t index ) {
+void prof_start( int32_t BATMANUNUSED(index) ) {
+
+}
+
+
+
+void prof_stop( int32_t BATMANUNUSED(index) ) {
 
 }
 

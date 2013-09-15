@@ -421,6 +421,8 @@ void debugFree(void *memoryParameter, int tag)
 
 #else
 
+#include "batman.h"
+
 void checkIntegrity(void)
 {
 }
@@ -459,7 +461,7 @@ void *debugRealloc(void *memory, uint32_t length, int32_t tag)
 	return result;
 }
 
-void debugFree(void *memory, int32_t tag)
+void debugFree(void *memory, int32_t BATMANUNUSED(tag))
 {
 	free(memory);
 }
