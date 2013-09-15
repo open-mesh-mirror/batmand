@@ -32,6 +32,10 @@
 
 #if defined DEBUG_MALLOC
 
+#ifndef MEMORY_USAGE
+#error DEBUG_MALLOC can only be used together with MEMORY_USAGE
+#endif
+
 static pthread_mutex_t chunk_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 struct chunkHeader *chunkList = NULL;
