@@ -347,7 +347,7 @@ void *unix_listen(void * BATMANUNUSED(arg)) {
 							} else if ( buff[0] == 'q' ) {
 
 								if ( status > 2 ) {
-									debug_output(3, "Unix socket: changing purge timeout from: %i to: %i\n", purge_timeout, strtol(buff + 2, NULL, 10));
+									debug_output(3, "Unix socket: changing purge timeout from: %i to: %li\n", purge_timeout, strtol(buff + 2, NULL, 10));
 									purge_timeout = strtol(buff + 2, NULL, 10);
 								}
 

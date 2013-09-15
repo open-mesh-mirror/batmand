@@ -423,7 +423,7 @@ void debug_orig(void) {
 		uptime_sec = (uint64_t)(get_time_msec64() / 1000);
 
 		debug_output(2, "BOD\n");
-		debug_output(2, "%''12s     (%s/%i) %''15s [%10s], gw_class ... [B.A.T.M.A.N. %s, MainIF/IP: %s/%s, UT: %id%2ih%2im] \n", "Gateway", "#", TQ_MAX_VALUE, "Nexthop", "outgoingIF", SOURCE_VERSION, ((struct batman_if *)if_list.next)->dev, orig_str, (uint32_t)(uptime_sec/86400), (uint32_t)((uptime_sec%86400)/3600), (uint32_t)((uptime_sec%3600)/60));
+		debug_output(2, "%12s     (%s/%i) %15s [%10s], gw_class ... [B.A.T.M.A.N. %s, MainIF/IP: %s/%s, UT: %id%2ih%2im] \n", "Gateway", "#", TQ_MAX_VALUE, "Nexthop", "outgoingIF", SOURCE_VERSION, ((struct batman_if *)if_list.next)->dev, orig_str, (uint32_t)(uptime_sec/86400), (uint32_t)((uptime_sec%86400)/3600), (uint32_t)((uptime_sec%3600)/60));
 
 		if ( list_empty( &gw_list ) ) {
 
@@ -446,7 +446,7 @@ void debug_orig(void) {
 
 				get_gw_speeds( gw_node->orig_node->gwflags, &download_speed, &upload_speed );
 
-				debug_output(2, "%s %-15s (%3i) %''15s [%10s], gw_class %3i - %i%s/%i%s, gateway failures: %i \n", ( curr_gateway == gw_node ? "=>" : "  " ), str, gw_node->orig_node->router->tq_avg, str2, gw_node->orig_node->router->if_incoming->dev, gw_node->orig_node->gwflags, (download_speed > 2048 ? download_speed / 1024 : download_speed), (download_speed > 2048 ? "MBit" : "KBit"), (upload_speed > 2048 ? upload_speed / 1024 : upload_speed), (upload_speed > 2048 ? "MBit" : "KBit"), gw_node->gw_failure);
+				debug_output(2, "%s %-15s (%3i) %15s [%10s], gw_class %3i - %i%s/%i%s, gateway failures: %i \n", ( curr_gateway == gw_node ? "=>" : "  " ), str, gw_node->orig_node->router->tq_avg, str2, gw_node->orig_node->router->if_incoming->dev, gw_node->orig_node->gwflags, (download_speed > 2048 ? download_speed / 1024 : download_speed), (download_speed > 2048 ? "MBit" : "KBit"), (upload_speed > 2048 ? upload_speed / 1024 : upload_speed), (upload_speed > 2048 ? "MBit" : "KBit"), gw_node->gw_failure);
 
 				batman_count++;
 
@@ -467,7 +467,7 @@ void debug_orig(void) {
 		uptime_sec = (uint64_t)(get_time_msec64() / 1000);
 
 		debug_output(1, "BOD \n");
-		debug_output(1, "  %-11s (%s/%i) %''15s [%10s]: %''20s ... [B.A.T.M.A.N. %s, MainIF/IP: %s/%s, UT: %id%2ih%2im] \n", "Originator", "#", TQ_MAX_VALUE, "Nexthop", "outgoingIF", "Potential nexthops", SOURCE_VERSION, ((struct batman_if *)if_list.next)->dev, orig_str, (uint32_t)(uptime_sec/86400), (uint32_t)((uptime_sec%86400)/3600), (uint32_t)((uptime_sec%3600)/60));
+		debug_output(1, "  %-11s (%s/%i) %15s [%10s]: %20s ... [B.A.T.M.A.N. %s, MainIF/IP: %s/%s, UT: %id%2ih%2im] \n", "Originator", "#", TQ_MAX_VALUE, "Nexthop", "outgoingIF", "Potential nexthops", SOURCE_VERSION, ((struct batman_if *)if_list.next)->dev, orig_str, (uint32_t)(uptime_sec/86400), (uint32_t)((uptime_sec%86400)/3600), (uint32_t)((uptime_sec%3600)/60));
 
 		if ( debug_clients.clients_num[3] > 0 ) {
 
@@ -481,7 +481,7 @@ void debug_orig(void) {
 			}
 
 			debug_output( 4, "Originator list \n" );
-			debug_output( 4, "  %-11s (%s/%i) %''15s [%10s]: %''20s\n", "Originator", "#", TQ_MAX_VALUE, "Nexthop", "outgoingIF", "Potential nexthops" );
+			debug_output( 4, "  %-11s (%s/%i) %15s [%10s]: %20s\n", "Originator", "#", TQ_MAX_VALUE, "Nexthop", "outgoingIF", "Potential nexthops" );
 
 		}
 
@@ -497,8 +497,8 @@ void debug_orig(void) {
 			addr_to_string( orig_node->orig, str, sizeof (str) );
 			addr_to_string( orig_node->router->addr, str2, sizeof (str2) );
 
-			debug_output( 1, "%-15s (%3i) %''15s [%10s]:", str, orig_node->router->tq_avg, str2, orig_node->router->if_incoming->dev );
-			debug_output( 4, "%''15s (%3i) %''15s [%10s], last_valid: %u: \n", str, orig_node->router->tq_avg, str2, orig_node->router->if_incoming->dev, orig_node->last_valid );
+			debug_output( 1, "%-15s (%3i) %15s [%10s]:", str, orig_node->router->tq_avg, str2, orig_node->router->if_incoming->dev );
+			debug_output( 4, "%15s (%3i) %15s [%10s], last_valid: %u: \n", str, orig_node->router->tq_avg, str2, orig_node->router->if_incoming->dev, orig_node->last_valid );
 
 			debug_out_size = 0;
 
