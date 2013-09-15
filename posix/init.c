@@ -35,6 +35,7 @@
 #include <arpa/inet.h>
 #include <fcntl.h>
 #include <getopt.h>
+#include <unistd.h>
 
 
 #include "../os.h"
@@ -43,48 +44,6 @@
 
 int8_t stop;
 
-
-
-static int my_daemon(void) {
-
-	int fd;
-
-	switch( fork() ) {
-
-		case -1:
-			return -1;
-
-		case 0:
-			break;
-
-		default:
-			exit(EXIT_SUCCESS);
-
-	}
-
-	if ( setsid() == -1 )
-		return(-1);
-
-	/* Make certain we are not a session leader, or else we might reacquire a controlling terminal */
-	if ( fork() )
-		exit(EXIT_SUCCESS);
-
-	chdir( "/" );
-
-	if ( ( fd = open(_PATH_DEVNULL, O_RDWR, 0) ) != -1 ) {
-
-		dup2(fd, STDIN_FILENO);
-		dup2(fd, STDOUT_FILENO);
-		dup2(fd, STDERR_FILENO);
-
-		if ( fd > 2 )
-			close(fd);
-
-	}
-
-	return 0;
-
-}
 
 static void create_routing_pipe(void)
 {
@@ -534,7 +493,7 @@ void apply_init_args( int argc, char *argv[] ) {
 		/* daemonize */
 		if (debug_level == 0) {
 
-			if (my_daemon() < 0) {
+			if (daemon(0, 0) < 0) {
 
 				printf("Error - can't fork to background: %s\n", strerror(errno));
 				restore_defaults();
