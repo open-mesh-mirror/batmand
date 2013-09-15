@@ -22,12 +22,20 @@
 
 
 #include <string.h>
-#include <stdlib.h>
 #include <stdio.h>
+#include <netinet/in.h>
+#include <stddef.h>
+
+#include "list-batman.h"
+#include "packet.h"
 #include "os.h"
 #include "batman.h"
 #include "originator.h"
 #include "hna.h"
+#include "hash.h"
+#include "profile.h"
+#include "allocate.h"
+#include "ring_buffer.h"
 #include "types.h"
 
 struct neigh_node * create_neighbor(struct orig_node *orig_node, struct orig_node *orig_neigh_node, uint32_t neigh, struct batman_if *if_incoming) {

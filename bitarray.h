@@ -22,6 +22,7 @@
 #ifndef _BATMAND_BITARRAY_H
 #define _BATMAND_BITARRAY_H
 
+#include <stdint.h>
 #include "batman.h"
 #define WORD_BIT_SIZE ( sizeof(TYPE_OF_WORD) * 8 )
 

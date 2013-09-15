@@ -26,16 +26,20 @@
 #include <errno.h>
 #include <sys/ioctl.h>
 #include <arpa/inet.h>    /* inet_ntop() */
-#include <netinet/ip.h>   /* iph */
+#include <netinet/in.h>
 #include <linux/if_tun.h> /* TUNSETPERSIST, ... */
 #include <linux/if.h>     /* ifr_if, ifr_tun */
 #include <sys/socket.h>
 #include <stdio.h>
 #include <stdlib.h>       /* system() */
 #include <sys/wait.h>     /* WEXITSTATUS */
+#include <stddef.h>
+#include <stdint.h>
+#include <string.h>
 
 #include "../os.h"
 #include "../batman.h"
+#include "../types.h"
 
 #define IPTABLES_ADD_MASQ "iptables -t nat -A POSTROUTING -o %s -j MASQUERADE"
 #define IPTABLES_DEL_MASQ "iptables -t nat -D POSTROUTING -o %s -j MASQUERADE"

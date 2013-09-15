@@ -23,21 +23,27 @@
 
 #include <errno.h>
 #include <unistd.h>
-#include <stdlib.h>
 #include <string.h>
-#include <arpa/inet.h>
-#include <sys/ioctl.h>
 #include <sys/socket.h>
-#include <netinet/in_systm.h>
 #include <netinet/ip.h>
 #include <netinet/udp.h>
-#include <netinet/tcp.h>
 #include <net/if.h>
 #include <fcntl.h>        /* open(), O_RDWR */
+#include <netinet/in.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <sys/select.h>
+#include <sys/time.h>
+#include <sys/types.h>
 
 
 #include "../os.h"
 #include "../batman.h"
+#include "../allocate.h"
+#include "../hash.h"
+#include "../list-batman.h"
+#include "../packet.h"
+#include "../types.h"
 
 
 

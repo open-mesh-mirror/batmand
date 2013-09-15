@@ -22,7 +22,14 @@
 #ifndef _BATMAND_TYPES_H
 #define _BATMAND_TYPES_H
 
+#include <stdint.h>
+#include <pthread.h>
+#include <sys/un.h>
+#include <netinet/in.h>
+
+#include "list-batman.h"
 #include "packet.h"
+#include "batman.h"
 
 struct orig_node {                /* structure for orig_list maintaining nodes of mesh */
 	uint32_t orig;

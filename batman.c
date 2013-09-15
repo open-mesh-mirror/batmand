@@ -25,7 +25,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
-#include <errno.h>
+#include <netinet/in.h>
 
 #include "os.h"
 #include "batman.h"
@@ -33,6 +33,11 @@
 #include "schedule.h"
 #include "hna.h"
 #include "types.h"
+#include "profile.h"
+#include "allocate.h"
+#include "hash.h"
+#include "bitarray.h"
+#include "packet.h"
 
 
 uint8_t debug_level = 0;

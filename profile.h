@@ -22,6 +22,9 @@
 #ifndef _BATMAND_PROFILE_H
 #define _BATMAND_PROFILE_H
 
+#include <stdint.h>
+#include <time.h>
+
 enum {
 
 	PROF_choose_gw,

@@ -22,7 +22,12 @@
 #ifndef _BATMAND_OS_H
 #define _BATMAND_OS_H
 
-#include "batman.h"
+#include <stddef.h>
+#include <stdint.h>
+#include <netinet/in.h>
+
+
+#include "types.h"
 
 #ifdef __GNUC_MINOR__
 #define NO_RETURN  __attribute__ ((__noreturn__))

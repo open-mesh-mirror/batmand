@@ -22,6 +22,8 @@
 #ifndef _BATMAND_PACKET_H
 #define _BATMAND_PACKET_H
 
+#include <stdint.h>
+
 #define COMPAT_VERSION 5
 #define VIS_COMPAT_VERSION 23
 

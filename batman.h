@@ -25,20 +25,15 @@
 #define _BATMAND_BATMAN_H
 
 #include <sys/types.h>
-#include <netinet/in.h>
 #include <pthread.h>
-#include <sys/un.h>
 #include <stdint.h>
-#include <stdio.h>
+#include <sys/select.h>
+#include <sys/un.h>
+#include <netinet/in.h>
 
 #define TYPE_OF_WORD uintmax_t /* you should choose something big, if you don't want to waste cpu */
 
 #include "list-batman.h"
-#include "bitarray.h"
-#include "hash.h"
-#include "allocate.h"
-#include "profile.h"
-#include "ring_buffer.h"
 
 #ifndef SOURCE_VERSION
 #define SOURCE_VERSION "0.4"
@@ -192,7 +187,11 @@ extern uint8_t local_win_size;
 extern uint8_t num_words;
 extern uint8_t aggregation_enabled;
 
-#include "types.h" // can be removed as soon as these function have been cleaned up
+/* fwd declarations */
+struct batman_if;
+struct orig_node;
+struct neigh_node;
+
 int8_t batman(void);
 void usage(void);
 void verbose_usage(void);

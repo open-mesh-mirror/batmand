@@ -21,13 +21,13 @@
 
 
 
+#include <stdint.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <stdio.h>
 #include <syslog.h>
 #include <errno.h>
 #include <signal.h>
-#include <paths.h>
 #include <string.h>
 #include <sys/ioctl.h>
 #include <sys/socket.h>
@@ -35,12 +35,20 @@
 #include <arpa/inet.h>
 #include <fcntl.h>
 #include <getopt.h>
-#include <unistd.h>
+#include <netinet/in.h>
+#include <pthread.h>
+#include <sys/select.h>
+#include <sys/un.h>
 
 
 #include "../os.h"
 #include "../batman.h"
 #include "../hna.h"
+#include "../allocate.h"
+#include "../bitarray.h"
+#include "../list-batman.h"
+#include "../packet.h"
+#include "../types.h"
 
 int8_t stop;
 

@@ -21,13 +21,23 @@
 
 
 
+#include "allocate.h"
 #include "hna.h"
 #include "os.h"
 #include "hash.h"
+#include "packet.h"
+#include "types.h"
 
 #include <errno.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <arpa/inet.h>
+#include <netinet/in.h>
+#include <pthread.h>
+#include <stddef.h>
+#include <string.h>
+#include <sys/socket.h>
+
 
 
 unsigned char *hna_buff_local = NULL;

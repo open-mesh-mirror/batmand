@@ -22,7 +22,8 @@
 #ifndef _BATMAND_ORIGINATOR_H
 #define _BATMAND_ORIGINATOR_H
 
-#include "batman.h"
+#include <stdint.h>
+
 #include "types.h"
 
 

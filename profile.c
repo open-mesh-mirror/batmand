@@ -21,9 +21,12 @@
 
 
 
-#include "os.h"
-#include "batman.h"
 #include <inttypes.h>
+#include <stdint.h>
+#include <time.h>
+
+#include "profile.h"
+#include "os.h"
 
 
 
@@ -78,7 +81,7 @@ void prof_print(void) {
 #else
 
 
-void prof_init( int32_t index, char *name ) {
+void prof_init( int32_t index, const char *name ) {
 
 }
 

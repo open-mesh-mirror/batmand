@@ -22,17 +22,14 @@
 
 
 #include <stdio.h>
-#include <fcntl.h>
-#include <errno.h>
-#include <unistd.h>
+#include <stdint.h>
 #include <sys/ioctl.h>
 #include <sys/socket.h>
 #include <inttypes.h>
 #include <net/if.h>
+#include <string.h>
 
 #include "../os.h"
-#include "../batman.h"
-
 
 #define IOCGETNWDEV 1
 

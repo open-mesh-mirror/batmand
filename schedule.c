@@ -23,6 +23,15 @@
 
 #include <string.h>
 #include <stdlib.h>
+#include <netinet/in.h>
+
+#include "list-batman.h"
+#include "packet.h"
+#include "types.h"
+#include "allocate.h"
+#include "hash.h"
+#include "profile.h"
+#include "bitarray.h"
 #include "os.h"
 #include "batman.h"
 #include "schedule.h"

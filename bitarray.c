@@ -20,9 +20,6 @@
  */
 
 
-
-#include <stdio.h>              /* printf() */
-
 #include "bitarray.h"
 #include "os.h"
 

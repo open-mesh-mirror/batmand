@@ -31,13 +31,23 @@
 #include <syslog.h>
 #include <sys/socket.h>
 #include <sys/times.h>
-#include <sys/ioctl.h>
 #include <sys/wait.h>
-#include <net/if.h>
+#include <netinet/in.h>
+#include <pthread.h>
+#include <stdint.h>
+#include <sys/select.h>
+#include <sys/time.h>
+#include <time.h>
+
 
 #include "../os.h"
 #include "../batman.h"
 #include "../hna.h"
+#include "../allocate.h"
+#include "../hash.h"
+#include "../packet.h"
+#include "../types.h"
+#include "../list-batman.h"
 
 
 #define BAT_LOGO_PRINT(x,y,z) printf( "\x1B[%i;%iH%c", y + 1, x, z )                      /* write char 'z' into column 'x', row 'y' */

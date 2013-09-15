@@ -29,6 +29,14 @@
 #include <linux/netlink.h>
 #include <linux/rtnetlink.h>
 #include <sys/socket.h>
+#include <netinet/in.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <string.h>
+#include <sys/uio.h>
+#include "../allocate.h"
+#include "../bitarray.h"
 
 #include "../os.h"
 #include "../batman.h"

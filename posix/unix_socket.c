@@ -32,11 +32,20 @@
 #include <unistd.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
-
+#include <netinet/in.h>
+#include <pthread.h>
+#include <stdint.h>
+#include <sys/select.h>
+#include <sys/un.h>
+#include <sys/types.h>
 
 #include "../os.h"
 #include "../batman.h"
 #include "../hna.h"
+#include "../allocate.h"
+#include "../list-batman.h"
+#include "../packet.h"
+#include "../types.h"
 
 
 void debug_output(int8_t debug_prio, const char *format, ...) {

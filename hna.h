@@ -22,6 +22,8 @@
 #ifndef _BATMAND_HNA_H
 #define _BATMAND_HNA_H
 
+#include <stdint.h>
+#include "list-batman.h"
 #include "batman.h"
 
 
