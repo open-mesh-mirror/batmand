@@ -100,7 +100,8 @@ void debug_output(int8_t debug_prio, const char *format, ...) {
 			dprintf(debug_level_info->fd, "[%10u] ", get_time_msec());
 
 		if (((debug_level == 1) || (debug_level == 2)) && (debug_level_info->fd == 1) && (strncmp(format, "BOD", 3) == 0))
-			system("clear");
+			/* clear screen, set cursor back to 0,0 */
+			printf("\033[2J\033[0;0f");
 
 		if (((debug_level != 1) && (debug_level != 2)) || (debug_level_info->fd != 1) || (strncmp(format, "EOD", 3) != 0))
 			vdprintf(debug_level_info->fd, format, args);

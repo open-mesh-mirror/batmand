@@ -181,7 +181,8 @@ static void bat_wait( int32_t T, int32_t t ) {
 
 void print_animation( void ) {
 
-	system( "clear" );
+	/* clear screen, set cursor back to 0,0 */
+	printf("\033[2J\033[0;0f");
 	BAT_LOGO_END( 0, 50 );
 
 	sym_print( 0, 3, "." );

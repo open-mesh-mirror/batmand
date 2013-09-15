@@ -719,7 +719,8 @@ more_hna:
 				} else if ( strncmp( buff_ptr, "BOD", 3 ) == 0 ) {
 
 					if ( !batch_mode )
-						system( "clear" );
+						/* clear screen, set cursor back to 0,0 */
+						printf("\033[2J\033[0;0f");
 
 				} else {
 
