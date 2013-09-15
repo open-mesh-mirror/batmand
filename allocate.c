@@ -67,7 +67,7 @@ struct memoryUsage
 };
 
 
-static size_t getHeaderPad() {
+static size_t getHeaderPad(void) {
 	size_t alignwith, pad;
 
 	if (sizeof(TYPE_OF_WORD) > sizeof(void*))

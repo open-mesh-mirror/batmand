@@ -42,13 +42,13 @@ struct prof_container {
 
 	clock_t start_time;
 	clock_t total_time;
-	char *name;
+	const char *name;
 	uint64_t calls;
 
 };
 
 
-void prof_init(int32_t index, char *name);
+void prof_init(int32_t index, const char *name);
 void prof_start(int32_t index);
 void prof_stop(int32_t index);
 void prof_print(void);

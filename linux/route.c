@@ -73,7 +73,7 @@ static const char *rule_type_to_string_script[] = {
 
 #include <net/route.h>
 
-void add_del_route(uint32_t dest, uint8_t netmask, uint32_t router, uint32_t src_ip, int32_t ifi, char *dev, uint8_t rt_table, int8_t route_type, int8_t route_action)
+void add_del_route(uint32_t dest, uint8_t netmask, uint32_t router, uint32_t src_ip, int32_t ifi, const char *dev, uint8_t rt_table, int8_t route_type, int8_t route_action)
 {
 	struct rtentry route;
 	struct sockaddr_in *addr;
@@ -152,7 +152,7 @@ void add_del_route(uint32_t dest, uint8_t netmask, uint32_t router, uint32_t src
 	close(sock);
 }
 
-void add_del_rule(uint32_t BATMANUNUSED(network), uint8_t BATMANUNUSED(netmask), int8_t BATMANUNUSED(rt_table), uint32_t BATMANUNUSED(prio), char *BATMANUNUSED(iif), int8_t BATMANUNUSED(rule_type), int8_t BATMANUNUSED(rule_action))
+void add_del_rule(uint32_t BATMANUNUSED(network), uint8_t BATMANUNUSED(netmask), int8_t BATMANUNUSED(rt_table), uint32_t BATMANUNUSED(prio), const char *BATMANUNUSED(iif), int8_t BATMANUNUSED(rule_type), int8_t BATMANUNUSED(rule_action))
 {
 	return;
 }
@@ -169,7 +169,7 @@ int flush_routes_rules(int8_t BATMANUNUSED(is_rule))
 
 #else
 
-void add_del_route(uint32_t dest, uint8_t netmask, uint32_t router, uint32_t src_ip, int32_t ifi, char *dev, uint8_t rt_table, int8_t route_type, int8_t route_action)
+void add_del_route(uint32_t dest, uint8_t netmask, uint32_t router, uint32_t src_ip, int32_t ifi, const char *dev, uint8_t rt_table, int8_t route_type, int8_t route_action)
 {
 	int netlink_sock;
 	size_t len;
@@ -354,7 +354,7 @@ void add_del_route(uint32_t dest, uint8_t netmask, uint32_t router, uint32_t src
  *
  ***/
 
-void add_del_rule(uint32_t network, uint8_t netmask, int8_t rt_table, uint32_t prio, char *iif, int8_t rule_type, int8_t rule_action)
+void add_del_rule(uint32_t network, uint8_t netmask, int8_t rt_table, uint32_t prio, const char *iif, int8_t rule_type, int8_t rule_action)
 {
 	int netlink_sock;
 	size_t len;

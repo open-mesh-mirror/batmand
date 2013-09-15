@@ -70,7 +70,7 @@ static void set_integer_file(const char* filename, int32_t integer)
 	fclose(f);
 }
 
-void set_rp_filter(int32_t state, char* dev)
+void set_rp_filter(int32_t state, const char* dev)
 {
 	char filename[100], *colon_ptr;
 
@@ -85,7 +85,7 @@ void set_rp_filter(int32_t state, char* dev)
 		*colon_ptr = ':';
 }
 
-int32_t get_rp_filter(char *dev)
+int32_t get_rp_filter(const char *dev)
 {
 	int32_t state = 0;
 	char filename[100], *colon_ptr;
@@ -103,7 +103,7 @@ int32_t get_rp_filter(char *dev)
 	return state;
 }
 
-void set_send_redirects(int32_t state, char* dev)
+void set_send_redirects(int32_t state, const char* dev)
 {
 	char filename[100], *colon_ptr;
 
@@ -118,7 +118,7 @@ void set_send_redirects(int32_t state, char* dev)
 		*colon_ptr = ':';
 }
 
-int32_t get_send_redirects(char *dev)
+int32_t get_send_redirects(const char *dev)
 {
 	int32_t state = 0;
 	char filename[100], *colon_ptr;
@@ -146,7 +146,7 @@ int32_t get_forwarding(void)
 	return get_integer_file("/proc/sys/net/ipv4/ip_forward");
 }
 
-int8_t bind_to_iface(int32_t sock, char *dev)
+int8_t bind_to_iface(int32_t sock, const char *dev)
 {
 	char *colon_ptr;
 

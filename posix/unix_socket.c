@@ -39,7 +39,7 @@
 #include "../hna.h"
 
 
-void debug_output(int8_t debug_prio, char *format, ...) {
+void debug_output(int8_t debug_prio, const char *format, ...) {
 
 	struct list_head *debug_pos;
 	struct debug_level_info *debug_level_info;

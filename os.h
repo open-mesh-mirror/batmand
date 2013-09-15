@@ -44,8 +44,8 @@ void segmentation_fault(int32_t sig) NO_RETURN;
 void restore_and_exit(uint8_t is_sigsegv) NO_RETURN;
 
 /* route.c */
-void add_del_route( uint32_t dest, uint8_t netmask, uint32_t router, uint32_t src_ip, int32_t ifi, char *dev, uint8_t rt_table, int8_t route_type, int8_t del );
-void add_del_rule( uint32_t network, uint8_t netmask, int8_t rt_table, uint32_t prio, char *iif, int8_t dst_rule, int8_t del );
+void add_del_route( uint32_t dest, uint8_t netmask, uint32_t router, uint32_t src_ip, int32_t ifi, const char *dev, uint8_t rt_table, int8_t route_type, int8_t del );
+void add_del_rule( uint32_t network, uint8_t netmask, int8_t rt_table, uint32_t prio, const char *iif, int8_t dst_rule, int8_t del );
 int add_del_interface_rules( int8_t del );
 int flush_routes_rules( int8_t rt_table );
 
@@ -69,13 +69,13 @@ void init_interface_gw(void);
 void interface_listen_sockets(void);
 
 /* kernel.c */
-void set_rp_filter( int32_t state, char* dev );
-int32_t get_rp_filter( char *dev );
-void set_send_redirects( int32_t state, char* dev );
-int32_t get_send_redirects( char *dev );
+void set_rp_filter( int32_t state, const char* dev );
+int32_t get_rp_filter( const char *dev );
+void set_send_redirects( int32_t state, const char* dev );
+int32_t get_send_redirects( const char *dev );
 void set_forwarding( int32_t state );
 int32_t get_forwarding( void );
-int8_t bind_to_iface( int32_t sock, char *dev );
+int8_t bind_to_iface( int32_t sock, const char *dev );
 int is_wifi_interface(char *dev, int fd);
 
 /* posix.c */
@@ -96,7 +96,7 @@ void *client_to_gw_tun( void *arg );
 /* unix_sokcet.c */
 void *unix_listen( void *arg );
 void internal_output(uint32_t sock);
-void debug_output( int8_t debug_prio, char *format, ... );
+void debug_output( int8_t debug_prio, const char *format, ... );
 
 
 #endif

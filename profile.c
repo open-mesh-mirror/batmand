@@ -33,7 +33,7 @@ static struct prof_container prof_container[PROF_COUNT];
 
 
 
-void prof_init(int32_t index, char *name) {
+void prof_init(int32_t index, const char *name) {
 
 	prof_container[index].total_time = 0;
 	prof_container[index].calls = 0;

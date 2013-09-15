@@ -39,12 +39,12 @@ struct list_head_first hna_chg_list;
 static pthread_mutex_t hna_chg_list_mutex;
 static struct hashtable_t *hna_global_hash = NULL;
 
-int compare_hna(void *data1, void *data2)
+static int compare_hna(void *data1, void *data2)
 {
 	return (memcmp(data1, data2, 5) == 0 ? 1 : 0);
 }
 
-int choose_hna(void *data, int32_t size)
+static int choose_hna(void *data, int32_t size)
 {
 	unsigned char *key= data;
 	uint32_t hash = 0;

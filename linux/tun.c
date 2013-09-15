@@ -47,7 +47,7 @@
 #define IPTABLES_DEL_ACC "iptables -t nat -D POSTROUTING -s %s/%i -j ACCEPT"
 
 
-int run_cmd(char *cmd) {
+static int run_cmd(const char *cmd) {
 	int error, pipes[2], stderr = -1, ret = 0;
 	char error_log[256];
 
@@ -90,7 +90,7 @@ int probe_nat_tool(void) {
 	return run_cmd("which iptables > /dev/null");
 }
 
-void exec_iptables_rule(char *cmd, int8_t route_action) {
+static void exec_iptables_rule(const char *cmd, int8_t route_action) {
 	if (disable_client_nat)
 		return;
 

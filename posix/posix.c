@@ -125,7 +125,7 @@ uint64_t get_time_msec64(void)
 }
 
 /* batman animation */
-static void sym_print( char x, char y, char *z ) {
+static void sym_print( char x, char y, const char *z ) {
 
 	char i = 0, Z;
 
