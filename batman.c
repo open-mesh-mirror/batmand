@@ -47,7 +47,7 @@ uint8_t debug_level = 0;
 
 uint8_t debug_level_max = 5;
 
-#elif DEBUG_MALLOC && MEMORY_USAGE
+#elif defined DEBUG_MALLOC && defined MEMORY_USAGE
 
 uint8_t debug_level_max = 5;
 
