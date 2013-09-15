@@ -69,7 +69,7 @@ static const char *rule_type_to_string_script[] = {
  *
  ***/
 
-#if NO_POLICY_ROUTING
+#ifdef NO_POLICY_ROUTING
 
 #include <net/route.h>
 
