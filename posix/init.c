@@ -51,6 +51,7 @@
 #include "../types.h"
 
 int8_t stop;
+int no_detach;
 
 
 static void create_routing_pipe(void)
@@ -124,6 +125,7 @@ void apply_init_args( int argc, char *argv[] ) {
 		{"purge-timeout",     required_argument,       0, 'q'},
 		{"disable-aggregation",     no_argument,       0, 'x'},
 		{"disable-client-nat",     no_argument,       0, 'z'},
+		{"no-detach",     no_argument,       0, 'D'},
 		{0, 0, 0, 0}
 	};
 
@@ -131,7 +133,7 @@ void apply_init_args( int argc, char *argv[] ) {
 	stop = 0;
 	prog_name = argv[0];
 
-	while ( ( optchar = getopt_long( argc, argv, "a:A:bcd:hHio:g:p:r:s:vV", long_options, &option_index ) ) != -1 ) {
+	while ( ( optchar = getopt_long( argc, argv, "a:A:bcd:hHio:g:p:r:s:vVD", long_options, &option_index ) ) != -1 ) {
 
 		switch ( optchar ) {
 
@@ -343,6 +345,11 @@ void apply_init_args( int argc, char *argv[] ) {
 				found_args++;
 				break;
 
+			case 'D':
+				no_detach = 1;
+				found_args++;
+				break;
+
 			case 'h':
 			default:
 				usage();
@@ -501,12 +508,10 @@ void apply_init_args( int argc, char *argv[] ) {
 		/* daemonize */
 		if (debug_level == 0) {
 
-			if (daemon(0, 0) < 0) {
-
+			if (!no_detach && daemon(0, 0) < 0) {
 				printf("Error - can't fork to background: %s\n", strerror(errno));
 				restore_defaults();
 				exit(EXIT_FAILURE);
-
 			}
 
 			openlog("batmand", LOG_PID, LOG_DAEMON);

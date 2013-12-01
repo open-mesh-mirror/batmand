@@ -145,6 +145,7 @@ void usage(void)
 	fprintf( stderr, "       -v print version\n" );
 	fprintf( stderr, "       --policy-routing-script\n" );
 	fprintf( stderr, "       --disable-client-nat\n" );
+	fprintf( stderr, "       --no-detach\n" );
 }
 
 
