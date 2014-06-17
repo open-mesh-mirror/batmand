@@ -353,10 +353,9 @@ void update_routes(struct orig_node *orig_node, struct neigh_node *neigh_node, u
 	prof_start(PROF_update_routes);
 	debug_output(4, "update_routes() \n");
 
-	old_router = orig_node->router;
-
 	/* also handles orig_node->router == NULL and neigh_node == NULL */
 	if ((orig_node != NULL) && (orig_node->router != neigh_node)) {
+		old_router = orig_node->router;
 
 		if ( ( orig_node != NULL ) && ( neigh_node != NULL ) ) {
 			addr_to_string( orig_node->orig, orig_str, ADDR_STR_LEN );
@@ -415,7 +414,8 @@ void update_routes(struct orig_node *orig_node, struct neigh_node *neigh_node, u
 		orig_node->router = neigh_node;
 
 	} else if (orig_node != NULL) {
-		hna_global_update(orig_node, hna_recv_buff, hna_buff_len, old_router);
+		hna_global_update(orig_node, hna_recv_buff, hna_buff_len,
+				  orig_node->router);
 	}
 
 	prof_stop(PROF_update_routes);
