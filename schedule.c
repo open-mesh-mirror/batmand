@@ -359,7 +359,7 @@ void send_outstanding_packets(uint32_t curr_time)
 
 packet_free:	list_del((struct list_head *)&forw_list, forw_pos, &forw_list);
 
-		if (forw_node->own)
+		if (forw_node->own && forw_node->if_incoming)
 			schedule_own_packet(forw_node->if_incoming);
 
 		debugFree(forw_node->pack_buff, 1501);
