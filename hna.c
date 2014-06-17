@@ -322,6 +322,7 @@ static void _hna_global_add(struct orig_node *orig_node, struct hna_element *hna
 	struct hna_orig_ptr *hna_orig_ptr = NULL;
 	struct orig_node *old_orig_node = NULL;
 	struct hashtable_t *swaphash;
+	int found = 0;
 
 	hna_global_entry = ((struct hna_global_entry *)hash_find(hna_global_hash, hna_element));
 
@@ -354,14 +355,14 @@ static void _hna_global_add(struct orig_node *orig_node, struct hna_element *hna
 		return;
 
 	list_for_each_entry(hna_orig_ptr, &hna_global_entry->orig_list, list) {
-		if (hna_orig_ptr->orig_node == orig_node)
+		if (hna_orig_ptr->orig_node == orig_node) {
+			found = 1;
 			break;
-
-		hna_orig_ptr = NULL;
+		}
 	}
 
 	/* append the given orig node to the list */
-	if (!hna_orig_ptr) {
+	if (!found) {
 		hna_orig_ptr = debugMalloc(sizeof(struct hna_orig_ptr), 704);
 
 		if (!hna_orig_ptr)
