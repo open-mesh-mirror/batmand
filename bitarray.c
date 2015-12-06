@@ -173,7 +173,7 @@ int bit_packet_count( TYPE_OF_WORD *seq_bits ) {
 
 		while (word) {
 
-			word &= word-1;   /* see http://graphics.stanford.edu/~seander/bithacks.html#CountBitsSetKernighan */
+			word &= word-1;   /* see https://graphics.stanford.edu/~seander/bithacks.html#CountBitsSetKernighan */
 			hamming++;
 
 		}
@@ -190,7 +190,7 @@ uint8_t bit_count( int32_t to_count ) {
 
 	while ( to_count ) {
 
-		to_count &= to_count-1;   /* see http://graphics.stanford.edu/~seander/bithacks.html#CountBitsSetKernighan */
+		to_count &= to_count-1;   /* see https://graphics.stanford.edu/~seander/bithacks.html#CountBitsSetKernighan */
 		hamming++;
 
 	}

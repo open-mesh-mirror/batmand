@@ -39,12 +39,12 @@ Compiling
 
 You don't necessarily need to compile. May be your distribution or our
 download store offers precompiled packages. Check
-http://www.open-mesh.org/wiki/open-mesh/Download to get an overview.
+https://www.open-mesh.org/projects/open-mesh/wiki/Download to get an overview.
 
 Download and compile the latest stable sources from the download section
-http://www.open-mesh.org/wiki/open-mesh/Download by executing eg.:
+https://www.open-mesh.org/projects/open-mesh/wiki/Download by executing eg.:
 
-$ wget http://downloads.open-mesh.org/batman/stable/sources/batmand/batmand-0.3.2.tar.gz
+$ wget https://downloads.open-mesh.org/batman/stable/sources/batmand/batmand-0.3.2.tar.gz
 $ tar xzvf batmand-0.3.2.tar.gz
 $ cd batman-0.3.2
 $ make
